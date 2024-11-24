@@ -2,7 +2,12 @@
 import sqlite3
 import chromadb
 from datetime import datetime
+import json
 from typing import Dict, List, Any, Optional
+import PyPDF2
+import io
+from docx import Document
+from bs4 import BeautifulSoup
 
 
 class CanvasDatabase:
@@ -383,7 +388,212 @@ class CanvasDatabase:
             print(f"Error querying content: {e}")
             return []
 
-    # Add all your other methods from the original db.py...
+    def _prepare_content(self, item_type: str, data: Dict[str, Any]) -> str:
+        """
+        Prepare content for ChromaDB based on item type
+        Args:
+            item_type: Type of canvas item (e.g., 'course', 'assignment')
+            data: Dictionary containing item data
+        Returns:
+            Formatted string content for storage in ChromaDB
+        """
+        content_parts = []
+        
+        if item_type == 'course':
+            content_parts.extend([
+                f"Course: {data['name']}",
+                data.get('description', ''),
+                data.get('syllabus_content', '')
+            ])
+        
+        elif item_type == 'assignment':
+            content_parts.extend([
+                f"Assignment: {data['title']}",
+                data.get('description', ''),
+                f"Due Date: {data.get('due_date', '')}"
+            ])
+        
+        elif item_type == 'announcement':
+            content_parts.extend([
+                f"Announcement: {data['title']}",
+                data.get('message', '')
+            ])
+        
+        elif item_type == 'discussion':
+            content_parts.extend([
+                f"Discussion: {data['title']}",
+                data.get('message', '')
+            ])
+        
+        elif item_type == 'page':
+            content_parts.extend([
+                f"Page: {data['title']}",
+                data.get('body', '')
+            ])
+        
+        # Filter out empty strings and join with newlines
+        return '\n'.join(part for part in content_parts if part)
+
+    def _store_in_sqlite(self, item_type: str, data: Dict[str, Any]):
+        """
+        Store item in appropriate SQLite table
+        Args:
+            item_type: Type of canvas item
+            data: Dictionary containing item data
+        Raises:
+            ValueError: If item_type is unknown
+        """
+        table_name = {
+            'course': 'courses',
+            'assignment': 'assignments',
+            'announcement': 'announcements',
+            'discussion': 'discussions',
+            'page': 'pages',
+            'module': 'modules',
+            'file': 'files',
+            'submission': 'submissions',
+            'event': 'calendar_events',
+            'grade': 'grades'
+        }.get(item_type)
+
+        if not table_name:
+            raise ValueError(f"Unknown item type: {item_type}")
+
+        # Get column names for the table
+        self.cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = [row[1] for row in self.cursor.fetchall()]
+        columns.remove('created_at')  # Remove auto-generated column
+
+        # Filter data to match table columns
+        filtered_data = {k: v for k, v in data.items() if k in columns}
+        
+        # Generate SQL
+        placeholders = ','.join(['?' for _ in filtered_data])
+        columns_str = ','.join(filtered_data.keys())
+        sql = f"INSERT OR REPLACE INTO {table_name} ({columns_str}) VALUES ({placeholders})"
+        
+        # Execute
+        self.cursor.execute(sql, list(filtered_data.values()))
+
+    def _get_item_details(self, item_type: str, item_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about an item from SQLite
+        Args:
+            item_type: Type of canvas item
+            item_id: ID of the item
+        Returns:
+            Dictionary containing item details or None if not found
+        """
+        table_name = {
+            'course': 'courses',
+            'assignment': 'assignments',
+            'announcement': 'announcements',
+            'discussion': 'discussions',
+            'page': 'pages'
+        }.get(item_type)
+
+        if not table_name:
+            return None
+
+        self.cursor.execute(f"SELECT * FROM {table_name} WHERE id = ?", (item_id,))
+        result = self.cursor.fetchone()
+        
+        if result:
+            # Convert to dictionary
+            columns = [description[0] for description in self.cursor.description]
+            return dict(zip(columns, result))
+        
+        return None
+
+    def _extract_file_text(self, file_data: bytes, content_type: str) -> str:
+        """
+        Extract text content from file data
+        Args:
+            file_data: Binary file data
+            content_type: MIME type of the file (e.g., 'application/pdf', 'text/plain')
+        Returns:
+            str: Extracted text content or error message
+        """
+        try:
+            # Create file-like object from bytes
+            file_obj = io.BytesIO(file_data)
+            
+            # Handle different file types
+            if content_type == 'application/pdf':
+                try:
+                    # Handle PDF files
+                    pdf_reader = PyPDF2.PdfReader(file_obj)
+                    text_content = []
+                    for page in pdf_reader.pages:
+                        text_content.append(page.extract_text())
+                    return '\n'.join(text_content)
+                except Exception as e:
+                    print(f"Error processing PDF: {e}")
+                    return "Error: Unable to process PDF file"
+                
+            elif content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                try:
+                    # Handle Word documents
+                    doc = Document(file_obj)
+                    # Extract text from paragraphs
+                    paragraphs = [paragraph.text for paragraph in doc.paragraphs]
+                    # Extract text from tables
+                    tables = []
+                    for table in doc.tables:
+                        for row in table.rows:
+                            row_text = ' | '.join(cell.text for cell in row.cells)
+                            if row_text.strip():  # Only add non-empty rows
+                                tables.append(row_text)
+                    
+                    return '\n'.join(paragraphs + tables)
+                except Exception as e:
+                    print(f"Error processing Word document: {e}")
+                    return "Error: Unable to process Word document"
+                
+            elif content_type == 'text/plain':
+                try:
+                    # Handle plain text files
+                    return file_data.decode('utf-8', errors='ignore')
+                except Exception as e:
+                    print(f"Error processing text file: {e}")
+                    return "Error: Unable to process text file"
+                
+            elif content_type == 'text/markdown' or content_type == 'text/md':
+                try:
+                    # Handle markdown files - treat as plain text
+                    return file_data.decode('utf-8', errors='ignore')
+                except Exception as e:
+                    print(f"Error processing markdown file: {e}")
+                    return "Error: Unable to process markdown file"
+                
+            elif content_type == 'text/html':
+                try:
+                    # Handle HTML files
+                    html_text = file_data.decode('utf-8', errors='ignore')
+                    soup = BeautifulSoup(html_text, 'html.parser')
+                    # Remove script and style elements
+                    for script in soup(["script", "style"]):
+                        script.decompose()
+                    # Get text
+                    text = soup.get_text(separator='\n', strip=True)
+                    return text
+                except Exception as e:
+                    print(f"Error processing HTML file: {e}")
+                    return "Error: Unable to process HTML file"
+                
+            elif content_type.startswith('image/'):
+                # For images, store metadata only
+                size_kb = len(file_data) / 1024
+                return f"Image file ({content_type}) - Size: {size_kb:.2f}KB"
+                
+            else:
+                # For unsupported types, store basic metadata
+                size_kb = len(file_data) / 1024
+                return f"Unsupported file type: {content_type} - Size: {size_kb:.2f}KB"
+
+        except Exception as e:
+            print(f"General error extracting text: {e}")
+            return f"Error: Unable to process file ({content_type})"
 
     def close(self):
         """Close database connections"""
