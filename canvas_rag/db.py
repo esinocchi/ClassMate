@@ -8,10 +8,14 @@ from typing import Dict, List, Any, Optional
 class CanvasDatabase:
     def __init__(self):
         # Initialize SQLite
+        # sqlite_conn: holds connection object to SQLite database
+        # cursor: executes SQL commands and fetches results from the database
         self.sqlite_conn = sqlite3.connect('canvas.db')
         self.cursor = self.sqlite_conn.cursor()
         
         # Initialize ChromaDB for vector search
+        # chroma_client: performs operations for vector storage and retrieval
+        # collection: stores and manages the vector representations of the Canvas content
         self.chroma_client = chromadb.Client()
         self.collection = self.chroma_client.get_or_create_collection(
             name="canvas_content"
@@ -22,6 +26,7 @@ class CanvasDatabase:
 
     def init_tables(self):
         """Initialize comprehensive database structure for all Canvas data"""
+        # executescript() executes batches of SQL commands
         self.cursor.executescript('''
         -- Courses table
         CREATE TABLE IF NOT EXISTS courses (
@@ -260,16 +265,22 @@ class CanvasDatabase:
         CREATE INDEX IF NOT EXISTS idx_announcements_course 
         ON announcements (course_id);
     ''')
+        # saves changes to database
         self.sqlite_conn.commit()
 
     def store_canvas_item(self, item_type: str, data: Dict[str, Any]) -> bool:
+        # takes in a string of the item type and a dictionary containing the item's data
+        # returns boolean if the item was stored properly
         """Store any type of Canvas item"""
         try:
-            # Store in SQLite
+            # Stores data in SQLite database, involves executing an INSERT SQL command
             self._store_in_sqlite(item_type, data)
 
             # Prepare content for ChromaDB
+
+            # Creates vector represenatation for storage
             content = self._prepare_content(item_type, data)
+
             if content:
                 self.collection.add(
                     documents=[content],
@@ -291,11 +302,17 @@ class CanvasDatabase:
             return False
 
     def store_file(self, course_id: str, file_name: str, file_data: bytes, content_type: str) -> Optional[str]:
+        # stores files like PDFs, images, etc...
+        # takes in course_id, file_name, content_type as strings and file_data as binary bytes
+        # returns the ID of the stored file as a string or None if the operation fails
         """Store file with extracted text"""
         try:
+            # generated a unique file ID based off course ID and current timestamp
             file_id = f"file_{course_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            # processes binary data and returns extracted text, which is useful for searching and indexing
             extracted_text = self._extract_file_text(file_data, content_type)
 
+            # executes an SQL INSERT command to add the file's details in the files table of the database
             self.cursor.execute('''
                 INSERT INTO files (id, course_id, filename, content_type, file_size, file_data, extracted_text)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -309,6 +326,7 @@ class CanvasDatabase:
                 extracted_text
             ))
 
+            # if there is extracted_text, it is added to the ChromaDB collection
             if extracted_text:
                 self.collection.add(
                     documents=[extracted_text],
@@ -332,8 +350,11 @@ class CanvasDatabase:
             return None
 
     def query_content(self, query_text: str, n_results: int = 5) -> List[Dict[str, Any]]:
+        # takes in query_text as a string and n_results as an integer
+        # returns a list of dictioanaries that contains the data of the queried content
         """Query content using ChromaDB's similarity search"""
         try:
+            # performs a similarity search based on provided text query and returns matching documents along with their metadata and IDs
             results = self.collection.query(
                 query_texts=[query_text],
                 n_results=n_results
