@@ -107,23 +107,6 @@ class CanvasDatabase:
             FOREIGN KEY (course_id) REFERENCES courses (id)
         );
 
-        -- Discussion Topics table
-        CREATE TABLE IF NOT EXISTS discussions (
-            id TEXT PRIMARY KEY,
-            course_id TEXT,
-            title TEXT NOT NULL,
-            message TEXT,
-            author_id TEXT,
-            posted_date TEXT,
-            due_date TEXT,
-            lock_date TEXT,
-            pinned BOOLEAN,
-            locked BOOLEAN,
-            allow_rating BOOLEAN,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (course_id) REFERENCES courses (id)
-        );
-
         -- Discussion Posts table
         CREATE TABLE IF NOT EXISTS discussion_posts (
             id TEXT PRIMARY KEY,
@@ -218,36 +201,12 @@ class CanvasDatabase:
             FOREIGN KEY (assignment_id) REFERENCES assignments (id)
         );
 
-        -- Rubrics table
-        CREATE TABLE IF NOT EXISTS rubrics (
-            id TEXT PRIMARY KEY,
-            course_id TEXT,
-            title TEXT NOT NULL,
-            description TEXT,
-            points_possible REAL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (course_id) REFERENCES courses (id)
-        );
-
-        -- Rubric Criteria table
-        CREATE TABLE IF NOT EXISTS rubric_criteria (
-            id TEXT PRIMARY KEY,
-            rubric_id TEXT,
-            description TEXT,
-            points REAL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (rubric_id) REFERENCES rubrics (id)
-        );
-
         -- Create necessary indices for better performance
         CREATE INDEX IF NOT EXISTS idx_assignments_course 
         ON assignments (course_id);
         
         CREATE INDEX IF NOT EXISTS idx_modules_course 
         ON modules (course_id);
-        
-        CREATE INDEX IF NOT EXISTS idx_discussions_course 
-        ON discussions (course_id);
         
         CREATE INDEX IF NOT EXISTS idx_pages_course 
         ON pages (course_id);
@@ -269,7 +228,7 @@ class CanvasDatabase:
         
         CREATE INDEX IF NOT EXISTS idx_announcements_course 
         ON announcements (course_id);
-    ''')
+        ''')
         # saves changes to database
         self.sqlite_conn.commit()
 
@@ -278,14 +237,18 @@ class CanvasDatabase:
         # returns boolean if the item was stored properly
         """Store any type of Canvas item"""
         try:
+            # Check if the item already exists in the database
+            if self._item_exists(item_type, data['id']):
+                print(f"{item_type} with ID {data['id']} already exists. Skipping insertion.")
+                return False
+
             # Stores data in SQLite database, involves executing an INSERT SQL command
             self._store_in_sqlite(item_type, data)
 
             # Prepare content for ChromaDB
-
-            # Creates vector represenatation for storage
             content = self._prepare_content(item_type, data)
 
+            # If content is prepared, add it to ChromaDB
             if content:
                 self.collection.add(
                     documents=[content],
@@ -298,6 +261,7 @@ class CanvasDatabase:
                     ids=[f"{item_type}_{data['id']}"]
                 )
 
+            # Commit changes to the SQLite database
             self.sqlite_conn.commit()
             return True
 
@@ -305,6 +269,34 @@ class CanvasDatabase:
             print(f"Error storing {item_type}: {e}")
             self.sqlite_conn.rollback()
             return False
+
+    def _item_exists(self, item_type: str, item_id: str) -> bool:
+        """
+        Check if an item already exists in the database
+        Args:
+            item_type: Type of canvas item
+            item_id: ID of the item
+        Returns:
+            bool: True if the item exists, False otherwise
+        """
+        table_name = {
+            'course': 'courses',
+            'assignment': 'assignments',
+            'announcement': 'announcements',
+            'discussion': 'discussions',
+            'page': 'pages',
+            'module': 'modules',
+            'file': 'files',
+            'submission': 'submissions',
+            'event': 'calendar_events',
+            'grade': 'grades'
+        }.get(item_type)
+
+        if not table_name:
+            raise ValueError(f"Unknown item type: {item_type}")
+
+        self.cursor.execute(f"SELECT 1 FROM {table_name} WHERE id = ?", (item_id,))
+        return self.cursor.fetchone() is not None
 
     def store_file(self, course_id: str, file_name: str, file_data: bytes, content_type: str) -> Optional[str]:
         # stores files like PDFs, images, etc...
@@ -399,6 +391,7 @@ class CanvasDatabase:
         """
         content_parts = []
         
+        # Prepare content based on the type of item
         if item_type == 'course':
             content_parts.extend([
                 f"Course: {data['name']}",
@@ -443,6 +436,7 @@ class CanvasDatabase:
         Raises:
             ValueError: If item_type is unknown
         """
+        # Map item type to corresponding table name
         table_name = {
             'course': 'courses',
             'assignment': 'assignments',
@@ -467,12 +461,12 @@ class CanvasDatabase:
         # Filter data to match table columns
         filtered_data = {k: v for k, v in data.items() if k in columns}
         
-        # Generate SQL
+        # Generate SQL for inserting or replacing data
         placeholders = ','.join(['?' for _ in filtered_data])
         columns_str = ','.join(filtered_data.keys())
         sql = f"INSERT OR REPLACE INTO {table_name} ({columns_str}) VALUES ({placeholders})"
         
-        # Execute
+        # Execute the SQL command
         self.cursor.execute(sql, list(filtered_data.values()))
 
     def _get_item_details(self, item_type: str, item_id: str) -> Optional[Dict[str, Any]]:
@@ -484,6 +478,7 @@ class CanvasDatabase:
         Returns:
             Dictionary containing item details or None if not found
         """
+        # Map item type to corresponding table name
         table_name = {
             'course': 'courses',
             'assignment': 'assignments',
@@ -495,11 +490,12 @@ class CanvasDatabase:
         if not table_name:
             return None
 
+        # Query the database for the item details
         self.cursor.execute(f"SELECT * FROM {table_name} WHERE id = ?", (item_id,))
         result = self.cursor.fetchone()
         
         if result:
-            # Convert to dictionary
+            # Convert the result to a dictionary
             columns = [description[0] for description in self.cursor.description]
             return dict(zip(columns, result))
         
