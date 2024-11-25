@@ -2,7 +2,6 @@
 import sqlite3
 import chromadb
 from datetime import datetime
-import json
 from typing import Dict, List, Any, Optional
 import PyPDF2
 import io
