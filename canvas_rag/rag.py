@@ -1,10 +1,22 @@
 from typing import Dict, List, Any
-from db import CanvasDatabase
+try:
+    from .db import CanvasDatabase
+    from .config import API_KEY
+except ImportError:
+    from db import CanvasDatabase
+    from config import API_KEY
+
+import openai
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 class CanvasRAG:
-    def __init__(self):
+    def __init__(self, api_key, model, temperature, max_tokens):
         # Initialize the CanvasDatabase instance
         self.db = CanvasDatabase()
+        openai.api_key = api_key
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
     def query_llm(self, user_query: str) -> Dict[str, Any]:
         """Process user query using RAG approach"""
@@ -107,11 +119,40 @@ User Question: {user_query}
 Please provide a clear and specific answer based on the above course content. Include any relevant dates, requirements, or important details mentioned in the content.
 
 Answer:"""
-
+    
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     def _get_llm_response(self, prompt: str) -> str:
         """Get response from LLM"""
         # Implement your LLM integration here
-        return "This is a placeholder response. Implement actual LLM integration."
+        try:
+            response = openai.ChatCompletion.create(
+                model= self.model,  # You can also use "gpt-4-turbo-preview" for the latest version
+                messages=[
+                    {"role": "system", "content": """You are a knowledgeable Canvas learning assistant. 
+                    Your role is to help students by providing accurate information based on 
+                    the course content provided. Always base your responses on the given context and 
+                    acknowledge if certain information isn't available in the provided content."""},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.temperature,  # Lower temperature for more focused responses
+                max_tokens=self.max_tokens,  # Adjust based on your needs
+                presence_penalty=0.0,
+                frequency_penalty=0.0
+            )
+            
+            # Extract the response text
+            answer = response.choices[0].message.content.strip()
+            
+            return answer
+            
+        except openai.error.RateLimitError:
+            raise Exception("Rate limit exceeded. Please try again later")
+        except openai.error.AuthenticationError:
+            raise Exception("Authentication failed")
+        except openai.error.APIError as e:
+            raise Exception(f"API error occurred: {str(e)}")
+        except Exception as e:
+            raise Exception(f"An error occurred while getting LLM response: {str(e)}")
 
     def close(self):
         """Close database connection"""
@@ -119,7 +160,7 @@ Answer:"""
         self.db.close()
 
 if __name__ == "__main__":
-    rag = CanvasRAG()
+    rag = CanvasRAG(API_KEY, 'gpt-4o-2024-11-20', 0.3, 500)
     
     # Example query
     test_query = "What assignments are due this week?"
