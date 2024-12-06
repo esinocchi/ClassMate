@@ -6,7 +6,7 @@ canvas = Canvas(CANVAS_URL, CANVAS_TOKEN)
 
 def list_courses():
     user = canvas.get_current_user()
-    courses = user.get_courses()
+    courses = user.get_courses(enrollment_state='active', include=['favorites'])
     print("Your Canvas Courses:")
     for course in courses:
         try:

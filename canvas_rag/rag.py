@@ -1,11 +1,7 @@
+# rag.py
 from typing import Dict, List, Any
-try:
-    from .db import CanvasDatabase
-    from .config import API_KEY
-except ImportError:
-    from db import CanvasDatabase
-    from config import API_KEY
-
+from db import CanvasDatabase
+from config import API_KEY
 import openai
 from tenacity import retry, stop_after_attempt, wait_exponential
 
