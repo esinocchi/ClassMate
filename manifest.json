@@ -16,8 +16,8 @@
       "content_scripts": [
         {
           "matches": ["https://psu.instructure.com/*"],
-          "js": ["Script.js"],
-          "css": ["Style.css"]
+          "js": ["FrontEndScript.js"],
+          "css": ["FrontEndStyle.css"]
         }
       ],
       "web_accessible_resources": [
