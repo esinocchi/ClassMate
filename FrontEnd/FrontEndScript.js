@@ -18,11 +18,11 @@ const imageUrl2 = chrome.runtime.getURL('images/button.png');
 chat.innerHTML = `
 <span id= "titleText">What can we help you with?</span>
 <textarea id = "promptEntryBox" placeholder = "Ask me anything..."></textarea>
-<button id = "promptEntryButton"><img src="${imageUrl2}" alt="NotFound" height="35px" width="35px"></button>
+<button id = "promptEntryButton" onclick = ><img src="${imageUrl2}" alt="NotFound" height="35px" width="35px"></button>
 `;
 document.body.appendChild(chat);
 
-
+//Make initial logo clickable and assign function
 box.addEventListener('click', () => {
     if (closed == true) {
         closed = false;
@@ -33,6 +33,22 @@ box.addEventListener('click', () => {
     }
 });
 
+promptEntryButton = document.getElementById('promptEntryButton');
+titleText = document.getElementById('titleText');
+chat = document.getElementById('chat');
+promptEntryBox = document.getElementById('promptEntryBox');
+
+function getUserInput() {
+    //get user text from prompt box to later return
+    userText = promptEntryBox.value;
+
+    //wipe text from prompt box
+    promptEntryBox.value = "";
+
+    return userText;
+}
+
+//resize prompt box window to open
 function openWindow() {
     titleText.style.opacity = '1';
     titleText.style.right = '130px';
@@ -53,6 +69,7 @@ function openWindow() {
     chat.style.opacity = '1';
 }
 
+//resize prompt box window to close
 function closeWindow() {
     titleText.style.opacity = '0';
     titleText.style.right = '-140px'
