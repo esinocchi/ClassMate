@@ -35,9 +35,9 @@ box.addEventListener('click', () => {
 
 promptEntryButton = document.getElementById('promptEntryButton');
 titleText = document.getElementById('titleText');
-chat = document.getElementById('chat');
 promptEntryBox = document.getElementById('promptEntryBox');
 
+promptEntryButton.addEventListener('click', getUserInput);
 function getUserInput() {
     //get user text from prompt box to later return
     userText = promptEntryBox.value;
