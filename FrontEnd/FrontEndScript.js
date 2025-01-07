@@ -6,84 +6,116 @@ box.id = "Box";
 const imageUrl = chrome.runtime.getURL('images/CanvasAILogo.png');
 // Add content to the box
 box.innerHTML = `
-    <span></span>
     <img src="${imageUrl}" alt="NotFound" />
 `;
 // Append the box to the body
 document.body.appendChild(box);
 
+//make initial div clickable
+box.addEventListener("click", () => {
+    toggleChat()
+});
+
 const chat = document.createElement("div");
 chat.id = "ChatWindow";
 const imageUrl2 = chrome.runtime.getURL('images/button.png');
 chat.innerHTML = `
-<span id= "titleText">What can we help you with?</span>
-<textarea id = "promptEntryBox" placeholder = "Ask me anything..."></textarea>
-<button id = "promptEntryButton" onclick = ><img src="${imageUrl2}" alt="NotFound" height="35px" width="35px"></button>
+<div class = "header">
+    <span id= "titleText">What can we help you with?</span>
+</div>
+<div id="dynamicBoxesContainer"></div>
+<div class="footer">
+    <textarea id = "promptEntryBox" placeholder = "Ask me anything..."></textarea>
+    <button id = "promptEntryButton">
+        <img src="${imageUrl2}" alt="NotFound" height="35px" width="35px">
+    </button>
+</div>
 `;
+
 document.body.appendChild(chat);
 
-//Make initial logo clickable and assign function
-box.addEventListener('click', () => {
-    if (closed == true) {
-        closed = false;
-        openWindow();
-    } else {
-        closed = true
-        closeWindow();
-    }
+promptEntryButton.addEventListener("click", () => {
+    //get and remove value from promptbox
+    let prompt = promptEntryBox.value;
+    promptEntryBox.value = '';
+    promptEntryBox.select()
+
+    //add memorybox
+    const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+    addMemoryBox(prompt ,`Kasra Ghadimi got a small dick`)
 });
 
-promptEntryButton = document.getElementById('promptEntryButton');
-titleText = document.getElementById('titleText');
-promptEntryBox = document.getElementById('promptEntryBox');
+document.addEventListener("keydown", function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
 
-promptEntryButton.addEventListener('click', getUserInput);
-function getUserInput() {
-    //get user text from prompt box to later return
-    userText = promptEntryBox.value;
+        //get and remove value from promptbox
+        let prompt = promptEntryBox.value;
+        promptEntryBox.value = '';
+        promptEntryBox.select()
 
-    //wipe text from prompt box
-    promptEntryBox.value = "";
+        //add memorybox
+        const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+        addMemoryBox(prompt ,`Kasra Ghadimi got a small dick`)
+    }
+  });
 
-    return userText;
+
+function toggleChat() {
+    if (chat.classList.contains("open")) {
+        chat.classList.remove("open")
+    } else {
+        chat.classList.add("open")
+        promptEntryBox.select()
+    }
 }
 
-//resize prompt box window to open
-function openWindow() {
-    titleText.style.opacity = '1';
-    titleText.style.right = '130px';
+function addMemoryBox(prompt, response) {
+    if (prompt == '') {
+        return -1
+    }
 
-    promptEntryBox.style.opacity = '1';
-    promptEntryBox.style.width = '330px';
-    promptEntryBox.style.top = '25px';
+    const memoryBox = document.createElement("div");
+    memoryBox.classList.add("promptMemoryBox");
 
-    promptEntryButton.style.opacity = '1';
-    promptEntryButton.style.width = '35px';
-    promptEntryButton.style.height = '35px';
-    promptEntryButton.style.top = '25px';
+    // Create prompt box element
+    const promptBox = document.createElement("div");
+    promptBox.classList.add("promptBox");
+    promptBox.innerText = prompt;
 
-    chat.style.top = '5px';
-    chat.style.right = '5px';
-    chat.style.height = '120px';
-    chat.style.width = '400px';
-    chat.style.opacity = '1';
-}
+    // Create response box with typing effect
+    const responseBox = document.createElement("div");
+    responseBox.classList.add("responseBox");
 
-//resize prompt box window to close
-function closeWindow() {
-    titleText.style.opacity = '0';
-    titleText.style.right = '-140px'
+    // Append prompt and response boxes to memoryBox
+    memoryBox.appendChild(promptBox);
+    memoryBox.appendChild(responseBox);
 
-    promptEntryBox.style.opacity = '0';
-    promptEntryBox.style.width = '0px';
+    const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
 
-    promptEntryButton.style.opacity = '0';
-    promptEntryButton.style.width = '0';
-    promptEntryButton.style.height = '0';
+    // Append memoryBox to dynamicBoxesContainer
+    dynamicBoxesContainer.appendChild(memoryBox);
 
-    chat.style.top = '8px';
-    chat.style.right = '8px';
-    chat.style.height = '30px';
-    chat.style.width = '65px';
-    chat.style.opacity = '0';
-}
+    dynamicBoxesContainer.classList.add("used");
+
+    dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
+
+    // Simulate typing effect for response
+    let index = 0;
+    const typingSpeed = 2; 
+    const responseLength = response.length;
+
+    dynamicBoxesContainer.style.overflow = 'hidden';
+    dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
+
+    const interval = setInterval(() => {
+        if (index < responseLength) {
+            responseBox.textContent += response.charAt(index);
+            dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
+            index++;
+        } else {
+            clearInterval(interval); 
+            dynamicBoxesContainer.style.overflow = 'auto';
+        }
+    }, typingSpeed);
+    }
