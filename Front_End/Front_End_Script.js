@@ -1,5 +1,6 @@
 // Create a container div for the box
 let closed = true;
+let promptData = [];
 
 const box = document.createElement("div");
 box.id = "Box";
@@ -16,6 +17,7 @@ box.addEventListener("click", () => {
     toggleChat()
 });
 
+//Create interactable Chatbox
 const chat = document.createElement("div");
 chat.id = "ChatWindow";
 const imageUrl2 = chrome.runtime.getURL('images/button.png');
@@ -34,32 +36,35 @@ chat.innerHTML = `
 
 document.body.appendChild(chat);
 
+//Give button functionality
 promptEntryButton.addEventListener("click", () => {
-    //get and remove value from promptbox
-    let prompt = promptEntryBox.value;
-    promptEntryBox.value = '';
-    promptEntryBox.select()
-
-    //add memorybox
-    const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-    addMemoryBox(prompt ,`Kasra Ghadimi got a small dick`)
+    handlePrompt();
 });
 
 document.addEventListener("keydown", function(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
-
-        //get and remove value from promptbox
-        let prompt = promptEntryBox.value;
-        promptEntryBox.value = '';
-        promptEntryBox.select()
-
-        //add memorybox
-        const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-        addMemoryBox(prompt ,`Kasra Ghadimi got a small dick`)
+        handlePrompt();
     }
   });
 
+function handlePrompt() {
+        //get and remove value from promptbox
+        let prompt = promptEntryBox.value;
+        let response = '';
+        promptEntryBox.value = '';
+        promptEntryBox.select();
+
+        promptData.push(prompt);
+
+        //remove lone prompt from list and replace with response pair
+        promptData.pop();
+        promptData.push([prompt, "sample response"]);
+
+        //create new box to hold response
+        const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+        addMemoryBox(prompt ,"sample response");
+}
 
 function toggleChat() {
     if (chat.classList.contains("open")) {
