@@ -75,6 +75,10 @@ function toggleChat() {
     }
 }
 
+function sendToBackend(prompt) {
+
+}
+
 function addMemoryBox(prompt, response) {
     if (prompt == '') {
         return -1
