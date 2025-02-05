@@ -7,10 +7,11 @@ import pytesseract
 from prompt_to_file_GPT import prompt_to_pdf
 from dotenv import load_dotenv
 
-API_URL = "https://psu.instructure.com/api/v1" #Base URL 
-API_TOKEN = "1050~DaetBfWunCWahT2J629xQXK9yFRNXVCTR3fhzNfRhe6MHUcDaeQree6ZCakQNG9n"
+load_dotenv("Penn State/projects/CanvasAI/CanvasAI/backend/canvas_API_keys.env")
 
-load_dotenv("openaiAPIkey.env")
+API_URL = "https://psu.instructure.com/api/v1" #Base URL 
+API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+BASE_DIR = "Penn State/Projects/CanvasAI/"
 
 def extract_text_and_images(pdf_file_URL: str):
     total_text = ""
@@ -80,7 +81,7 @@ def lecture_file_to_notes_pdf(course: str, lecture_file: str):
 
     try:
         response = requests.get(file_url, headers={"Authorization": f"Bearer {API_TOKEN}"}, stream=True)
-        with open("Penn State/Projects/CanvasAI/lecture_file.pdf", "wb") as file:
+        with open(f"{BASE_DIR}CanvasAI/media_output/lecture_file.pdf", "wb") as file:
             for data in response.iter_content(chunk_size=4096):
                 file.write(data)
     except:
@@ -89,7 +90,8 @@ def lecture_file_to_notes_pdf(course: str, lecture_file: str):
     #if not working return Error
 
     try:
-        file_text = extract_text_and_images("Penn State/Projects/CanvasAI/lecture_file.pdf")
+        file_text = extract_text_and_images(f"{BASE_DIR}CanvasAI/media_output/lecture_file.pdf")
+        os.remove(f"{BASE_DIR}CanvasAI/media_output/lecture_file.pdf")
     except:
         return "File text could not be extracted"
     print(file_text)
@@ -115,8 +117,8 @@ def find_course(input_course: str):
     course_list = requests.get(   
         f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": "all_courses", "access_token": {API_TOKEN}}
     ).json() 
-    print(course_list)
     #.json() creates a list object with dictionaries containing course info
+
     potential_courses = {}
     for i in range(len(course_list)):
         course_name = course_list[i].get("name")
@@ -180,7 +182,5 @@ def find_file_from_course(course_id: str, potential_file_name: str):
         return potential_files
     except:
         return "ERROR: cannot access files from course"
-
-#print(lecture_file_to_notes_pdf("cmpen270", "4: boolean"))
 
 print(lecture_file_to_notes_pdf("cmpen 270", "lecture set 4"))
