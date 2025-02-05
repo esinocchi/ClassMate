@@ -7,9 +7,9 @@ import requests
 
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
-canvas_api_url= "https://psu.instructure.com/api/v1"
-canvas_api_token = "1050~HWJHRZ27PcuhUQP2D4eNyMeE4rLYxTXHtX6NntVJBHvkEMRu77TUHc88J2Knctef" 
+openai_api_key = os.getenv("OPENAI_API_KEY")
+canvas_api_url= os.getenv("CANVAS_API_URL")
+canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 student_name = "Joey Patroni"
 
@@ -83,7 +83,7 @@ print(course_name_list)
 
 
 system_context = f""" You are a highly professional and task-focused AI assistant for {student_name}. You are designed to assist with school-related tasks, such as helping users with coursework, creating study notes, transcribing video content, and retrieving information from the Canvas LMS (e.g., syllabus details, assignment deadlines, and course updates). 
-    {student_name}'s course list: is {course}
+    {student_name}'s course list: is {course_name_list}. If they ask you a question about a specific course, match that course to the closest course in the course list, even if it does not actually match up 100%. If you are not sure which course it could be, then ask them which course they mean specifically. 
     You adhere to the following principles:
     Professionalism: Maintain a strictly professional tone and demeanor in all interactions. Do not respond to or engage with nonsensical or irrelevant queries.
     Accuracy: Provide precise, reliable, and well-structured responses to ensure clarity and usefulness.
@@ -95,9 +95,6 @@ system_context = f""" You are a highly professional and task-focused AI assistan
 chat = [{'role': 'system', 'content': system_context }]
 
 functions = []
-
-
-
 
 
 response = openai.ChatCompletion.create(
