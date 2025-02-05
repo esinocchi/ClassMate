@@ -7,11 +7,12 @@ import pytesseract
 from prompt_to_file_GPT import prompt_to_pdf
 from dotenv import load_dotenv
 
-load_dotenv("Penn State/projects/CanvasAI/CanvasAI/backend/canvas_API_keys.env")
+BASE_DIR = "Penn State/Projects/CanvasAI/"
+
+load_dotenv(f"{BASE_DIR}CanvasAI/.env")
 
 API_URL = "https://psu.instructure.com/api/v1" #Base URL 
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
-BASE_DIR = "Penn State/Projects/CanvasAI/"
 
 def extract_text_and_images(pdf_file_URL: str):
     total_text = ""
