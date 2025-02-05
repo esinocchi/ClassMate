@@ -7,20 +7,21 @@ import PyPDF2
 import io
 from docx import Document
 from bs4 import BeautifulSoup
+from pptx import Presentation
 
 
 class CanvasDatabase:
-    def __init__(self):
+    def __init__(self, user_id: str):
         # Initialize SQLite
         # sqlite_conn: holds connection object to SQLite database
         # cursor: executes SQL commands and fetches results from the database
-        self.sqlite_conn = sqlite3.connect('canvas.db')
+        self.sqlite_conn = sqlite3.connect(f'canvas_{user_id}.db')
         self.cursor = self.sqlite_conn.cursor()
         
         # Initialize ChromaDB for vector search
         # chroma_client: performs operations for vector storage and retrieval
         # collection: stores and manages the vector representations of the Canvas content
-        self.chroma_client = chromadb.Client()
+        self.chroma_client = chromadb.PersistentClient(path=f"chroma_{user_id}")
         self.collection = self.chroma_client.get_or_create_collection(
             name="canvas_content"
         )
@@ -104,6 +105,16 @@ class CanvasDatabase:
             published BOOLEAN,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (course_id) REFERENCES courses (id)
+        );
+                                  
+        CREATE TABLE IF NOT EXISTS discussions (
+            id TEXT PRIMARY KEY,
+            course_id TEXT,
+            title TEXT NOT NULL,
+            message TEXT,
+            posted_date TEXT,
+            create_at TIMESTAMP DEFUALT CURRENT_TIMESTAMP,
+            FOREIGN KEY (course_id) REFERENCES courses (id)                      
         );
 
         -- Discussion Posts table
@@ -518,13 +529,9 @@ class CanvasDatabase:
                 try:
                     # Handle PDF files
                     pdf_reader = PyPDF2.PdfReader(file_obj)
-                    text_content = []
-                    for page in pdf_reader.pages:
-                        text_content.append(page.extract_text())
-                    return '\n'.join(text_content)
+                    return '\n'.join(page.extract_text() for page in pdf_reader.pages)
                 except Exception as e:
-                    print(f"Error processing PDF: {e}")
-                    return "Error: Unable to process PDF file"
+                    return f"PDF Error: {str(e)}"
                 
             elif content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                 try:
@@ -544,6 +551,18 @@ class CanvasDatabase:
                 except Exception as e:
                     print(f"Error processing Word document: {e}")
                     return "Error: Unable to process Word document"
+                
+            elif content_type == 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+                try:
+                    prs = Presentation(file_obj)
+                    text = []
+                    for slide in prs.slides:
+                        for shape in slide.shapes:
+                            if hasattr(shape, "text") and shape.text.strip():
+                                text.append(shape.text.strip())
+                    return '\n'.join(text)
+                except Exception as e:
+                    return f"PPTX Error: {str(e)}"
                 
             elif content_type == 'text/plain':
                 try:
