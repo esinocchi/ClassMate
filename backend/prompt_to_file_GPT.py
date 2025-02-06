@@ -8,16 +8,16 @@ import os
 
 
 BASE_DIR = "Penn State/Projects/CanvasAI/"
+#Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 load_dotenv(f"{BASE_DIR}CanvasAI/.env")
 
 def prompt_to_pdf(prompt: str):
     openai.api_key = os.getenv("OPENAI_API_KEY")
 
-    #this will depend on the directory structure of CanvasAI
     latex_file_path = f"{BASE_DIR}CanvasAI/media_output/latexoutput.tex"
+     #this will depend on the directory structure of CanvasAI
 
-    #Chatting method with model
     response = openai.ChatCompletion.create(
         model="ft:gpt-4o-mini-2024-07-18:personal:input-to-latex:AjGUuIsy",
         messages=[
@@ -25,16 +25,16 @@ def prompt_to_pdf(prompt: str):
             {"role": "user", "content": prompt}
         ],
     )
+    #this will depend on the directory structure of CanvasAI
 
-    #latex_content is being set to the response of model
+
     latex_content = response["choices"][0]["message"]["content"]
-    
-    #creating a LaTeX file with the model response
+    #latex_content is being set to the response of model
+      
     with open(latex_file_path, "w", encoding="utf-8") as f:
         f.write(latex_content)
+    #creating a LaTeX file with the model response
 
-    #if the LaTeX file to pdf conversion doesn't work, return an Error
-    #the pdf will be shown in the working directory
     try:
         pdfl = PDFLaTeX.from_texfile(latex_file_path)
         pdfl.create_pdf(keep_pdf_file=True, keep_log_file=False)
@@ -43,9 +43,11 @@ def prompt_to_pdf(prompt: str):
             shutil.move("latexoutput.pdf", f"{BASE_DIR}CanvasAI/media_output/latexoutput.pdf")
     except:
         return "ERROR: pdf couldn't be created"
+    #if the LaTeX file to pdf conversion doesn't work, return an Error
+    #the pdf will be shown in the working directory
     
-    #delete the LaTeX, file
     os.remove(latex_file_path)
+    #delete the LaTeX, file
 
     return "PDF TO LATEX SUCESSFUL"
 

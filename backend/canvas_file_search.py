@@ -8,6 +8,7 @@ from prompt_to_file_GPT import prompt_to_pdf
 from dotenv import load_dotenv
 
 BASE_DIR = "Penn State/Projects/CanvasAI/"
+#Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 load_dotenv(f"{BASE_DIR}CanvasAI/.env")
 
@@ -183,5 +184,7 @@ def find_file_from_course(course_id: str, potential_file_name: str):
         return potential_files
     except:
         return "ERROR: cannot access files from course"
+    #try to access files section in a course. If working, list files that are close to input
+    #if files cannot be accessed, return Error
 
 print(lecture_file_to_notes_pdf("cmpen 270", "lecture set 4"))
