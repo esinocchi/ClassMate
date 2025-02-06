@@ -3,7 +3,7 @@ import os
 
 
 BASE_DIR = "Penn State/Projects/CanvasAI/"
-#Change BASE_DIR on your own
+#Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 class Popup:
     def __init__(self):
