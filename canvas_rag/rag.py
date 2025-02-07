@@ -1,173 +1,93 @@
-# rag.py
-from typing import Dict, List, Any
-from db import CanvasDatabase
-from config import API_KEY
+from typing import List, Dict, Any
 import openai
-from tenacity import retry, stop_after_attempt, wait_exponential
+import backoff
+from db import VectorDBHandler, S3Manager
 
 class CanvasRAG:
-    def __init__(self, api_key, model, temperature, max_tokens):
-        # Initialize the CanvasDatabase instance
-        self.db = CanvasDatabase()
-        openai.api_key = api_key
-        self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
+    def __init__(self, vector_db: VectorDBHandler, s3_manager: S3Manager):
+        self.vector_db = vector_db
+        self.s3_manager = s3_manager
+        self.llm_model = "gpt-4-turbo-preview"
+        self.embedding_model = "text-embedding-3-small"
+        self.max_context_length = 4000  # tokens
 
-    def query_llm(self, user_query: str) -> Dict[str, Any]:
-        """Process user query using RAG approach"""
-        try:
-            # Get relevant content from the database based on the user query
-            context = self.db.query_content(user_query)
-            
-            # Format the retrieved context for LLM consumption
-            formatted_context = self._format_context_for_llm(context)
-            
-            # Create a prompt for the LLM using the user query and formatted context
-            prompt = self._create_llm_prompt(user_query, formatted_context)
-            
-            # Get the response from the LLM based on the prompt
-            response = self._get_llm_response(prompt)
-            
-            # Return the LLM's answer along with the sources used
-            return {
-                'answer': response,
-                'sources': context
-            }
-
-        except Exception as e:
-            # Handle any errors that occur during the query process
-            print(f"Error in RAG query: {e}")
-            return {
-                'answer': "I encountered an error processing your query.",
-                'sources': []
-            }
-
-    def _format_context_for_llm(self, context: List[Dict[str, Any]]) -> str:
-        """Format context for LLM consumption"""
-        formatted_parts = []
+    def process_upload(self, user_id: str, course_id: str, file_data: bytes, filename: str):
+        # Store in S3
+        s3_uri = self.s3_manager.upload_file(user_id, course_id, file_data, filename)
         
-        # Iterate through each item in the context to format it
-        for item in context:
-            content_type = item['metadata']['type']
-            
-            # Format assignment information
-            if content_type == 'assignment':
-                formatted_parts.append(
-                    f"Assignment Information:\n"
-                    f"Title: {item['details'].get('title', 'Untitled')}\n"
-                    f"Due Date: {item['details'].get('due_date', 'Not specified')}\n"
-                    f"Description: {item['details'].get('description', 'No description')}\n"
-                    f"Points: {item['details'].get('points_possible', 'Not specified')}"
-                )
-            
-            # Format file content
-            elif content_type == 'file':
-                formatted_parts.append(
-                    f"Content from {item['metadata'].get('filename', 'File')}:\n"
-                    f"{item['content']}"
-                )
-            
-            # Format course information
-            elif content_type == 'course':
-                formatted_parts.append(
-                    f"Course Information:\n"
-                    f"{item['content']}"
-                )
-            
-            # Format announcement details
-            elif content_type == 'announcement':
-                formatted_parts.append(
-                    f"Announcement:\n"
-                    f"Title: {item['details'].get('title', 'Untitled')}\n"
-                    f"Message: {item['details'].get('message', 'No message')}"
-                )
-            
-            # Format page content
-            elif content_type == 'page':
-                formatted_parts.append(
-                    f"Page Content:\n"
-                    f"Title: {item['details'].get('title', 'Untitled')}\n"
-                    f"Content: {item['details'].get('body', 'No content')}"
-                )
-            
-            # Format module information
-            elif content_type == 'module':
-                formatted_parts.append(
-                    f"Module Information:\n"
-                    f"Name: {item['details'].get('name', 'Untitled')}\n"
-                    f"Position: {item['details'].get('position', 'Not specified')}"
-                )
+        # Extract text
+        text = self._extract_text(file_data, filename)
         
-        # Join all formatted parts into a single string
-        return "\n\n".join(formatted_parts)
+        # Store in vector DB
+        doc_id = f"{user_id}_{course_id}_{filename}"
+        metadata = {
+            "user_id": user_id,
+            "course_id": course_id,
+            "s3_uri": s3_uri,
+            "filename": filename
+        }
+        self.vector_db.insert_document(doc_id, text, metadata)
+        return doc_id
 
-    def _create_llm_prompt(self, user_query: str, context: str) -> str:
-        """Create prompt for LLM"""
-        # Construct the prompt for the LLM using the user query and context
-        return f"""As a Canvas learning assistant, please help answer the following question based on the course content provided.
+    def query(self, user_id: str, question: str, k: int = 5) -> str:
+        # Vector search
+        results = self.vector_db.search(question, k=k)
+        
+        # Build context
+        context = self._build_context(results)
+        
+        # Generate answer
+        return self._generate_answer(question, context)
 
-Relevant Course Content:
-{context}
+    @backoff.on_exception(backoff.expo, openai.APIError, max_tries=3)
+    def _generate_answer(self, question: str, context: str) -> str:
+        messages = [
+            {
+                "role": "system",
+                "content": f"""Answer questions about course materials using only the provided context.
+                Context: {context}"""
+            },
+            {"role": "user", "content": question}
+        ]
+        
+        response = openai.ChatCompletion.create(
+            model=self.llm_model,
+            messages=messages,
+            temperature=0.3,
+            max_tokens=500
+        )
+        return response.choices[0].message.content
 
-User Question: {user_query}
+    def _extract_text(self, file_data: bytes, filename: str) -> str:
+        if filename.endswith('.pdf'):
+            from pypdf import PdfReader
+            pdf = PdfReader(io.BytesIO(file_data))
+            return "\n".join([page.extract_text() for page in pdf.pages])
+        
+        elif filename.endswith('.docx'):
+            from docx import Document
+            doc = Document(io.BytesIO(file_data))
+            return "\n".join([para.text for para in doc.paragraphs])
+        
+        raise ValueError("Unsupported file format")
 
-Please provide a clear and specific answer based on the above course content. Include any relevant dates, requirements, or important details mentioned in the content.
+    def _build_context(self, results: List[Dict]) -> str:
+        context = []
+        current_length = 0
+        
+        for doc in results:
+            doc_text = f"From {doc['metadata']['filename']}:\n{doc['text']}"
+            if current_length + len(doc_text) > self.max_context_length:
+                break
+            context.append(doc_text)
+            current_length += len(doc_text)
+        
+        return "\n\n".join(context)
 
-Answer:"""
-    
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    def _get_llm_response(self, prompt: str) -> str:
-        """Get response from LLM"""
-        # Implement your LLM integration here
-        try:
-            response = openai.ChatCompletion.create(
-                model= self.model,  # You can also use "gpt-4-turbo-preview" for the latest version
-                messages=[
-                    {"role": "system", "content": """You are a knowledgeable Canvas learning assistant. 
-                    Your role is to help students by providing accurate information based on 
-                    the course content provided. Always base your responses on the given context and 
-                    acknowledge if certain information isn't available in the provided content."""},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=self.temperature,  # Lower temperature for more focused responses
-                max_tokens=self.max_tokens,  # Adjust based on your needs
-                presence_penalty=0.0,
-                frequency_penalty=0.0
-            )
-            
-            # Extract the response text
-            answer = response.choices[0].message.content.strip()
-            
-            return answer
-            
-        except openai.error.RateLimitError:
-            raise Exception("Rate limit exceeded. Please try again later")
-        except openai.error.AuthenticationError:
-            raise Exception("Authentication failed")
-        except openai.error.APIError as e:
-            raise Exception(f"API error occurred: {str(e)}")
-        except Exception as e:
-            raise Exception(f"An error occurred while getting LLM response: {str(e)}")
-
-    def close(self):
-        """Close database connection"""
-        # Close the connection to the database
-        self.db.close()
-
-if __name__ == "__main__":
-    rag = CanvasRAG(API_KEY, 'gpt-4o-2024-11-20', 0.3, 500)
-    
-    # Example query
-    test_query = "What assignments are due this week?"
-    result = rag.query_llm(test_query)
-    
-    # Print the query and the answer received from the LLM
-    print(f"\nQuery: {test_query}")
-    print(f"Answer: {result['answer']}")
-    print("\nSources used:")
-    for source in result['sources']:
-        print(f"- {source['metadata']['type']}: {source['content'][:100]}...")
-    
-    # Close the database connection
-    rag.close()
+    # Enable batch embedding for cost savings
+    def batch_embed_documents(self, texts: List[str]) -> List[List[float]]:
+        response = openai.Embedding.create(
+            input=texts,
+            model=self.embedding_model
+        )
+        return [item["embedding"] for item in response["data"]]
