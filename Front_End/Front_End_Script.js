@@ -1,6 +1,5 @@
 // Create a container div for the box
 let closed = true;
-let promptData = [];
 
 const box = document.createElement("div");
 box.id = "Box";
@@ -46,24 +45,44 @@ document.addEventListener("keydown", function(event) {
         event.preventDefault();
         handlePrompt();
     }
-  });
+});
 
-function handlePrompt() {
-        //get and remove value from promptbox
-        let prompt = promptEntryBox.value;
-        let response = '';
-        promptEntryBox.value = '';
-        promptEntryBox.select();
+window.addEventListener("load", () => {
+    console.log('page reloading')
+    rebuildPage();
+});
 
-        promptData.push(prompt);
+  function handlePrompt() {
+    // Get and remove value from the prompt entry box
+    let prompt = promptEntryBox.value;
+    let response = ''; // Default response can be set here, e.g. "sample response"
+    promptEntryBox.value = ''; // Clear the prompt entry box
+    promptEntryBox.select(); // Select the input box to prepare for the next prompt
 
-        //remove lone prompt from list and replace with response pair
-        promptData.pop();
-        promptData.push([prompt, "sample response"]);
+    if (!prompt) {
+        return;
+    }
 
-        //create new box to hold response
+    chrome.storage.local.get(["previousChats"], function(result) {
+        // Default to an empty array if "previousChats" doesn't exist
+        let promptPairs = result.previousChats || [];
+
+        // If the list is longer than 20, pop the last one and add the new prompt-response pair
+        if (promptPairs.length > 19) {
+            promptPairs.pop(); // Remove the last element
+        }
+        
+        promptPairs.unshift([prompt, "sample response"]); // Add new prompt-response pair to the front
+
+        // Save updated list back to local storage
+        chrome.storage.local.set({ previousChats: promptPairs }, function() {
+            console.log("Updated list:", promptPairs); // Log the updated list (not 'tuples')
+        });
+
+        // Create a new box to hold the prompt and response
         const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-        addMemoryBox(prompt ,"sample response");
+        addMemoryBox(prompt, "sample response"); // Call the function to add the new box to the UI
+    });
 }
 
 function toggleChat() {
@@ -127,4 +146,15 @@ function addMemoryBox(prompt, response) {
             dynamicBoxesContainer.style.overflow = 'auto';
         }
     }, typingSpeed);
+    }
+
+    function rebuildPage() {
+        chrome.storage.local.get(["previousChats"], function(result) {
+            let promptPairs = result.previousChats || [];
+
+            for (let i = promptPairs.length - 1; i >= 0; i--) {
+                const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+                addMemoryBox(promptPairs[i][0], promptPairs[i][1]);
+            };
+        });
     }
