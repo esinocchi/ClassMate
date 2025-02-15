@@ -19,15 +19,17 @@ box.addEventListener("click", () => {
 //Create interactable Chatbox
 const chat = document.createElement("div");
 chat.id = "ChatWindow";
-const imageUrl2 = chrome.runtime.getURL('images/button.png');
+const imageUrl2 = chrome.runtime.getURL('images/UpArrow.png');
+const imageUrl3 = chrome.runtime.getURL('images/settings.png');
 chat.innerHTML = `
-<div class = "header">
-    <span id= "titleText">What can we help you with?</span>
+<div class="header">
+    <img src="${imageUrl3}" alt="NotFound" id="settingsIcon" height="20px" width="20px">
+    <span id="titleText">What can we help you with?</span>
 </div>
 <div id="dynamicBoxesContainer"></div>
 <div class="footer">
-    <textarea id = "promptEntryBox" placeholder = "Ask me anything..."></textarea>
-    <button id = "promptEntryButton">
+    <textarea id="promptEntryBox" placeholder = "Ask me anything..."></textarea>
+    <button id="promptEntryButton">
         <img src="${imageUrl2}" alt="NotFound" height="35px" width="35px">
     </button>
 </div>
@@ -35,7 +37,40 @@ chat.innerHTML = `
 
 document.body.appendChild(chat);
 
-//Give button functionality
+//Create interactable Settingsbox
+const settings = document.createElement("div");
+settings.id = "SettingsWindow";
+const imageUrl4 = chrome.runtime.getURL('images/BackArrow.png');
+settings.innerHTML = `
+<div class="header">
+    <img src="${imageUrl4}" alt="NotFound" id="homeArrow" height="20px" width="20px">
+    <span id="settingsTitleText">Settings</span>
+</div>
+<div id="settingsContainer">
+    <div class="settingsChild">
+        <span id="clearPromptLabel" class="settingsChildLabel">Clear Prompt History:</span>
+        <button id="clearPromptButton" class="settingsChildButton">Clear History</button>
+    </div>
+</div>
+`
+
+document.body.appendChild(settings)
+
+//Give settings button functionality
+settingsIcon.addEventListener("click", () => {
+    openSettings();
+});
+
+clearPromptButton.addEventListener("click", () => {
+    clearMemory();
+});
+
+homeArrow.addEventListener("click", () => {
+    settings.classList.remove("open");
+    toggleChat();
+});
+
+//Give prompt button functionality
 promptEntryButton.addEventListener("click", () => {
     handlePrompt();
 });
@@ -52,7 +87,7 @@ window.addEventListener("load", () => {
     rebuildPage();
 });
 
-  function handlePrompt() {
+function handlePrompt() {
     // Get and remove value from the prompt entry box
     let prompt = promptEntryBox.value;
     let response = ''; // Default response can be set here, e.g. "sample response"
@@ -85,17 +120,32 @@ window.addEventListener("load", () => {
     });
 }
 
+function openSettings() {
+    console.log("Settings Window Open")
+    if(chat.classList.contains("open")) {
+        chat.classList.remove("open")
+    }
+    settings.classList.add("open")
+}
+
+function closeSettings() {
+    if(settings.classList.contains("open")) {
+        settings.classList.remove("open")
+    }
+    chat.classList.add("open")
+}
+
 function toggleChat() {
-    if (chat.classList.contains("open")) {
+    //ensure that settings closes upon interaction
+    if (settings.classList.contains("open")) {
+        settings.classList.remove("open")
+    //close chat if open and open chat if closed
+    } else if (chat.classList.contains("open")) {
         chat.classList.remove("open")
     } else {
         chat.classList.add("open")
         promptEntryBox.select()
     }
-}
-
-function sendToBackend(prompt) {
-
 }
 
 function addMemoryBox(prompt, response) {
@@ -148,13 +198,24 @@ function addMemoryBox(prompt, response) {
     }, typingSpeed);
     }
 
-    function rebuildPage() {
-        chrome.storage.local.get(["previousChats"], function(result) {
-            let promptPairs = result.previousChats || [];
+function rebuildPage() {
+    chrome.storage.local.get(["previousChats"], function(result) {
+        let promptPairs = result.previousChats || [];
+        for (let i = promptPairs.length - 1; i >= 0; i--) {
+            addMemoryBox(promptPairs[i][0], promptPairs[i][1]);
+        };
+    });
+}
 
-            for (let i = promptPairs.length - 1; i >= 0; i--) {
-                const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-                addMemoryBox(promptPairs[i][0], promptPairs[i][1]);
-            };
-        });
-    }
+function clearMemory() {
+    let promptPairs = []
+    chrome.storage.local.set({ previousChats: promptPairs }, function() {
+        console.log("list Cleared", promptPairs); // Log the updated list (not 'tuples')
+    });
+
+    let parent = document.getElementById("dynamicBoxesContainer"); 
+    // Loop through children in reverse order (to avoid issues while removing)
+    [...parent.children].forEach(child => {
+        child.remove();
+    });
+}

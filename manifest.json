@@ -22,7 +22,7 @@
       ],
     "web_accessible_resources": [
         {
-        "resources": ["images/CanvasAILogo.png", "images/button.png"],
+        "resources": ["images/CanvasAILogo.png", "images/UpArrow.png", "images/BackArrow.png", "images/settings.png"],
         "matches": ["https://psu.instructure.com/*"]
         }
     ],
