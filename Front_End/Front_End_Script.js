@@ -219,3 +219,8 @@ function clearMemory() {
         child.remove();
     });
 }
+
+function getURL() {
+    let currentUrl = window.location.href;
+    return currentUrl;    
+}
