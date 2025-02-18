@@ -51,6 +51,13 @@ settings.innerHTML = `
         <span id="clearPromptLabel" class="settingsChildLabel">Clear Prompt History:</span>
         <button id="clearPromptButton" class="settingsChildButton">Clear History</button>
     </div>
+    <div id="classesBox">
+        <div class="header">
+            <span id="classesTitleText">Your Active Classes</span>
+        </div>
+        <div id="classesHolder">
+        </div>
+    </div>
 </div>
 `
 
@@ -148,6 +155,32 @@ function toggleChat() {
     }
 }
 
+function addClassSetting(classID) {
+    const ClassBox = document.createElement("div");
+    ClassBox.classList.add("settingsChild");
+
+    const classLabel = document.createElement("span");
+    classLabel.classList.add("settingsChildLabel");
+    classLabel.innerText = classID + ":";
+
+    const activeToggle = document.createElement("div");
+    let currID = "activeToggle-" + classID;
+    activeToggle.classList.add("checkbox-wrapper-49")
+    activeToggle.innerHTML = `
+    <div class="block">
+        <input data-index="0" id="${currID}" type="checkbox" />
+        <label for="${currID}"></label>
+    </div>
+`
+    activeToggle.classList.add("settingsToggle")
+
+    ClassBox.appendChild(classLabel);
+    ClassBox.appendChild(activeToggle);
+
+    const classesHolder = document.getElementById("classesHolder");
+    classesHolder.appendChild(ClassBox);
+}
+
 function addMemoryBox(prompt, response) {
     if (prompt == '') {
         return -1
@@ -205,6 +238,10 @@ function rebuildPage() {
             addMemoryBox(promptPairs[i][0], promptPairs[i][1]);
         };
     });
+
+    addClassSetting("Sample Class 0");
+    addClassSetting("Sample Class 1");
+    addClassSetting("Sample Class 2");
 }
 
 function clearMemory() {
