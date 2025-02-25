@@ -38,8 +38,9 @@ class Popup:
             self.open_button_pressed = file_content.get("open_button_pressed")
             self.courses_avoided = file_content.get("courses_avoided")
             self.user_name = file_content.get("user_name")
+            return "Data deserialized succesfully"
         except:
-            return "ERROR: data cannot be accessed "
+            return "ERROR: data cannot be accessed"
 
 
 
