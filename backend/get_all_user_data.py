@@ -12,8 +12,11 @@ load_dotenv(f"{BASE_DIR}CanvasAI/.env")
 
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
 
-def list_of_syllabi_files_to_string():
-   return 
+def test():
+   users = requests.get(f"{API_URL}/user", headers = {"Authorization": f"Bearer {API_TOKEN}"}).json() 
+   for user in users:
+      print(user.get("id"))
+
 def get_all_user_data():  
    """
    no input --> returns a "user_data" dictionary in this format: {"course_name": {"course_ID": course_ID#, "course_files": { "file_name" : file_URL}}, "course_syllabus": complete_syllabus_string}
@@ -112,15 +115,21 @@ def get_all_user_data():
          else:
             break
          page_number += 1
+
+   json_string = json.dumps(user_data)
+   #converts dictionary object into a JSON string  
    
-   for course in user_data:
-      if type(user_data[course]["course_syllabus"]) is list:
-         print(user_data[course]["course_syllabus"])
+   user_data_path = f"{BASE_DIR}CanvasAI/UserData/'f{API_URL}'/1234/user_data.json"  
+   os.makedirs(os.path.dirname(user_data_path), exist_ok=True)
+   #"creates" a directory per user in the UserData directory: School URL then User ID
 
-   return json.dumps(user_data)  
-         
+   with open(user_data_path, "w", encoding="utf-8") as f:
+      f.write(json_string)
+   #succesfully updates the user_data
+   
+   return "succesful"
 
-get_all_user_data()
+print(test())
 
 
    
