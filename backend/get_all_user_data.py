@@ -7,11 +7,11 @@ BASE_DIR = "Desktop/Projects/"
 #Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 API_URL = "https://psu.instructure.com/api/v1" #Base URL 
-
 load_dotenv()
-
 API_TOKEN = os.getenv("CANVAS_TOKEN")
 print(API_TOKEN)
+
+selected_courses = ['2379517', '2361957', '2361815', '2364485', '2361972'] # hardcoded selected courses
 
 def test():
    users = requests.get(f"{API_URL}/user", headers = {"Authorization": f"Bearer {API_TOKEN}"}).json() 
