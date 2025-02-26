@@ -186,5 +186,3 @@ def find_file_from_course(course_id: str, potential_file_name: str):
         return "ERROR: cannot access files from course"
     #try to access files section in a course. If working, list files that are close to input
     #if files cannot be accessed, return Error
-
-print(lecture_file_to_notes_pdf("cmpen 270", "lecture set 4"))
