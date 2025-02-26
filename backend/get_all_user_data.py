@@ -3,14 +3,15 @@ import os
 import json
 from dotenv import load_dotenv 
 
-BASE_DIR = "Penn State/Projects/CanvasAI/"
+BASE_DIR = "Desktop/Projects/"
 #Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 API_URL = "https://psu.instructure.com/api/v1" #Base URL 
 
-load_dotenv(f"{BASE_DIR}CanvasAI/.env")
+load_dotenv()
 
-API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+API_TOKEN = os.getenv("CANVAS_TOKEN")
+print(API_TOKEN)
 
 def test():
    users = requests.get(f"{API_URL}/user", headers = {"Authorization": f"Bearer {API_TOKEN}"}).json() 
@@ -92,8 +93,9 @@ def get_all_user_data():
                while True:
                   module_items = requests.get(f"{API_URL}/courses/{course_ID}/modules/{module_ID}/items", params={"enrollment_state": "active", "include[]": "all_courses", "page": module_item_page_number, "access_token": {API_TOKEN}}).json()
                   
-                  if type(user_data[course]["course_syllabus"]) is list:
-                     user_data[course]["course_syllabus"] += [module_items[0].get("url")]
+                  if type(module_items) is list and module_items != []:
+                     if type(user_data[course]["course_syllabus"]) is list and len(module_items) > 0:
+                        user_data[course]["course_syllabus"] += [module_items[0].get("url")]
 
                   if type(module_items) is list and module_items != []:
                   #for each module, there are module items, so we have to iterate within each module as well
@@ -119,7 +121,8 @@ def get_all_user_data():
    json_string = json.dumps(user_data)
    #converts dictionary object into a JSON string  
    
-   user_data_path = f"{BASE_DIR}CanvasAI/UserData/'f{API_URL}'/1234/user_data.json"  
+   user_id = "1234"  # Replace with the actual user ID if needed
+   user_data_path = f"{BASE_DIR}CanvasAI/UserData/{API_URL}/{user_id}/user_data.json"  
    os.makedirs(os.path.dirname(user_data_path), exist_ok=True)
    #"creates" a directory per user in the UserData directory: School URL then User ID
 
@@ -129,7 +132,7 @@ def get_all_user_data():
    
    return "succesful"
 
-print(test())
+get_all_user_data()
 
 
    
