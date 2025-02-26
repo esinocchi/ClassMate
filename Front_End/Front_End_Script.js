@@ -71,7 +71,6 @@ settingsIcon.addEventListener("click", () => {
 //give clear memory button functionality
 clearPromptButton.addEventListener("click", () => {
     clearMemory();
-    tester_ClassSettings();
 });
 
 //give back arrow functionality
@@ -95,7 +94,6 @@ document.addEventListener("keydown", function(event) {
 
 //reload past chats and class settings on page load
 window.addEventListener("load", () => {
-    console.log('page reloading')
     rebuildPage();
 });
 
@@ -117,19 +115,18 @@ function handlePrompt() {
 
         // If the list is longer than 20, pop the last one and add the new prompt-response pair
         if (promptPairs.length > 19) {
-            promptPairs.pop(); // Remove the last element
+            promptPairs.pop(); 
         }
         
-        promptPairs.unshift([prompt, "sample response"]); // Add new prompt-response pair to the front
+        promptPairs.unshift([prompt, "sample response"]); 
 
         // Save updated list back to local storage
         chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
-            console.log("Updated list:", promptPairs); // Log the updated list (not 'tuples')
         });
 
         // Create a new box to hold the prompt and response
         const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-        addMemoryBox(prompt, "sample response"); // Call the function to add the new box to the UI
+        addMemoryBox(prompt, "sample response");
     });
 }
 
@@ -207,11 +204,7 @@ function addClassSetting(classID, checked) {
             for (let i = ClassSelections.length - 1; i >= 0; i--) {
                 if(ClassSelections[i][0] == checkboxName.replace("active-checkBox-", "")){
                     ClassSelections[i][1] = isChecked;
-                    chrome.storage.local.set({ ClassSelections_CanvasAI: ClassSelections}, function() {
-                        for(let course of ClassSelections){
-                            console.log(course[0] + ": " + course[1] + "\n")
-                        }
-                    });
+                    chrome.storage.local.set({ ClassSelections_CanvasAI: ClassSelections}, function() {});
                     break;
                 }
             }
@@ -222,7 +215,7 @@ function addClassSetting(classID, checked) {
 //create memory box for previous chats
 function addMemoryBox(prompt, response) {
     if (prompt == '') {
-        return -1
+        return -1;
     }
 
     const memoryBox = document.createElement("div");
@@ -272,7 +265,6 @@ function addMemoryBox(prompt, response) {
 
 //rebuild class selections and past chats
 function rebuildPage() {
-    console.log("rebuild page")
     chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
         let promptPairs = result.previousChats_CanvasAI || [];
         for (let i = promptPairs.length - 1; i >= 0; i--) {
@@ -283,7 +275,6 @@ function rebuildPage() {
     chrome.storage.local.get(["ClassSelections_CanvasAI"], function(result) {
         let ClassSelections = result.ClassSelections_CanvasAI || [];
         for (let i = ClassSelections.length - 1; i >= 0; i--) {
-            console.log("class added")
             addClassSetting(ClassSelections[i][0], ClassSelections[i][1]);
         }; 
     });
@@ -291,23 +282,18 @@ function rebuildPage() {
 
 //process new list of classes and update memory
 function processClassList(classes) {
-    chrome.storage.local.set({ ClassSelections_CanvasAI: classes}, function() {
-        console.log("Updated list:");
-        for(let course of classes) {
-            console.log(course + " ")
-        }
-    });
+    //process list in form [class, checked] into chrome memory
+    chrome.storage.local.set({ ClassSelections_CanvasAI: classes}, function() {});
 }
 
 //clear chat memory
 function clearMemory() {
+    //set memory == to 0
     let promptPairs = []
-    chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
-        console.log("list Cleared", promptPairs);
-    });
+    chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {});
 
     let parent = document.getElementById("dynamicBoxesContainer"); 
-    // Loop through children in reverse order (to avoid issues while removing)
+    // Loop through children in reverse order and remove
     [...parent.children].forEach(child => {
         child.remove();
     });
@@ -319,7 +305,16 @@ function getURL() {
     return currentUrl;    
 }
 
-function tester_ClassSettings() {
-    processClassList([["Class0", false], ["Class1", true], ["Class2", false], ["Class3", true]]);
-    console.log("memory updated")
+//pull states of classes
+function getCheckboxStates() {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"][data-class-id]');
+    const checkboxStates = new Set();
+
+    checkboxes.forEach(checkbox => {
+        const classId = checkbox.getAttribute('data-class-id');
+        const state = checkbox.checked ? 'checked' : 'unchecked';
+        checkboxStates.add([classId, state]);
+    });
+
+    return checkboxStates;
 }
