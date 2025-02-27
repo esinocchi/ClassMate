@@ -5,14 +5,21 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
 
-BASE_DIR = "Penn State/Projects/CanvasAI/"
+BASE_DIR = "Desktop/Projects/"
 #Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
 
 API_URL = "https://psu.instructure.com/api/v1" #Base URL 
+load_dotenv()
+API_TOKEN = os.getenv("CANVAS_TOKEN")
+print(API_TOKEN)
 
+<<<<<<< HEAD
 load_dotenv()
 
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+=======
+selected_courses = ['2379517', '2361957', '2361815', '2364485', '2361972'] # hardcoded selected courses
+>>>>>>> 1140502d286c36781f52b16bfd70c44bfecb6253
 
 def test():
    users = requests.get(f"{API_URL}/user", headers = {"Authorization": f"Bearer {API_TOKEN}"}).json() 
@@ -127,7 +134,14 @@ def get_all_user_data():
                
                while True:
                   module_items = requests.get(f"{API_URL}/courses/{course_ID}/modules/{module_ID}/items", params={"enrollment_state": "active", "include[]": "all_courses", "page": module_item_page_number, "access_token": {API_TOKEN}}).json()
+<<<<<<< HEAD
 
+=======
+                  
+                  if type(module_items) is list and module_items != []:
+                     if type(user_data[course]["course_syllabus"]) is list and len(module_items) > 0:
+                        user_data[course]["course_syllabus"] += [module_items[0].get("url")]
+>>>>>>> 1140502d286c36781f52b16bfd70c44bfecb6253
 
                   if type(module_items) is list and module_items != []:
                   #for each module, there are module items, so we have to iterate within each module as well
@@ -165,7 +179,8 @@ def get_all_user_data():
    json_string = json.dumps(user_data)
    #converts dictionary object into a JSON string  
    
-   user_data_path = f"{BASE_DIR}CanvasAI/UserData/'f{API_URL}'/1234/user_data.json"  
+   user_id = "1234"  # Replace with the actual user ID if needed
+   user_data_path = f"{BASE_DIR}CanvasAI/UserData/{API_URL}/{user_id}/user_data.json"  
    os.makedirs(os.path.dirname(user_data_path), exist_ok=True)
    #"creates" a directory per user in the UserData directory: School URL then User ID
 
@@ -175,7 +190,11 @@ def get_all_user_data():
    
    return "succesful"
 
+<<<<<<< HEAD
 print(get_all_user_data())
+=======
+get_all_user_data()
+>>>>>>> 1140502d286c36781f52b16bfd70c44bfecb6253
 
 
    
