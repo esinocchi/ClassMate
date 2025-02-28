@@ -110,26 +110,76 @@ def lecture_file_to_notes_pdf(course: str, lecture_file: str):
     
     return "Lecture file to notes pdf succesful"
     
-def find_course(input_course: str): 
+def find_courses(): 
     """
     (potential course name)
 
     """
-    course_list = requests.get(   
-        f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": "all_courses", "access_token": {API_TOKEN}}
-    ).json() 
-    #.json() creates a list object with dictionaries containing course info
+    headers = {'Authorization': f'Bearer {canvas_api_token}'}
+params = {
+    "enrollment_state": "active",
+    "include[]": "all_courses",
+    "per_page": 100  # Fetch more courses per page (optional)
+}
 
-    potential_courses = {}
-    for i in range(len(course_list)):
-        course_name = course_list[i].get("name")
-        if not course_name == None:
-            if text_formatter_for_simplicity(input_course) in text_formatter_for_simplicity(course_name):
-                potential_courses[course_name] = course_list[i].get("id")
-    #finds courses that are close enough to the input_course given
-    #stores them as [{course name, course id}] in potential courses
+course_name_list = []
+url = f"{canvas_api_url}/courses"
+page_counter = 1
 
-    return potential_courses
+while url:
+    print(f"\n--- Page {page_counter} ---")
+    print(f"Requesting URL: {url}")
+
+    response = requests.get(url, headers=headers, params=params)
+    params = None  # Clear params after the first request
+
+    # Handle errors
+    if response.status_code != 200:
+        print(f"Error: {response.status_code} - {response.text}")
+        break
+
+    # Extract course names
+    courses = response.json()
+    print(f"Found {len(courses)} courses on this page.")
+    for course in courses:
+        course_name = course.get('name')
+        if course_name:
+            course_name_list.append(course_name)
+
+    # Parse the "Link" header for pagination
+    link_header = response.headers.get('Link', '')
+    next_url = None
+
+    if link_header:
+        links = link_header.split(', ')
+        for link in links:
+            parts = link.split('; ', 1)
+            if len(parts) != 2:
+                continue
+            url_part, rel_part = parts
+            url_part = url_part.strip('<>')
+            rel_value = rel_part.replace('rel=', '').strip('"').lower()
+            
+            if 'next' in rel_value.split():
+                next_url = url_part
+                break  # Found the next page URL
+
+    # Update URL or terminate the loop
+    if next_url:
+        print(f"Next page URL: {next_url}")
+        url = next_url
+    else:
+        print("No more pages found.")
+        url = None  # Exit the loop
+
+    page_counter += 1
+
+    # Safety check to prevent infinite loops
+    if page_counter > 50:
+        print("\n Safety Break: Stopped after 50 pages.")
+        break
+
+    return 
 
 def find_module_item(course_id: str, input_file_name: str):
     """
