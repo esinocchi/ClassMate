@@ -5,4 +5,5 @@ chromadb==0.4.17
 tenacity==8.2.3
 beautifulsoup4==4.12.2
 PyPDF2==3.0.1
-python-docx==1.0.1 
+python-docx==1.0.1
+pypdf>=3.0.0 

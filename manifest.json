@@ -13,17 +13,20 @@
     "host_permissions": [
         "https://psu.instructure.com/*"
       ],
-      "content_scripts": [
+    "content_scripts": [
         {
           "matches": ["https://psu.instructure.com/*"],
           "js": ["Front_End/Front_End_Script.js"],
           "css": ["Front_End/Front_End_Style.css"]
         }
       ],
-      "web_accessible_resources": [
+    "web_accessible_resources": [
         {
-        "resources": ["images/CanvasAILogo.png", "images/button.png"],
+        "resources": ["images/CanvasAILogo.png", "images/UpArrow.png", "images/BackArrow.png", "images/settings.png"],
         "matches": ["https://psu.instructure.com/*"]
         }
+    ],
+    "permissions": [
+        "storage"
     ]
 }
