@@ -1,6 +1,3 @@
-import { sampleAPI } from './Front_End_Connections.js';
-
-
 // Create a container div for the box
 let closed = true;
 
@@ -143,7 +140,7 @@ async function handlePrompt() {
 
     // Create a new box to hold the prompt and response
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-    addMemoryBox(prompt, APIdata);
+    addMemoryBox(prompt, APIdat);
 }
 
 //open settings window
@@ -333,4 +330,21 @@ function getCheckboxStates() {
     });
 
     return checkboxStates;
+}
+
+
+
+//below this is API calls
+
+
+async function sampleAPI() {
+    try {
+        const response = await fetch('https://3.133.153.53:8000/');  // Correct the URL here
+        const data = await response.json();  // Wait for the JSON data
+        console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
+        return data;  // Return the data
+    } catch (error) {
+        console.error('Error calling API:', error);
+        return false;  // Return false if there's an error
+    }
 }
