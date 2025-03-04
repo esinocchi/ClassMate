@@ -1,3 +1,6 @@
+import { sampleAPI } from './Front_End_Connections.js';
+
+
 // Create a container div for the box
 let closed = true;
 
@@ -98,11 +101,12 @@ window.addEventListener("load", () => {
 });
 
 //main functionality for prompt handling
-function handlePrompt() {
+async function handlePrompt() {
     // Get and remove value from the prompt entry box
     let prompt = promptEntryBox.value;
     let response = ''; // Default response can be set here, e.g. "sample response"
     promptEntryBox.value = ''; // Clear the prompt entry box
+    promptValues = [];
     promptEntryBox.select(); // Select the input box to prepare for the next prompt
 
     if (!prompt) {
@@ -123,11 +127,23 @@ function handlePrompt() {
         // Save updated list back to local storage
         chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
         });
-
-        // Create a new box to hold the prompt and response
-        const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-        addMemoryBox(prompt, "sample response");
     });
+
+    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
+        // Check if there is an error or if the data is not found
+        if (chrome.runtime.lastError) {
+            console.error("Error retrieving data:", chrome.runtime.lastError);
+            return; // Exit if there's an error
+        }
+        // Load the data into the local variable
+        promptValues = result.previousChats_CanvasAI || []; 
+    });
+
+    const APIdata = await sampleAPI(promptValues);
+
+    // Create a new box to hold the prompt and response
+    const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+    addMemoryBox(prompt, APIdata);
 }
 
 //open settings window
