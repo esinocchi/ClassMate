@@ -23,6 +23,10 @@ Usage:
 2. Initialize the VectorDatabase with the path to your JSON data file
 3. Call process_data() to create embeddings for all documents
 4. Use search() to find relevant documents based on a query
+
+
+
+
 """
 
 import os
@@ -70,18 +74,19 @@ class VectorDatabase:
         )
         
         # Initialize documents and metadata
-        self.documents = []
-        self.document_map = {}
-        self.course_map = {}
+        self.documents = [] # stores documents
+        self.document_map = {} # maps documents with document ID
+        self.course_map = {} # information about courses
         
-        # Try to get existing collection or create a new one
-        try:
+        
+        try: # Attempts to retrieve existing collection
             self.collection = self.client.get_collection(
                 name=collection_name,
                 embedding_function=self.embedding_function
             )
             logger.info(f"Using existing collection: {collection_name}")
-        except Exception:
+        
+        except Exception: # If no existing collection, collection is created
             logger.info(f"Creating new collection: {collection_name}")
             self.collection = self.client.create_collection(
                 name=collection_name,
@@ -101,7 +106,7 @@ class VectorDatabase:
         Returns:
             Preprocessed text string.
         """
-        doc_type = doc.get('type', '').lower()
+        doc_type = doc.get('type', '').lower() # retrieves type from user_data JSON
         content = ""
         
         # Handle the specific document types
@@ -111,9 +116,6 @@ class VectorDatabase:
             content = f"File: {doc.get('name', '')}. {doc.get('content', '')}"
         elif doc_type == 'announcement':
             content = f"Announcement: {doc.get('name', '')}. {doc.get('content', '')}"
-        elif doc_type == 'event':
-            content = f"Event: {doc.get('name', '')}. {doc.get('content', '')}"
-        # Keep existing types for backward compatibility
         elif doc_type == 'syllabus':
             content = f"Syllabus: {doc.get('name', '')}. {doc.get('content', '')}"
         elif doc_type == 'discussion':
