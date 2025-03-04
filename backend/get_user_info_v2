@@ -44,7 +44,7 @@ def get_all_user_data():
     user_data = {
         "metadata": {
             "user_id": "1234",  # Replace with actual user ID
-            "canvas_token_id": API_TOKEN,  # Store the full token
+            "canvas_token_id": API_TOKEN[-12],  # Store part of token
             "canvas_domain": API_URL.replace("https://", "").split("/")[0],
             "api_version": "v1",
             "generated_at": start_time.isoformat(),
