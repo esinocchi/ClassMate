@@ -1,3 +1,20 @@
+"""
+{ 
+user_metadata: {user_id: __int__, canvas_token_id: __int___, canvas_domain: __str___, data_last_updated: ___str___, update_duration _ float__, courses_selected: []},
+
+ courses : {
+course_id:  {name: ___str__, code: _____, description: _____, workflow_state:______, syllabus_body: _____, default_view: ______, course_format: _____}}
+
+items: [{id: ____, Course_id: ____, type: ___, content: _____, url: ____, file_type: ____, size_kb: ___, content_id: _____, created_at: ______, updated_at: ______, due_date: ______, points_possible: _____, points_earned: _____ , : _____}, ]
+
+
+}
+
+Items: files, assignments, announcements, quizzes, pages
+
+"""
+
+
 import requests
 import os
 import json
@@ -22,12 +39,14 @@ def get_all_user_data():
     courses : {
     course_id:  {id: __int__, name: ___str__, code: _____, description: _____, workflow_state:______, syllabus_body: _____, default_view: ______, course_format: _____}}
 
-    Items: [id: ____, Course_id: ____, type: ___, content: _____, url: ____, file_type: ____, size_kb: ___, content_id: _____, created_at: ______, updated_at: ______, due_date: ______, points_possible: _____, points_earned: _____ ]
+    items: [id: ____, Course_id: ____, type: ___, content: _____, url: ____, file_type: ____, size_kb: ___, content_id: _____, created_at: ______, updated_at: ______, due_date: ______, points_possible: _____, points_earned: _____ ]
+    
+    calendar_events: []
     }
     
     """
 
-    user_data = {} 
+    user_data = {"user_metadata" : {}, "courses": {}, "items": []}
     page_number = 1
     #data in Canvas API is pagenated, so you have to manually go through multiple pages in case there are more items of the type needed
     
@@ -38,7 +57,13 @@ def get_all_user_data():
             break
 
         for i in range(len(user_courses)):
-            user_data[user_courses[i].get("name")] = {"course_ID": user_courses[i].get("id"), "course_files": {}, "course_syllabus": user_courses[i].get("syllabus_body")}
+            user_data["courses"][user_courses[i].get("id")] = {
+                "id": user_courses[i].get("id"),
+                "name": user_courses[i].get("name"),
+                "code": user_courses[i].get("code"),
+                "description": user_courses[i].get("description"),
+                
+                }
         page_number += 1
     #all courses that have a syllabus section have now been added to the "user_data" dictionary
 
@@ -55,4 +80,5 @@ def get_all_user_data():
                 user_data[user_courses[i].get("name")] = {"course_ID": user_courses[i].get("id"), "course_files": {}, "course_syllabus": []}
         page_number += 1
     #all courses have now been added to the "user_data" dictionary
+    
     return
