@@ -82,3 +82,10 @@ def get_all_user_data():
     #all courses have now been added to the "user_data" dictionary
     
     return
+
+def test():
+    announcements = requests.get(f"{API_URL}/announcements", headers={"Authorization": f"Bearer: {API_TOKEN}"}, params=[]).json() 
+    print(announcements)
+    return "yo"
+
+test()
