@@ -180,7 +180,6 @@ while url:
         print("\n Safety Break: Stopped after 50 pages.")
         break
 
-    return 
 
 def find_module_item(course_id: str, input_file_name: str):
     """

@@ -5,12 +5,12 @@ user_metadata: {user_id: __int__, canvas_token_id: __int___, canvas_domain: __st
  courses : {
 course_id:  {name: ___str__, code: _____, description: _____, workflow_state:______, syllabus_body: _____, default_view: ______, course_format: _____}}
 
-items: [{id: ____, Course_id: ____, type: ___, content: _____, url: ____, file_type: ____, size_kb: ___, content_id: _____, created_at: ______, updated_at: ______, due_date: ______, points_possible: _____, points_earned: _____ , : _____}, ]
+items: [{id: ____, name:  _____, course_id: ____, type: ___, content: _____, url: ____, file_type: ____, size_kb: ___, created_at: ______, updated_at: ______, due_date: ______, points_possible: _____, points_earned: _____ , module_name: _____, start_date: ______, end_date: ______}, ]
 
 
 }
 
-Items: files, assignments, announcements, quizzes, pages
+Items: files, assignment, announcement, quiz, page, event
 
 """
 
