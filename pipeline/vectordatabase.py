@@ -48,9 +48,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("canvas_vector_db")
 
-# Constants"
+# Constants
 DEFAULT_CACHE_DIR = "chroma_data/"
 DEFAULT_COLLECTION_NAME = "canvas_embeddings"
+
 class VectorDatabase:
     def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = DEFAULT_COLLECTION_NAME):
         """
@@ -78,7 +79,6 @@ class VectorDatabase:
         self.document_map = {} # maps documents with document ID
         self.course_map = {} # information about courses
         
-        
         try: # Attempts to retrieve existing collection
             self.collection = self.client.get_collection(
                 name=collection_name,
@@ -91,7 +91,7 @@ class VectorDatabase:
             self.collection = self.client.create_collection(
                 name=collection_name,
                 embedding_function=self.embedding_function,
-                # HNSW algorithm for apporximate nearest neighbor in high dimensional spaces
+                # HNSW algorithm for approximate nearest neighbor in high dimensional spaces
                 # using cosine similarity
                 metadata={"hnsw:space": "cosine"}
             )
@@ -106,109 +106,81 @@ class VectorDatabase:
         Returns:
             Preprocessed text string that is sent to chromadb for embedding
         """
+        # Get common fields
         doc_type = doc.get('type', '').lower()
-        course_id = doc.get('course_id', '')
         doc_id = doc.get('id', '')
-        content = doc.get('content', '')
-
-        types = ['file', 'assignment', 'announcement', 'quiz', 'event']
+        course_id = doc.get('course_id', '')
         
         # Build a rich text representation with all relevant fields
-        text_parts = [f"Type: {doc_type.capitalize()}"]
+        text_parts = []
         
+        # Basic identification
+        if doc_id:
+            text_parts.append(f"ID: {doc_id}")
+        if doc_type:
+            text_parts.append(f"Type: {doc_type.capitalize()}")
         if course_id:
             text_parts.append(f"Course ID: {course_id}")
         
-        if doc_id:
-            text_parts.append(f"ID: {doc_id}")
-        
-        # Add different fields based on document type
+        # Handle different document types
         match doc_type:
             case 'file':
-                file_type = doc.get('file_type', '') # e.g. pdf, docx, etc.
-                size = doc.get('size_kb', '')
-                if file_type:
-                    text_parts.append(f"File Type: {file_type}")
-                if size:
-                    text_parts.append(f"Size: {size} KB")
+                # Add file-specific fields
+                for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
+                             'updated_at', 'locked', 'lock_explanation']:
+                    if field in doc and doc[field] is not None:
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
                 
             case 'assignment':
-                due_date = doc.get('due_date', '')
-                points = doc.get('points_possible', '')
-                points_possible = doc.get('points_possible', '')
-                if due_date:
-                    text_parts.append(f"Due Date: {due_date}")
-                if points:
-                    text_parts.append(f"Points: {points}")
-                if points_possible:
-                    text_parts.append(f"Points Possible: {points_possible}")
+                # Add assignment-specific fields
+                for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
+                             'submission_types', 'can_submit', 'graded_submissions_exist']:
+                    if field in doc and doc[field] is not None:
+                        if field == 'submission_types' and isinstance(doc[field], list):
+                            text_parts.append(f"Submission Types: {', '.join(doc[field])}")
+                        else:
+                            text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                
+                # Handle content field which might contain extracted links
+                content = doc.get('content', [])
+                if content and isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, str):
+                            text_parts.append(f"Content Link: {item}")
                 
             case 'announcement':
-                created_at = doc.get('created_at', '')
-                if created_at:
-                    text_parts.append(f"Posted: {created_at}")
+                # Add announcement-specific fields
+                for field in ['title', 'message', 'posted_at', 'course_id']:
+                    if field in doc and doc[field] is not None:
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
                 
             case 'quiz':
-                due_date = doc.get('due_date', '')
-                points = doc.get('points_possible', '')
-                if due_date:
-                    text_parts.append(f"Due Date: {due_date}")
-                if points:
-                    text_parts.append(f"Points: {points}")
+                # Add quiz-specific fields
+                for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
+                             'allowed_attempts', 'points_possible', 'due_at', 
+                             'locked_for_user', 'lock_explanation']:
+                    if field in doc and doc[field] is not None:
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
                 
             case 'event':
-                start_date = doc.get('created_at', '')
-                if start_date:
-                    text_parts.append(f"Date: {start_date}")
+                # Add event-specific fields
+                for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
+                             'location_address', 'context_code', 'context_name', 
+                             'all_context_codes', 'url']:
+                    if field in doc and doc[field] is not None:
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
         
-        # Add metadata timestamps if available
-        created = doc.get('created_at', '')
-        updated = doc.get('updated_at', '')
-        if created:
-            text_parts.append(f"Created: {created}")
-        if updated:
-            text_parts.append(f"Updated: {updated}")
-
-        module = doc.get('module_name', '')
-        if module:
-            text_parts.append(f"Module: {module}")
+        # Add module information
+        module_id = doc.get('module_id')
+        if module_id:
+            text_parts.append(f"Module ID: {module_id}")
         
-        # Add the content at the end
-        if content:
-            text_parts.append(f"Content: {content}")
+        module_name = doc.get('module_name')
+        if module_name:
+            text_parts.append(f"Module Name: {module_name}")
         
         # Join all parts with newlines for better separation
         return "\n".join(text_parts)
-    
-    def _extract_additional_keywords(self, doc: Dict[str, Any]) -> List[str]:
-        """
-        Extract additional keywords from document metadata.
-        
-        Args:
-            doc: Document dictionary.
-            
-        Returns:
-            List of additional keywords.
-        """
-        # Keep your existing keyword extraction logic
-        keywords = []
-        
-        # Add course name if available
-        course_id = doc.get('course_id')
-        if course_id and course_id in self.course_map:
-            course_name = self.course_map[course_id].get('name', '')
-            if course_name:
-                keywords.append(f"Course: {course_name}")
-        
-        # Add module name if available
-        module_id = doc.get('module_id')
-        if module_id and course_id in self.course_map:
-            for module in self.course_map[course_id].get('modules', []):
-                if module.get('id') == module_id:
-                    keywords.append(f"Module: {module.get('name', '')}")
-                    break
-        
-        return keywords
     
     def process_data(self, force_reload: bool = False) -> bool:
         """
@@ -238,54 +210,159 @@ class VectorDatabase:
         
         # Extract user metadata
         user_metadata = data.get('user_metadata', {})
-        logger.info(f"Processing data for user ID: {user_metadata.get('user_id')}")
+        logger.info(f"Processing data for user ID: {user_metadata.get('id')}")
         
         # Extract courses and build course map
-        courses = data.get('courses', {})
-        for course_id, course_info in courses.items():
-            self.course_map[course_id] = course_info
+        courses = data.get('courses', [])
+        for course in courses:
+            course_id = str(course.get('id'))
+            if course_id:
+                self.course_map[course_id] = course
         
         # Prepare data for ChromaDB
         ids = []
         texts = []
         metadatas = []
         
-        # Process items (documents)
-        items = data.get('items', [])
-        
-        for item in items:
-            item_id = item.get('id')
-            if not item_id:
+        # Process files
+        files = data.get('files', [])
+        for file in files:
+            file_id = file.get('id')
+            if not file_id:
                 continue
             
-            # Standardize document type if needed
-            if 'type' in item:
-                item_type = item['type'].lower()
-                
-                # Map to standard types if needed
-                if item_type in ['homework', 'lab', 'quiz', 'exam', 'project']:
-                    item['type'] = 'assignment'
-                elif item_type in ['document', 'attachment', 'resource', 'material']:
-                    item['type'] = 'file'
-                elif item_type in ['notification', 'update', 'news']:
-                    item['type'] = 'announcement'
-                elif item_type in ['meeting', 'schedule', 'calendar']:
-                    item['type'] = 'event'
+            # Make sure type is set
+            if 'type' not in file:
+                file['type'] = 'file'
                 
             # Store document in memory
-            self.documents.append(item)
-            self.document_map[str(item_id)] = item
+            self.documents.append(file)
+            self.document_map[str(file_id)] = file
             
             # Prepare for ChromaDB
-            ids.append(str(item_id))
-            texts.append(self._preprocess_text_for_embedding(item))
+            ids.append(str(file_id))
+            texts.append(self._preprocess_text_for_embedding(file))
             
             # Extract metadata for filtering
             metadata = {
-                'id': str(item_id),
-                'type': item.get('type', ''),
-                'course_id': str(item.get('course_id', '')),
-                'content_id': str(item.get('content_id', '')) if item.get('content_id') else None
+                'id': str(file_id),
+                'type': 'file',
+                'course_id': str(file.get('course_id', '')),
+                'folder_id': str(file.get('folder_id', ''))
+            }
+            metadatas.append(metadata)
+        
+        # Process announcements
+        announcements = data.get('announcements', [])
+        for announcement in announcements:
+            announcement_id = announcement.get('id')
+            if not announcement_id:
+                continue
+            
+            # Make sure type is set
+            if 'type' not in announcement:
+                announcement['type'] = 'announcement'
+                
+            # Store document in memory
+            self.documents.append(announcement)
+            self.document_map[str(announcement_id)] = announcement
+            
+            # Prepare for ChromaDB
+            ids.append(str(announcement_id))
+            texts.append(self._preprocess_text_for_embedding(announcement))
+            
+            # Extract metadata for filtering
+            metadata = {
+                'id': str(announcement_id),
+                'type': 'announcement',
+                'course_id': str(announcement.get('course_id', ''))
+            }
+            metadatas.append(metadata)
+        
+        # Process assignments
+        assignments = data.get('assignments', [])
+        for assignment in assignments:
+            assignment_id = assignment.get('id')
+            if not assignment_id:
+                continue
+            
+            # Make sure type is set
+            if 'type' not in assignment:
+                assignment['type'] = 'assignment'
+                
+            # Store document in memory
+            self.documents.append(assignment)
+            self.document_map[str(assignment_id)] = assignment
+            
+            # Prepare for ChromaDB
+            ids.append(str(assignment_id))
+            texts.append(self._preprocess_text_for_embedding(assignment))
+            
+            # Extract metadata for filtering
+            metadata = {
+                'id': str(assignment_id),
+                'type': 'assignment',
+                'course_id': str(assignment.get('course_id', '')),
+                'module_id': str(assignment.get('module_id', ''))
+            }
+            metadatas.append(metadata)
+        
+        # Process quizzes
+        quizzes = data.get('quizzes', [])
+        for quiz in quizzes:
+            quiz_id = quiz.get('id')
+            if not quiz_id:
+                continue
+            
+            # Make sure type is set
+            if 'type' not in quiz:
+                quiz['type'] = 'quiz'
+                
+            # Store document in memory
+            self.documents.append(quiz)
+            self.document_map[str(quiz_id)] = quiz
+            
+            # Prepare for ChromaDB
+            ids.append(str(quiz_id))
+            texts.append(self._preprocess_text_for_embedding(quiz))
+            
+            # Extract metadata for filtering
+            metadata = {
+                'id': str(quiz_id),
+                'type': 'quiz',
+                'course_id': str(quiz.get('course_id', '')),
+                'module_id': str(quiz.get('module_id', ''))
+            }
+            metadatas.append(metadata)
+        
+        # Process calendar events
+        events = data.get('calendar_events', [])
+        for event in events:
+            event_id = event.get('id')
+            if not event_id:
+                continue
+            
+            # Make sure type is set
+            if 'type' not in event:
+                event['type'] = 'event'
+                
+            # Parse course_id from context_code if available
+            if 'context_code' in event and event['context_code'].startswith('course_'):
+                event['course_id'] = event['context_code'].replace('course_', '')
+                
+            # Store document in memory
+            self.documents.append(event)
+            self.document_map[str(event_id)] = event
+            
+            # Prepare for ChromaDB
+            ids.append(str(event_id))
+            texts.append(self._preprocess_text_for_embedding(event))
+            
+            # Extract metadata for filtering
+            metadata = {
+                'id': str(event_id),
+                'type': 'event',
+                'course_id': str(event.get('course_id', ''))
             }
             metadatas.append(metadata)
         
@@ -321,29 +398,43 @@ class VectorDatabase:
             
             # Extract user metadata
             user_metadata = data.get('user_metadata', {})
-            logger.info(f"Loading metadata for user ID: {user_metadata.get('user_id')}")
+            logger.info(f"Loading metadata for user ID: {user_metadata.get('id')}")
             
             # Extract courses and build course map
-            courses = data.get('courses', {})
-            for course_id, course_info in courses.items():
-                self.course_map[course_id] = course_info
+            courses = data.get('courses', [])
+            for course in courses:
+                course_id = str(course.get('id'))
+                if course_id:
+                    self.course_map[course_id] = course
             
-            # Process items (documents)
-            items = data.get('items', [])
+            # Process all document types
+            document_types = {
+                'files': 'file',
+                'announcements': 'announcement',
+                'assignments': 'assignment',
+                'quizzes': 'quiz',
+                'calendar_events': 'event'
+            }
             
-            for item in items:
-                item_id = item.get('id')
-                if not item_id:
-                    continue
-                
-                # Store document in memory for reference
-                self.documents.append(item)
-                self.document_map[str(item_id)] = item
+            for key, doc_type in document_types.items():
+                items = data.get(key, [])
+                for item in items:
+                    item_id = item.get('id')
+                    if not item_id:
+                        continue
+                    
+                    # Make sure type is set
+                    if 'type' not in item:
+                        item['type'] = doc_type
+                    
+                    # Store document in memory for reference
+                    self.documents.append(item)
+                    self.document_map[str(item_id)] = item
             
             # Build document relations
             self._build_document_relations(self.documents)
             
-            logger.info(f"Successfully loaded metadata for {len(items)} items")
+            logger.info(f"Successfully loaded metadata for {len(self.documents)} items")
             
         except Exception as e:
             logger.error(f"Error loading document metadata: {e}")
@@ -355,20 +446,20 @@ class VectorDatabase:
         Args:
             documents: List of document dictionaries.
         """
-        # Build relations based on course_id and content_id
+        # Build relations based on course_id and module_id
         for doc in documents:
             doc_id = doc.get('id')
             if not doc_id:
                 continue
                 
-            # Add related documents based on content_id and course_id
+            # Add related documents based on module_id and course_id
             doc['related_docs'] = []
-            content_id = doc.get('content_id')
+            module_id = doc.get('module_id')
             course_id = doc.get('course_id')
             
-            if content_id and course_id:
+            if module_id and course_id:
                 for other_doc in documents:
-                    if (other_doc.get('content_id') == content_id and 
+                    if (other_doc.get('module_id') == module_id and 
                         other_doc.get('course_id') == course_id and 
                         other_doc.get('id') != doc_id):
                         doc['related_docs'].append(other_doc.get('id'))
@@ -384,39 +475,71 @@ class VectorDatabase:
                         # Add with lower priority (we'll add these at the end of the list)
                         doc['related_docs'].append(other_doc.get('id'))
     
-    def _enhance_query(self, query: str) -> str:
+    def _save_to_cache(self):
         """
-        Enhance the query with additional context based on query content.
+        Save document metadata and course map to cache.
+        """
+        # This is a placeholder for future implementation
+        # If you want to implement caching beyond ChromaDB's persistence,
+        # you could save the document map and course map to a file
+        pass
+    
+    def _load_from_cache(self):
+        """
+        Load document metadata and course map from cache.
+        
+        Returns:
+            True if data was loaded from cache, False otherwise.
+        """
+        # This is a placeholder for future implementation
+        # If you've implemented caching beyond ChromaDB's persistence,
+        # you could load the document map and course map from a file
+        
+        # For now, we'll just check if the ChromaDB collection has any items
+        try:
+            count = self.collection.count()
+            if count > 0:
+                # Load document metadata
+                self._load_document_metadata()
+                logger.info(f"Loaded {count} documents from ChromaDB cache")
+                return True
+        except Exception as e:
+            logger.error(f"Error checking ChromaDB cache: {e}")
+        
+        return False
+    
+    def _get_related_documents(self, doc_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        Get related documents for a list of document IDs.
         
         Args:
-            query: Original query string.
+            doc_ids: List of document IDs.
             
         Returns:
-            Enhanced query string.
+            List of related document dictionaries.
         """
-        query_lower = query.lower()
-        enhanced_terms = []
+        related_docs = []
+        seen_ids = set(doc_ids)
         
-        # Add document type-specific terms based on query content
-        if any(term in query_lower for term in ["due", "submit", "homework", "lab", "project"]):
-            enhanced_terms.extend(["assignment", "due date", "submission", "deadline"])
+        for doc_id in doc_ids:
+            doc = self.document_map.get(doc_id)
+            if not doc:
+                continue
+            
+            # Get related document IDs
+            doc_related_ids = doc.get('related_docs', [])
+            
+            for related_id in doc_related_ids:
+                # Avoid duplicates
+                if related_id in seen_ids:
+                    continue
+                
+                related_doc = self.document_map.get(str(related_id))
+                if related_doc:
+                    related_docs.append(related_doc)
+                    seen_ids.add(related_id)
         
-        if any(term in query_lower for term in ["file", "document", "download", "upload", "pdf", "docx"]):
-            enhanced_terms.extend(["file", "document", "attachment", "download"])
-        
-        if any(term in query_lower for term in ["announce", "notification", "update", "news"]):
-            enhanced_terms.extend(["announcement", "notification", "update", "important"])
-        
-        if any(term in query_lower for term in ["event", "meeting", "schedule", "calendar", "when", "time", "date"]):
-            enhanced_terms.extend(["event", "calendar", "schedule", "time", "date", "location"])
-        
-        # Add the enhanced terms to the query if any were generated
-        if enhanced_terms:
-            enhanced_query = f"{query} {' '.join(enhanced_terms)}"
-        else:
-            enhanced_query = query
-        
-        return enhanced_query
+        return related_docs
     
     def search(self, query: str, course_ids: Optional[List[str]] = None, top_k: int = 5,
                include_related: bool = True, minimum_score: float = 0.3, 
@@ -507,11 +630,10 @@ class VectorDatabase:
             courses.append({
                 'id': course_id,
                 'name': course.get('name', ''),
-                'code': course.get('code', ''),
-                'description': course.get('description', ''),
-                'workflow_state': course.get('workflow_state', ''),
+                'code': course.get('course_code', ''),
+                'description': course.get('public_description', ''),
                 'default_view': course.get('default_view', ''),
-                'course_format': course.get('course_format', '')
+                'syllabus_body': course.get('syllabus_body', '')
             })
         return courses
     
@@ -568,9 +690,9 @@ class VectorDatabase:
         if any(term in query_lower for term in ["quiz", "test", "exam", "assessment", "question"]):
             doc_types.append("quiz")
         
-        # Page-related terms
-        if any(term in query_lower for term in ["page", "content", "information", "read"]):
-            doc_types.append("page")
+        # Event-related terms
+        if any(term in query_lower for term in ["event", "meeting", "schedule", "calendar", "when", "time", "date"]):
+            doc_types.append("event")
         
         return doc_types if doc_types else None
 
@@ -578,6 +700,14 @@ class VectorDatabase:
 # Example usage
 if __name__ == "__main__":
     # Initialize the vector database with the path to your JSON data file
-    dic = {}
-    x = dic.get("id")
-    print(x)
+    vector_db = VectorDatabase("user_data.json")
+    vector_db.process_data()
+    
+    # Search for documents
+    results = vector_db.search("When is the next assignment due?", top_k=3)
+    
+    # Print results
+    for result in results:
+        print(f"Document: {result['document'].get('name', 'Unnamed')} ({result['document'].get('type')})")
+        print(f"Similarity: {result['similarity']:.4f}")
+        print("---")
