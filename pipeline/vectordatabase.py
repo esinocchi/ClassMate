@@ -2,27 +2,26 @@
 """
 Vector Database Module for Canvas Data
 --------------------------------------
-This module processes Canvas course data from a JSON file and creates vector embeddings
-using the Hugging Face Inference API with the all-MiniLM-L6-v2 model.
+This module processes Canvas course data from a structured JSON file and creates vector embeddings
+using the Hugging Face Inference API with the all-MiniLM-L6-v2 model, leveraging ChromaDB for storage.
 
 Key features:
-1. Loads Canvas course data from a structured JSON file (evan_data.json)
-2. Creates embeddings via Hugging Face Inference API (no local model required)
-3. Stores embeddings in memory with document metadata for efficient retrieval
-4. Provides similarity search functionality to find relevant course materials
-5. Supports filtering by course ID to narrow search results
-6. Includes persistence to avoid recomputing embeddings
-7. Optimizes embeddings for Canvas-specific content types
-8. Supports contextual search with related documents
+1. **Data Loading**: Loads Canvas course data from a structured JSON file (user_data2.json) containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
+2. **ChromaDB Integration**: Utilizes ChromaDB for efficient storage and retrieval of embeddings, ensuring persistence and avoiding recomputation.
+3. **Similarity Search**: Provides functionality to search for relevant course materials based on a query, with support for filtering by course ID and document type.
+4. **Document Relations**: Builds relationships between documents based on course and module IDs, allowing for contextual search results that include related documents.
+5. **Text Preprocessing**: Normalizes and preprocesses document text to enhance embedding quality and search relevance, handling various document types (files, assignments, announcements, quizzes, events).
+6. **Caching Mechanism**: Implements a caching mechanism to avoid reprocessing data if it has already been loaded, improving efficiency.
+7. **Logging**: Configures logging to provide insights into the processing steps and any errors encountered during execution.
 
-The module is designed to be resource-efficient (no local GPU/CPU needed for inference)
-while still providing good semantic search capabilities.
+The module is designed to be resource-efficient (no local GPU/CPU needed for inference) while still providing good semantic search capabilities.
 
 Usage:
-1. Set your HUGGINGFACE_API_KEY in environment variables
-2. Initialize the VectorDatabase with the path to your JSON data file
-3. Call process_data() to create embeddings for all documents
-4. Use search() to find relevant documents based on a query
+1. Initialize the VectorDatabase with the path to your JSON data file.
+2. Call process_data() to create embeddings for all documents.
+3. Use search() to find relevant documents based on a query.
+
+Note: Ensure that the JSON data file is structured correctly, containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
 
 
 
