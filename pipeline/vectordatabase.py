@@ -2,27 +2,26 @@
 """
 Vector Database Module for Canvas Data
 --------------------------------------
-This module processes Canvas course data from a JSON file and creates vector embeddings
-using the Hugging Face Inference API with the all-MiniLM-L6-v2 model.
+This module processes Canvas course data from a structured JSON file and creates vector embeddings
+using the Hugging Face Inference API with the all-MiniLM-L6-v2 model, leveraging ChromaDB for storage.
 
 Key features:
-1. Loads Canvas course data from a structured JSON file (evan_data.json)
-2. Creates embeddings via Hugging Face Inference API (no local model required)
-3. Stores embeddings in memory with document metadata for efficient retrieval
-4. Provides similarity search functionality to find relevant course materials
-5. Supports filtering by course ID to narrow search results
-6. Includes persistence to avoid recomputing embeddings
-7. Optimizes embeddings for Canvas-specific content types
-8. Supports contextual search with related documents
+1. **Data Loading**: Loads Canvas course data from a structured JSON file (user_data2.json) containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
+2. **ChromaDB Integration**: Utilizes ChromaDB for efficient storage and retrieval of embeddings, ensuring persistence and avoiding recomputation.
+3. **Similarity Search**: Provides functionality to search for relevant course materials based on a query, with support for filtering by course ID and document type.
+4. **Document Relations**: Builds relationships between documents based on course and module IDs, allowing for contextual search results that include related documents.
+5. **Text Preprocessing**: Normalizes and preprocesses document text to enhance embedding quality and search relevance, handling various document types (files, assignments, announcements, quizzes, events).
+6. **Caching Mechanism**: Implements a caching mechanism to avoid reprocessing data if it has already been loaded, improving efficiency.
+7. **Logging**: Configures logging to provide insights into the processing steps and any errors encountered during execution.
 
-The module is designed to be resource-efficient (no local GPU/CPU needed for inference)
-while still providing good semantic search capabilities.
+The module is designed to be resource-efficient (no local GPU/CPU needed for inference) while still providing good semantic search capabilities.
 
 Usage:
-1. Set your HUGGINGFACE_API_KEY in environment variables
-2. Initialize the VectorDatabase with the path to your JSON data file
-3. Call process_data() to create embeddings for all documents
-4. Use search() to find relevant documents based on a query
+1. Initialize the VectorDatabase with the path to your JSON data file.
+2. Call process_data() to create embeddings for all documents.
+3. Use search() to find relevant documents based on a query.
+
+Note: Ensure that the JSON data file is structured correctly, containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
 
 
 
@@ -66,7 +65,7 @@ class VectorDatabase:
         self.cache_dir = cache_dir
         self.collection_name = collection_name
         
-        # Initialize ChromaDB client
+        # Initialize ChromaDB client to store files in disk in cache_dir
         self.client = chromadb.PersistentClient(path=cache_dir)
         
         # Initialize embedding function (using the same model as before: all-MiniLM-L6-v2)
@@ -74,9 +73,8 @@ class VectorDatabase:
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         
-        # Initialize documents and metadata
         self.documents = [] # stores documents
-        self.document_map = {} # maps documents with document ID
+        self.document_map = {} # Allows O(1) lookup of documents by ID
         self.course_map = {} # information about courses
         
         try: # Attempts to retrieve existing collection
@@ -91,10 +89,17 @@ class VectorDatabase:
             self.collection = self.client.create_collection(
                 name=collection_name,
                 embedding_function=self.embedding_function,
-                # HNSW algorithm for approximate nearest neighbor in high dimensional spaces
-                # using cosine similarity
+                # hnsw:space defined the distance function of the embedding space
+                # cosine is currently selected
                 metadata={"hnsw:space": "cosine"}
             )
+            '''
+            Other hyperparameters to be changed in testing:
+            hnsw:space: euclidean, manhattan, cosine, dot
+            hnsw:ef_construction: determines the size of the candidate list (default: 100)
+            hnsw:search_ef: determines the size of the dynamic list (default: 100)
+            hnsw:m: determines the number of neighbors (edges) each node in the graph can have (default: 16)
+            '''
     
     def _preprocess_text_for_embedding(self, doc: Dict[str, Any]) -> str:
         """
@@ -106,8 +111,8 @@ class VectorDatabase:
         Returns:
             Preprocessed text string that is sent to chromadb for embedding
         """
-        # Get common fields
-        doc_type = doc.get('type', '').lower()
+        # Fields in each type
+        doc_type = doc.get('type', '').capitalize()
         doc_id = doc.get('id', '')
         course_id = doc.get('course_id', '')
         
@@ -118,57 +123,128 @@ class VectorDatabase:
         if doc_id:
             text_parts.append(f"ID: {doc_id}")
         if doc_type:
-            text_parts.append(f"Type: {doc_type.capitalize()}")
+            text_parts.append(f"Type: {doc_type}")
         if course_id:
             text_parts.append(f"Course ID: {course_id}")
         
         # Handle different document types
         match doc_type:
-            case 'file':
-                # Add file-specific fields
+            case 'File':
+                # For files, prioritize the display_name by placing it at the beginning
+                display_name = doc.get('display_name', '')
+                if display_name:
+                    # Normalize the display name to improve matching
+                    normalized_name = self._normalize_text(display_name)
+                    # Add the name at the beginning for emphasis
+                    text_parts.insert(0, f"Filename: {normalized_name}")
+                    # Also add it as a title for better matching
+                    text_parts.insert(0, f"Title: {normalized_name}")
+                
                 for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
                              'updated_at', 'locked', 'lock_explanation']:
-                    if field in doc and doc[field] is not None:
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                    if field in doc and doc[field] is not None: # error prevention
+                        # Normalize any text fields to handle special characters
+                        if isinstance(doc[field], str):
+                            value = self._normalize_text(doc[field])
+                        else:
+                            value = doc[field]
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
                 
-            case 'assignment':
-                # Add assignment-specific fields
+            case 'Assignment':
+                # For assignments, prioritize the name by placing it at the beginning
+                name = doc.get('name', '')
+                if name:
+                    # Normalize the name to improve matching
+                    normalized_name = self._normalize_text(name)
+                    # Add the name at the beginning for emphasis
+                    text_parts.insert(0, f"Assignment: {normalized_name}")
+                    text_parts.insert(0, f"Title: {normalized_name}")
+                
                 for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
                              'submission_types', 'can_submit', 'graded_submissions_exist']:
-                    if field in doc and doc[field] is not None:
+                    if field in doc and doc[field] is not None: # error prevention
                         if field == 'submission_types' and isinstance(doc[field], list):
+                            # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
                             text_parts.append(f"Submission Types: {', '.join(doc[field])}")
                         else:
-                            text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                            # Normalize any text fields
+                            if isinstance(doc[field], str):
+                                value = self._normalize_text(doc[field])
+                            else:
+                                value = doc[field]
+                            # e.g. HW2 (name) -> Name: HW2
+                            text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
                 
                 # Handle content field which might contain extracted links
                 content = doc.get('content', [])
                 if content and isinstance(content, list):
+                    text_parts.append("Content Link(s): \n")
                     for item in content:
                         if isinstance(item, str):
-                            text_parts.append(f"Content Link: {item}")
+                            text_parts.append(f'\t{item}\n')
                 
-            case 'announcement':
-                # Add announcement-specific fields
+            case 'Announcement':
+                # For announcements, prioritize the title by placing it at the beginning
+                title = doc.get('title', '')
+                if title:
+                    # Normalize the title to improve matching
+                    normalized_title = self._normalize_text(title)
+                    # Add the title at the beginning for emphasis
+                    text_parts.insert(0, f"Announcement: {normalized_title}")
+                    text_parts.insert(0, f"Title: {normalized_title}")
+                
                 for field in ['title', 'message', 'posted_at', 'course_id']:
-                    if field in doc and doc[field] is not None:
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                    if field in doc and doc[field] is not None: # error prevention
+                        # Normalize any text fields
+                        if isinstance(doc[field], str):
+                            value = self._normalize_text(doc[field])
+                        else:
+                            value = doc[field]
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
                 
-            case 'quiz':
-                # Add quiz-specific fields
+            case 'Quiz':
+                # For quizzes, prioritize the title by placing it at the beginning
+                title = doc.get('title', '')
+                if title:
+                    # Normalize the title to improve matching
+                    normalized_title = self._normalize_text(title)
+                    # Add the title at the beginning for emphasis
+                    text_parts.insert(0, f"Quiz: {normalized_title}")
+                    text_parts.insert(0, f"Title: {normalized_title}")
+                
                 for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
                              'allowed_attempts', 'points_possible', 'due_at', 
                              'locked_for_user', 'lock_explanation']:
-                    if field in doc and doc[field] is not None:
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                    if field == 'time_limit' and isinstance(doc[field], int):
+                        text_parts.append(f"Time Limit: {doc[field]} minutes")
+                    elif field in doc and doc[field] is not None:
+                        # Normalize any text fields
+                        if isinstance(doc[field], str):
+                            value = self._normalize_text(doc[field])
+                        else:
+                            value = doc[field]
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
                 
-            case 'event':
-                # Add event-specific fields
+            case 'Event':
+                # For events, prioritize the title by placing it at the beginning
+                title = doc.get('title', '')
+                if title:
+                    # Normalize the title to improve matching
+                    normalized_title = self._normalize_text(title)
+                    # Add the title at the beginning for emphasis
+                    text_parts.insert(0, f"Event: {normalized_title}")
+                    text_parts.insert(0, f"Title: {normalized_title}")
+                
                 for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
                              'location_address', 'context_code', 'context_name', 
                              'all_context_codes', 'url']:
                     if field in doc and doc[field] is not None:
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {doc[field]}")
+                        # Normalize any text fields
+                        if isinstance(doc[field], str):
+                            value = self._normalize_text(doc[field])
+                        else:
+                            value = doc[field]
+                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
         
         # Add module information
         module_id = doc.get('module_id')
@@ -177,11 +253,58 @@ class VectorDatabase:
         
         module_name = doc.get('module_name')
         if module_name:
+            # Normalize module name
+            if isinstance(module_name, str):
+                module_name = self._normalize_text(module_name)
             text_parts.append(f"Module Name: {module_name}")
         
         # Join all parts with newlines for better separation
+        # After processing, the text_parts list for a singule assingment item will have the following format:
+        # [
+        #     "ID: 123",
+        #     "Type: Assignment",
+        #     "Course ID: 456",
+        #     "Name: HW2",
+        #     "Description: This is a description of the assignment",
+        #     "Created At: 2021-01-01",
+        #     "Updated At: 2021-01-02",
+        #     "Due At: 2021-01-03",
+        #     "Submission Types: Online Text Entry, Online Upload",
+        #     "Graded Submissions Exist: True",
+        #     "Module ID: 123",
+        #     "Module Name: Module 1",
+        #     "Content Link(s):
+        #       https://www.example.com
+        #       https://www.example.com
+        #       https://www.example.com
+        #       https://www.example.com
+        #       https://www.example.com
+        #       https://www.example.com
+        # ]
         return "\n".join(text_parts)
     
+    def _normalize_text(self, text: str) -> str:
+        """
+        Normalize text by handling special characters and standardizing formats.
+        
+        Args:
+            text: Text to normalize.
+            
+        Returns:
+            Normalized text.
+        """
+        if not isinstance(text, str):
+            return text
+            
+        # Replace various types of quotes and apostrophes with standard ones
+        normalized = text.replace('\u2019', "'").replace('\u2018', "'")
+        normalized = normalized.replace('\u201c', '"').replace('\u201d', '"')
+        
+        # Replace other common special characters
+        normalized = normalized.replace('\u2013', '-').replace('\u2014', '-')
+        
+        return normalized
+        
     def process_data(self, force_reload: bool = False) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
@@ -204,10 +327,6 @@ class VectorDatabase:
             logger.error(f"Error loading JSON file: {e}")
             return False
         
-        # Process documents
-        self.documents = []
-        self.document_map = {}
-        
         # Extract user metadata
         user_metadata = data.get('user_metadata', {})
         logger.info(f"Processing data for user ID: {user_metadata.get('id')}")
@@ -219,152 +338,70 @@ class VectorDatabase:
             if course_id:
                 self.course_map[course_id] = course
         
-        # Prepare data for ChromaDB
-        ids = []
-        texts = []
-        metadatas = []
+        ids = [] # list of document IDs
+        texts = [] # list of preprocessed text for each document
+        metadatas = [] # list of metadata for each document
         
-        # Process files
-        files = data.get('files', [])
-        for file in files:
-            file_id = file.get('id')
-            if not file_id:
-                continue
-            
-            # Make sure type is set
-            if 'type' not in file:
-                file['type'] = 'file'
-                
-            # Store document in memory
-            self.documents.append(file)
-            self.document_map[str(file_id)] = file
-            
-            # Prepare for ChromaDB
-            ids.append(str(file_id))
-            texts.append(self._preprocess_text_for_embedding(file))
-            
-            # Extract metadata for filtering
-            metadata = {
-                'id': str(file_id),
-                'type': 'file',
-                'course_id': str(file.get('course_id', '')),
-                'folder_id': str(file.get('folder_id', ''))
-            }
-            metadatas.append(metadata)
+        # Process all document types
+        document_types = {
+            'files': 'file',
+            'announcements': 'announcement',
+            'assignments': 'assignment',
+            'quizzes': 'quiz',
+            'calendar_events': 'event'
+        }
+
+        # collection_key is the key of the dictionary in the JSON file that contains list documents
+        # doc_type is the type of document
         
-        # Process announcements
-        announcements = data.get('announcements', [])
-        for announcement in announcements:
-            announcement_id = announcement.get('id')
-            if not announcement_id:
-                continue
+        for collection_key, doc_type in document_types.items():
+            items = data.get(collection_key, [])
             
-            # Make sure type is set
-            if 'type' not in announcement:
-                announcement['type'] = 'announcement'
+            for item in items:
+                item_id = item.get('id')
+                if not item_id:
+                    continue
                 
-            # Store document in memory
-            self.documents.append(announcement)
-            self.document_map[str(announcement_id)] = announcement
-            
-            # Prepare for ChromaDB
-            ids.append(str(announcement_id))
-            texts.append(self._preprocess_text_for_embedding(announcement))
-            
-            # Extract metadata for filtering
-            metadata = {
-                'id': str(announcement_id),
-                'type': 'announcement',
-                'course_id': str(announcement.get('course_id', ''))
-            }
-            metadatas.append(metadata)
-        
-        # Process assignments
-        assignments = data.get('assignments', [])
-        for assignment in assignments:
-            assignment_id = assignment.get('id')
-            if not assignment_id:
-                continue
-            
-            # Make sure type is set
-            if 'type' not in assignment:
-                assignment['type'] = 'assignment'
+                # Make sure type is set
+                if 'type' not in item:
+                    item['type'] = doc_type
+                    
+                # Store document in memory
+                self.documents.append(item)
+                self.document_map[str(item_id)] = item
                 
-            # Store document in memory
-            self.documents.append(assignment)
-            self.document_map[str(assignment_id)] = assignment
-            
-            # Prepare for ChromaDB
-            ids.append(str(assignment_id))
-            texts.append(self._preprocess_text_for_embedding(assignment))
-            
-            # Extract metadata for filtering
-            metadata = {
-                'id': str(assignment_id),
-                'type': 'assignment',
-                'course_id': str(assignment.get('course_id', '')),
-                'module_id': str(assignment.get('module_id', ''))
-            }
-            metadatas.append(metadata)
-        
-        # Process quizzes
-        quizzes = data.get('quizzes', [])
-        for quiz in quizzes:
-            quiz_id = quiz.get('id')
-            if not quiz_id:
-                continue
-            
-            # Make sure type is set
-            if 'type' not in quiz:
-                quiz['type'] = 'quiz'
+                # Prepare for ChromaDB
+                ids.append(str(item_id))
+                texts.append(self._preprocess_text_for_embedding(item))
                 
-            # Store document in memory
-            self.documents.append(quiz)
-            self.document_map[str(quiz_id)] = quiz
-            
-            # Prepare for ChromaDB
-            ids.append(str(quiz_id))
-            texts.append(self._preprocess_text_for_embedding(quiz))
-            
-            # Extract metadata for filtering
-            metadata = {
-                'id': str(quiz_id),
-                'type': 'quiz',
-                'course_id': str(quiz.get('course_id', '')),
-                'module_id': str(quiz.get('module_id', ''))
-            }
-            metadatas.append(metadata)
-        
-        # Process calendar events
-        events = data.get('calendar_events', [])
-        for event in events:
-            event_id = event.get('id')
-            if not event_id:
-                continue
-            
-            # Make sure type is set
-            if 'type' not in event:
-                event['type'] = 'event'
+                # Create base metadata
+                metadata = {
+                    'id': str(item_id),
+                    'type': doc_type,
+                    'course_id': str(item.get('course_id', ''))
+                }
+
+                # Add module_id to metadata if it exists
+                if item.get('module_id'):
+                    metadata['module_id'] = str(item['module_id'])
                 
-            # Parse course_id from context_code if available
-            if 'context_code' in event and event['context_code'].startswith('course_'):
-                event['course_id'] = event['context_code'].replace('course_', '')
+                # Add type-specific metadata fields
+                match doc_type:
+                    case 'file':
+                        metadata['folder_id'] = str(item.get('folder_id', ''))
+                    
+                    case 'announcement' | 'assignment' | 'quiz':
+                        if item.get('module_id'):
+                            metadata['module_id'] = str(item.get('module_id', ''))
+                    
+                    case 'event':
+                        # Parse course_id from context_code if available
+                        if 'context_code' in item and item['context_code'].startswith('course_'):
+                            course_id = item['context_code'].replace('course_', '')
+                            item['course_id'] = course_id
+                            metadata['course_id'] = str(course_id)
                 
-            # Store document in memory
-            self.documents.append(event)
-            self.document_map[str(event_id)] = event
-            
-            # Prepare for ChromaDB
-            ids.append(str(event_id))
-            texts.append(self._preprocess_text_for_embedding(event))
-            
-            # Extract metadata for filtering
-            metadata = {
-                'id': str(event_id),
-                'type': 'event',
-                'course_id': str(event.get('course_id', ''))
-            }
-            metadatas.append(metadata)
+                metadatas.append(metadata)
         
         # Build document relations
         self._build_document_relations(self.documents)
@@ -447,6 +484,7 @@ class VectorDatabase:
             documents: List of document dictionaries.
         """
         # Build relations based on course_id and module_id
+        # doc is a dictionary of a single document
         for doc in documents:
             doc_id = doc.get('id')
             if not doc_id:
@@ -558,12 +596,17 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        # Prepare where clause for filtering by course_id and/or document type
+        # Normalize the query to handle special characters
+        normalized_query = self._normalize_text(query)
+        
+        # Holds filtering conditions for the search
         where_clause = {}
         
+        # Filter by course_id if provided
         if course_ids:
-            where_clause["course_id"] = {"$in": course_ids}
+            where_clause["course_id"] = {"$in": course_ids} # $in is used to filter by a list of values
         
+        # Filter by document type if provided
         if doc_types:
             where_clause["type"] = {"$in": doc_types}
         
@@ -573,15 +616,16 @@ class VectorDatabase:
         
         # Query ChromaDB
         results = self.collection.query(
-            query_texts=[query],  # Use the query as-is, no enhancement
+            query_texts=[normalized_query],  # Use the normalized query
             n_results=top_k * 2,  # Get more results than needed to account for filtering
-            where=where_clause
+            where=where_clause, # Apply filters if any
+            include=["distances", "documents"]
         )
         
         # Process results
         search_results = []
-        doc_ids = results.get('ids', [[]])[0]
-        distances = results.get('distances', [[]])[0]
+        doc_ids = results.get('ids', [[]])[0] # access the first (and only) list in the results
+        distances = results.get('distances', [[]])[0] # access the first (and only) list in the results
         
         for i, doc_id in enumerate(doc_ids):
             doc = self.document_map.get(doc_id)
@@ -603,14 +647,15 @@ class VectorDatabase:
         
         # Include related documents if requested
         if include_related and search_results:
-            related_docs = self._get_related_documents([r['document']['id'] for r in search_results])
+            related_docs = self._get_related_documents([r['document'].get('id') for r in search_results])
             for doc in related_docs:
                 # Add related document with a slightly lower similarity score
-                search_results.append({
-                    'document': doc,
-                    'similarity': minimum_score,  # Use minimum score for related docs
-                    'is_related': True
-                })
+                if not any(r['document'].get('id') == doc.get('id') for r in search_results):
+                    search_results.append({
+                        'document': doc,
+                        'similarity': minimum_score,  # Use minimum score for related docs
+                        'is_related': True
+                    })
         
         # Sort by similarity score
         search_results.sort(key=lambda x: x['similarity'], reverse=True)
@@ -661,53 +706,46 @@ class VectorDatabase:
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
 
-    def _detect_document_type(self, query: str) -> Optional[List[str]]:
-        """
-        Detect likely document types based on query content.
-        
-        Args:
-            query: Query string.
-            
-        Returns:
-            List of likely document types or None if no specific type is detected.
-        """
-        query_lower = query.lower()
-        doc_types = []
-        
-        # Assignment-related terms
-        if any(term in query_lower for term in ["assignment", "homework", "due", "submit", "deadline", "lab", "project"]):
-            doc_types.append("assignment")
-        
-        # File-related terms
-        if any(term in query_lower for term in ["file", "document", "download", "upload", "pdf", "docx", "presentation"]):
-            doc_types.append("file")
-        
-        # Announcement-related terms
-        if any(term in query_lower for term in ["announcement", "announce", "notification", "update", "news", "important"]):
-            doc_types.append("announcement")
-        
-        # Quiz-related terms
-        if any(term in query_lower for term in ["quiz", "test", "exam", "assessment", "question"]):
-            doc_types.append("quiz")
-        
-        # Event-related terms
-        if any(term in query_lower for term in ["event", "meeting", "schedule", "calendar", "when", "time", "date"]):
-            doc_types.append("event")
-        
-        return doc_types if doc_types else None
-
 
 # Example usage
 if __name__ == "__main__":
+    # Define the path to the user data JSON file
+    user_id = "1234"  # Replace with actual user ID if needed
+    json_file_path = f"user_data/CanvasAI/UserData/psu.instructure.com/{user_id}/user_data2.json"
+    
+    # Check if the file exists, if not, try to find it in the current directory
+    if not os.path.exists(json_file_path):
+        logger.warning(f"File not found at {json_file_path}, checking current directory")
+        if os.path.exists("user_data2.json"):
+            json_file_path = "user_data2.json"
+        else:
+            # Look for any JSON files in the current directory
+            json_files = [f for f in os.listdir('.') if f.endswith('.json')]
+            if json_files:
+                json_file_path = json_files[0]
+                logger.info(f"Using JSON file found in current directory: {json_file_path}")
+            else:
+                logger.error("No JSON files found. Please provide a valid path to the user data JSON file.")
+                exit(1)
+    
     # Initialize the vector database with the path to your JSON data file
-    vector_db = VectorDatabase("user_data.json")
-    vector_db.process_data()
+    vector_db = VectorDatabase(json_file_path)
+    
+    # Clear the cache to ensure we're starting fresh
+    vector_db.clear_cache()
+    
+    # Process the data
+    processed = vector_db.process_data(force_reload=True)  # Force reload to apply the new preprocessing
+    if processed:
+        logger.info("Successfully processed data")
+    else:
+        logger.info("Using cached data")
     
     # Search for documents
-    results = vector_db.search("When is the next assignment due?", top_k=3)
+    results = vector_db.search("Bit Byte", top_k=10)
     
     # Print results
     for result in results:
-        print(f"Document: {result['document'].get('name', 'Unnamed')} ({result['document'].get('type')})")
+        print(f"Document: {result['document'].get('name', result['document'].get('title', result['document'].get('display_name', 'Unnamed')))} ({result['document'].get('type')})")
         print(f"Similarity: {result['similarity']:.4f}")
         print("---")
