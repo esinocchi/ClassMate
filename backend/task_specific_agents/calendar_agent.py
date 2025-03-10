@@ -1,59 +1,65 @@
 import os 
 from dotenv import load_dotenv
 import requests
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 load_dotenv()
 
 canvas_api_url= os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
+
 def find_events(
-   canvas_base_url: str,
-   access_token: str,
-   start_date: str,
-   end_date: str,
-   context_codes: list
-) -> dict:
+    canvas_base_url: str,
+    access_token: str,
+    course_code: str
+) -> list:
     """
-    Retrieve calendar events from the Canvas API.
+    Retrieve calendar events from the Canvas API for a specific course code from now until the next 3 months.
 
     Parameters:
         canvas_base_url (str): The base URL of the Canvas instance 
                                (e.g., 'https://canvas.instructure.com').
         access_token (str): Your Canvas API access token.
-        start_date (str): Start date (ISO8601 format) to filter events.
-        end_date (str): End date (ISO8601 format) to filter events.
-        context_codes (list): List of context codes (e.g., ['course_123', 'user_456'])
-                              to filter the calendar events.
+        course_code (str): The course code to filter the calendar events (e.g., 'course_123').
 
     Returns:
-        dict: The JSON response from the Canvas API containing the events.
-
-    Raises:
-        requests.exceptions.HTTPError: If the API returns an unsuccessful status code.
+        list: Raw calendar events from the Canvas API
     """
+    # Calculate the start date as now and the end date as three months from now
+    start_date = datetime.now()
+    end_date = start_date + relativedelta(months=3)
+    
+    # Format dates in the specific format Canvas expects (YYYY-MM-DD)
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d')
 
+    # Build the URL for the calendar events endpoint
     url = f"{canvas_base_url}/calendar_events"
 
+    # Prepare the headers with the access token
     headers = {
         "Authorization": f"Bearer {access_token}"
     }
 
-    # Construct query parameters.
+    # Set up the query parameters
     params = {
-        "start_date": start_date,
-        "end_date": end_date,
+        "start_date": start_date_str,
+        "end_date": end_date_str,
+        "context_codes[]": course_code,
+        "per_page": 100  # Request maximum number of events
     }
 
-    # Canvas expects multiple context_codes using the parameter name 'context_codes[]'
-    # so we add each code as part of the query parameters.
-    for code in context_codes:
-        params.setdefault("context_codes[]", []).append(code)
-
+    # Make the API call
     response = requests.get(url, headers=headers, params=params)
     response.raise_for_status()
-    return response.json()
-
+    
+    # Get the raw response
+    events = response.json()
+    
+    # Return the raw events list
+    return events if isinstance(events, list) else events.get('calendar_events', [])
 
 def create_event(
         canvas_base_url: str,
@@ -138,25 +144,20 @@ def create_event(
     return response.json()
 
 
-
 if __name__ == "__main__":
-    # Example usage:
-    canvas_base_url = canvas_api_url  # Replace with your Canvas domain.
+    # Replace these with your actual Canvas details
+    canvas_base_url = canvas_api_url
     access_token = canvas_api_token
-    start_date = "2025-03-01T00:00:00Z"
-    end_date = "2025-03-03T23:59:59Z"
-    context_codes = [ "course_2372294","user_7210330"]
+    course_code = "course_2372294"
 
     try:
-        events = find_events(
-            canvas_base_url=canvas_base_url,
-            access_token=access_token,
-            start_date=start_date,
-            end_date=end_date,
-            context_code=context_codes
-        )
-        print("Retrieved events:")
-        print(events)
-    except requests.exceptions.HTTPError as e:
-        print("Failed to retrieve events:")
-        print(e)
+        events = find_events(canvas_base_url, access_token, course_code)
+        
+        print("\nFound Events:")
+        print("-" * 50)
+        
+        for event in events:
+            print(event)
+        
+    except requests.exceptions.HTTPError as err:
+        print("An HTTP error occurred:", err)
