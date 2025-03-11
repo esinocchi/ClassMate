@@ -22,7 +22,7 @@ canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 #These need variable need to be pulled dynamically for the system context.
 student_name = "Arshawn Vossoughi"
-students_id = "user_12345"
+students_id = "user_7210330"
 courses = {"physics":"course_2372294","statistics":"course_2381676", "Earth 101":"course_2361510","Apocalyptic Geographies":"course_2361723"}
 
 #Needs to be updated as needed
