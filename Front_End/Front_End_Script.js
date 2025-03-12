@@ -134,7 +134,8 @@ async function handlePrompt() {
 
     // Create a new box to hold the prompt and response
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-    addMemoryBox(prompt, APIdata.response);
+    console.log(APIdata)
+    addMemoryBox(prompt, "sample response");
 }
 
 //open settings window
