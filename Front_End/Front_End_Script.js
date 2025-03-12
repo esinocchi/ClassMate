@@ -130,7 +130,7 @@ async function handlePrompt() {
         });
     });
 
-    const APIdata = await sampleAPI();
+    const APIdata = await sampleAPI(5, 7);
 
     // Create a new box to hold the prompt and response
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
@@ -335,10 +335,10 @@ function getCheckboxStates() {
 //below this is API calls
 
 
-async function sampleAPI() {
+async function sampleAPI(int1, int2) {
     console.log("FETCHING COMENSE");
     try {
-        const response = await fetch('https://canvasclassmate.me/');  // Correct the URL here
+        const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry?int1=${int1}&int2=${int2}`);  // Correct the URL here
         const data = await response.json();  // Wait for the JSON data
         console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
         return data;  // Return the data
