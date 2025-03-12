@@ -130,11 +130,11 @@ async function handlePrompt() {
         });
     });
 
-    const APIdata = await sampleAPI(promptPairs);
+    const APIdata = await sampleAPI();
 
     // Create a new box to hold the prompt and response
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-    addMemoryBox(prompt, APIdat);
+    addMemoryBox(prompt, APIdata);
 }
 
 //open settings window
@@ -336,8 +336,9 @@ function getCheckboxStates() {
 
 
 async function sampleAPI() {
+    console.log("FETCHING COMENSE");
     try {
-        const response = await fetch('https://canvasclassmate.me');  // Correct the URL here
+        const response = await fetch('https://canvasclassmate.me/');  // Correct the URL here
         const data = await response.json();  // Wait for the JSON data
         console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
         return data;  // Return the data
