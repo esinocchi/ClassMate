@@ -103,40 +103,34 @@ async function handlePrompt() {
     let prompt = promptEntryBox.value;
     let response = ''; // Default response can be set here, e.g. "sample response"
     promptEntryBox.value = ''; // Clear the prompt entry box
-    promptValues = [];
+    let promptPairs = [];
     promptEntryBox.select(); // Select the input box to prepare for the next prompt
 
     if (!prompt) {
         return;
     }
 
-    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
-        // Default to an empty array if "previousChats_CanvasAI" doesn't exist
-        let promptPairs = result.previousChats_CanvasAI || [];
+    // Wait for the promptPairs to be updated in local storage
+    await new Promise((resolve) => {
+        chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
+            // Default to an empty array if "previousChats_CanvasAI" doesn't exist
+            promptPairs = result.previousChats_CanvasAI || [];
 
-        // If the list is longer than 20, pop the last one and add the new prompt-response pair
-        if (promptPairs.length > 19) {
-            promptPairs.pop(); 
-        }
-        
-        promptPairs.unshift([prompt, "sample response"]); 
+            // If the list is longer than 20, pop the last one and add the new prompt-response pair
+            if (promptPairs.length > 19) {
+                promptPairs.pop();
+            }
 
-        // Save updated list back to local storage
-        chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
+            promptPairs.unshift([prompt, "sample response"]); // Add the new prompt to the front
+
+            // Save updated list back to local storage
+            chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
+                resolve(); // Resolve the promise to continue
+            });
         });
     });
 
-    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
-        // Check if there is an error or if the data is not found
-        if (chrome.runtime.lastError) {
-            console.error("Error retrieving data:", chrome.runtime.lastError);
-            return; // Exit if there's an error
-        }
-        // Load the data into the local variable
-        promptValues = result.previousChats_CanvasAI || []; 
-    });
-
-    const APIdata = await sampleAPI(promptValues);
+    const APIdata = await sampleAPI(promptPairs);
 
     // Create a new box to hold the prompt and response
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
@@ -333,13 +327,17 @@ function getCheckboxStates() {
 }
 
 
+//below this are await helper functions
+
+
+
 
 //below this is API calls
 
 
 async function sampleAPI() {
     try {
-        const response = await fetch('https://3.133.153.53:8000/');  // Correct the URL here
+        const response = await fetch('https://canvasclassmate.me');  // Correct the URL here
         const data = await response.json();  // Wait for the JSON data
         console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
         return data;  // Return the data
