@@ -19,4 +19,4 @@ app.add_middleware(
 
 @app.get('/')
 async def root():
-    return {'Sample': 'Sample API Return'}
+    return {'response': 'Sample API Return'}
