@@ -15,12 +15,17 @@ Items: files, assignment, announcement, quiz, page, event
 """
 
 
+import io
+from docx import Document 
 import requests
 import os
+import time
 import json
+import fitz  # PyMuPDF
+import pytesseract
 from dotenv import load_dotenv 
 from bs4 import BeautifulSoup
-
+from PIL import Image
 
 BASE_DIR = "Desktop/Projects/"
 #Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
@@ -30,6 +35,182 @@ load_dotenv()
 
 
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+
+def get_text_from_links(links: list):
+    """
+    Process a list of links in the format [{filename: fileurl}] and extract text.
+    This function handles the entire process of downloading and extracting text from files.
+    """
+    complete_text = ""
+    for link_dict in links:
+        for filename, fileurl in link_dict.items():
+            try:
+                # Extract file ID and course ID from the Canvas URL
+                # Example URL: https://psu.instructure.com/courses/123456/files/789012
+                file_id = fileurl.split('/')[-1].split('?')[0]  # Get file ID (789012)
+                course_id = fileurl.split('/courses/')[1].split('/')[0]  # Get course ID (123456)
+                
+                # Construct the Canvas API endpoint for file metadata
+                api_url = f"{API_URL}/courses/{course_id}/files/{file_id}"
+
+                # First request: Get file metadata including the actual download URL
+                headers = {"Authorization": f"Bearer {API_TOKEN}"}
+                response = requests.get(api_url, headers=headers)
+                
+                if response.status_code != 200:
+                    continue
+
+                # Extract the actual download URL from the file metadata
+                file_data = response.json()
+                download_url = file_data.get('url')
+                
+                if not download_url:
+                    continue
+
+                # Second request: Download the actual file content
+                file_response = requests.get(download_url, headers=headers)
+
+                if file_response.status_code != 200:
+                    continue
+
+                # Get the raw file content as bytes
+                file_bytes = file_response.content
+
+                # Determine the file type from the filename extension
+                file_type = get_file_type(filename)
+
+                # Process the file based on its type and extract text
+                extracted_text = extract_text_and_images(file_bytes, file_type)
+                complete_text += f"\nText from {filename}:\n{extracted_text}\n\n"
+            except Exception:
+                continue
+    return complete_text
+
+def get_file_type(filename: str):
+    """
+    Determine the file type based on the filename extension.
+    Returns the lowercase extension (e.g., "pdf", "docx", "png")
+    """
+    # Extract the file extension (e.g., "pdf", "docx", "png")
+    file_extension = filename.split(".")[-1].lower()
+    return file_extension
+
+def extract_text_and_images(file_bytes: bytes, file_type: str):
+    """
+    Extract text from files based on their type using raw bytes.
+    Handles different file types (PDF, DOCX, TXT, images) and extracts text accordingly.
+    For PDFs, also handles image extraction and OCR.
+    """
+    total_text = ""
+    print(f"\nProcessing file type: {file_type}")
+
+    try:
+        if file_type == "pdf":
+            # Handle PDF files
+            try:
+                # Create a memory stream from the PDF bytes
+                pdf_stream = io.BytesIO(file_bytes)
+                # Open the PDF document
+                doc = fitz.open(stream=pdf_stream, filetype="pdf")
+
+                # Check if PDF is password protected
+                if doc.is_encrypted:
+                    return "PDF is encrypted and cannot be processed."
+
+                # Process each page of the PDF
+                for page_num in range(len(doc)):
+                    try:
+                        # Extract text from the page
+                        page = doc.load_page(page_num)
+                        text = page.get_text()
+                        if text:
+                            total_text += f"Text from page {page_num + 1}:\n{text}\n"
+
+                        # Extract and process images from the page
+                        image_list = page.get_images(full=True)
+                        for img_index, img in enumerate(image_list):
+                            try:
+                                # Extract image data and perform OCR
+                                xref = img[0]
+                                base_image = doc.extract_image(xref)
+                                if base_image and "image" in base_image:
+                                    image_bytes = base_image["image"]
+                                    image = Image.open(io.BytesIO(image_bytes))
+                                    ocr_text = pytesseract.image_to_string(image)
+                                    if ocr_text:
+                                        total_text += f"Image {img_index + 1} from page {page_num + 1}:\n{ocr_text}\n"
+                            except Exception:
+                                continue
+                    except Exception:
+                        continue
+
+                # Clean up resources
+                doc.close()
+                pdf_stream.close()
+
+            except Exception as pdf_error:
+                return f"Error processing PDF: {pdf_error}"
+
+        elif file_type == "docx":
+            # Handle DOCX files
+            try:
+                # Open DOCX file from memory and extract text from paragraphs
+                doc = Document(io.BytesIO(file_bytes))
+                for paragraph in doc.paragraphs:
+                    if paragraph.text:
+                        total_text += paragraph.text + "\n"
+            except Exception as docx_error:
+                return f"Error processing DOCX: {docx_error}"
+
+        elif file_type == "txt":
+            # Handle TXT files
+            try:
+                # Try different text encodings to handle various text file formats
+                encodings = ['utf-8', 'latin-1', 'ascii', 'iso-8859-1']
+                for encoding in encodings:
+                    try:
+                        text = file_bytes.decode(encoding)
+                        if text:
+                            total_text = text
+                            break
+                    except UnicodeDecodeError:
+                        continue
+            except Exception as txt_error:
+                return f"Error processing TXT: {txt_error}"
+
+        elif file_type in ["jpg", "jpeg", "png"]:
+            # Handle image files using OCR
+            try:
+                # Open image and perform OCR to extract text
+                image = Image.open(io.BytesIO(file_bytes))
+                ocr_text = pytesseract.image_to_string(image)
+                if ocr_text:
+                    total_text = ocr_text
+            except Exception as img_error:
+                return f"Error processing image: {img_error}"
+
+    except Exception as e:
+        return f"Unexpected error: {e}"
+
+    # Print summary of extracted text
+    print(f"Extracted text ({len(total_text)} characters):\n{total_text[:500]}...")
+    return total_text
+
+def extract_links_from_html(html_string: str):
+    """
+    Extract file links from HTML content.
+    Looks for links to common document and image file types.
+    Returns a list of dictionaries in the format [{filename: fileurl}]
+    """
+    soup = BeautifulSoup(html_string, "html.parser")
+    links_found = []
+    for a in soup.find_all("a", href=True):
+        url_found = a["href"]
+        url_name = a.text or ""
+        # Check if the link points to a supported file type
+        if ".pdf" in url_name or ".txt" in url_name or ".rtf" in url_name or ".odt" in url_name or ".doc" in url_name or ".docx" in url_name or ".xlsx" in url_name or ".html" in url_name or ".md" in url_name or ".jpg" in url_name or ".png" in url_name or ".epub" in url_name or ".csv" in url_name or ".pptx" in url_name:
+            links_found += [{url_name: url_found}]
+    return links_found
 
 def get_all_user_data():  
     """
@@ -45,47 +226,357 @@ def get_all_user_data():
     }
     
     """
+    user_info = requests.get(f"{API_URL}/users/self", headers={"Authorization": f"Bearer {API_TOKEN}"}).json()
 
-    user_data = {"user_metadata" : {}, "courses": {}, "items": []}
+    user_data = {"user_metadata" : {"id": user_info.get("id"), "name": user_info.get("short_name"), "token": "", "domain": "", "updated_at": time.time(), "courses_selected": []}, "courses": [], "files": [], "announcements": [], "assignments": [], "quizzes": [], "calendar_events": [], "current_chat_context": ""}
+    
     page_number = 1
     #data in Canvas API is pagenated, so you have to manually go through multiple pages in case there are more items of the type needed
     
+    # getting courses
+    #
     while True: 
     #any "while True" function is always meant to go through multiple pages over and over until there's no more data left to retrieve
+        print("yo")
         user_courses = requests.get(f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": ["all_courses", "syllabus_body"], "page": page_number, "access_token": {API_TOKEN}}).json() 
         if user_courses == []:
             break
 
         for i in range(len(user_courses)):
-            user_data["courses"][user_courses[i].get("id")] = {
-                "id": user_courses[i].get("id"),
-                "name": user_courses[i].get("name"),
-                "code": user_courses[i].get("code"),
-                "description": user_courses[i].get("description"),
-                
-                }
+            if user_courses[i].get("syllabus_body") is None:
+                user_data["courses"] += [{
+                    "id": user_courses[i].get("id"),
+                    "name": user_courses[i].get("name"),
+                    "course_code": user_courses[i].get("course_code"),
+                    "original_name": user_courses[i].get("original_name"),
+                    "default_view": user_courses[i].get("course_code"),
+                    "syllabus_body": [],
+                    "public_description": user_courses[i].get("public_description"),
+                    "time_zone": user_courses[i].get("time_zone"),
+                    }]
+            else:
+                user_data["courses"] += [{
+                    "id": user_courses[i].get("id"),
+                    "name": user_courses[i].get("name"),
+                    "course_code": user_courses[i].get("course_code"),
+                    "original_name": user_courses[i].get("original_name"),
+                    "default_view": user_courses[i].get("course_code"),
+                    "syllabus_body": user_courses[i].get("syllabus_body"),
+                    "public_description": user_courses[i].get("public_description"),
+                    "time_zone": user_courses[i].get("time_zone"),
+                    }]
         page_number += 1
     #all courses that have a syllabus section have now been added to the "user_data" dictionary
 
     page_number = 1
-    
-    while True: 
-    #go back and add courses that don't have their syllabus explicitly posted
-        user_courses = requests.get(f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": {API_TOKEN}}).json() 
-        if user_courses == []:
-            break
+    #
+    # getting courses
+    print(len(user_data["courses"]), "length of courses")
+    for course in user_data["courses"]:
+      course_id = course.get("id")
+      
+      # getting modules
+      #
+      files_added = []
+      assignments_added = []
+      quizzes_added = []
+      page_number = 1
 
-        for i in range(len(user_courses)):
-            if user_courses[i].get("name") not in user_data:
-                user_data[user_courses[i].get("name")] = {"course_ID": user_courses[i].get("id"), "course_files": {}, "course_syllabus": []}
+      while True:
+        course_modules = requests.get(f"{API_URL}/courses/{course_id}/modules", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": {API_TOKEN}}).json()
+        if type(course_modules) is list and course_modules != []:
+            
+            for module in course_modules:
+               module_id = module.get("id")
+               module_name = module.get("name")
+               module_page_number = 1
+
+               # getting module items
+               #
+               while True:
+                  course_module_items = requests.get(f"{API_URL}/courses/{course_id}/modules/{module_id}/items", params={"enrollment_state": "active", "include[]": "all_courses", "page": module_page_number, "access_token": {API_TOKEN}}).json()
+                  
+                  if type(course_module_items) is list and course_module_items != []:
+                    
+                    for module_item in course_module_items:
+                       
+                        item_type = module_item.get("type")
+                       
+                        if item_type == "File":
+                            files_added += [module_item.get("content_id")]
+                            file = requests.get(f"{API_URL}/files/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                            user_data["files"] += [{
+                                "course_id": course_id,
+                                "id": file.get("id"),
+                                "type": file.get("type"),
+                                "folder_id": file.get("folder_id"),
+                                "display_name": file.get("display_name"),
+                                "filename": file.get("filename"),
+                                "url": file.get("url"),
+                                "size": file.get("size"),
+                                "updated_at": file.get("updated_at"),
+                                "locked": file.get("locked"),
+                                "lock_explanation": file.get("lock_explanation"),
+                                "module_id": module_id,
+                                "module_name": module_name
+
+                          }]
+                        elif item_type == "Assignment":
+                            assignments_added += [module_item.get("content_id")]
+                            assignment = requests.get(f"{API_URL}/courses/{course_id}/assignments/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                            user_data["assignments"] += [{
+                               "id": assignment.get("id"),
+                               "type": assignment.get("type"),
+                               "name": assignment.get("name"),
+                               "description": assignment.get("description"),
+                               "created_at": assignment.get("created_at"),
+                               "updated_at": assignment.get("updated_at"),
+                               "due_at": assignment.get("due_at"),
+                               "course_id": assignment.get("course_id"),
+                               "submission_types": assignment.get("submission_types"),
+                               "can_submit": assignment.get("can_submit"),
+                               "graded_submission_exist": assignment.get("graded_submission_exist"),
+                               "can_submit": assignment.get("can_submit"),
+                               "graded_submissions_exist": assignment.get("graded_submission_exist"),
+                               "module_id": module_id,
+                               "module_name": module_name,
+                               "content": extract_links_from_html(assignment.get("description") or "")
+                            }]
+                        elif item_type == "Quiz":
+                           quizzes_added += [module_item.get("content_id")]
+                           quiz = requests.get(f"{API_URL}/courses/{course_id}/quizzes/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                           user_data["quizzes"] += [{
+                               "id": quiz.get("id"),
+                               "title": quiz.get("title"),
+                               "preview_url": quiz.get("preview_url"),
+                               "description": quiz.get("description"),
+                               "quiz_type": quiz.get("quiz_type"),
+                               "time_limit": quiz.get("time_limit"),
+                               "allowed_attempts": quiz.get("allowed_attempts"),
+                               "points_possible": quiz.get("points_possible"),
+                               "due_at": quiz.get("due_at"),
+                               "locked_for_user": quiz.get("locked_for_user"),
+                               "lock_explanation": quiz.get("lock_explanation"),
+                               "module_id": module_id,
+                               "module_name": module_name,
+                            }]
+                        
+                           
+                  
+                  else:
+                     break
+                  module_page_number += 1
+
+               #
+               # getting module items
+               
+        else:
+           break
         page_number += 1
-    #all courses have now been added to the "user_data" dictionary
-    
-    return
+      #
+      # getting modules
 
-def test():
-    announcements = requests.get(f"{API_URL}/announcements", headers={"Authorization": f"Bearer: {API_TOKEN}"}, params=[]).json() 
-    print(announcements)
-    return "yo"
 
-test()
+      # getting extra files
+      #
+      page_number = 1
+
+      while True:
+         course_files = requests.get(f"{API_URL}/courses/{course_id}/files", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": {API_TOKEN}}).json()
+         
+         if type(course_files) is list and course_files != []:
+            
+            for i in range(len(course_files)):
+               
+               if type(course.get("syllabus_body")) is list and course_files[i].get("name") and "syllabus" in course_files[i].get("name"):
+                    course["syllabus_body"] += [course_files[i].get("url")]
+               #stores the file_name and file_URL of the syllabus if found
+               if course_files[i].get("id") not in files_added:
+                  user_data["files"] += [{
+                        "course_id": course_id,
+                        "id": course_files[i].get("id"),
+                        "type": course_files[i].get("type"),
+                        "folder_id": course_files[i].get("folder_id"),
+                        "display_name": course_files[i].get("display_name"),
+                        "filename": course_files[i].get("filename"),
+                        "url": course_files[i].get("url"),
+                        "size": course_files[i].get("size"),
+                        "updated_at": course_files[i].get("updated_at"),
+                        "locked": course_files[i].get("locked"),
+                        "lock_explanation": course_files[i].get("lock_explanation"),
+                        "module_id": None,
+                        "module_name": None
+                    }]
+         else:
+            break
+         page_number += 1
+      #
+      # getting files
+
+      # getting assignments
+      # 
+      page_number = 1
+      
+      while True:
+         course_assignments = requests.get(f"{API_URL}/courses/{course_id}/assignments", params={"enrollment_state": "active", "page": page_number, "access_token": {API_TOKEN}}).json()
+
+         if type(course_assignments) is list and course_assignments != []:
+            
+            for i in range(len(course_assignments)):
+               if course_assignments[i].get("id") not in assignments_added:
+                  user_data["assignments"] += [{
+                               "id": course_assignments[i].get("id"),
+                               "type": course_assignments[i].get("type"),
+                               "name": course_assignments[i].get("name"),
+                               "description": course_assignments[i].get("description"),
+                               "created_at": course_assignments[i].get("created_at"),
+                               "updated_at": course_assignments[i].get("updated_at"),
+                               "due_at": course_assignments[i].get("due_at"),
+                               "course_id": course_assignments[i].get("course_id"),
+                               "submission_types": course_assignments[i].get("submission_types"),
+                               "can_submit": course_assignments[i].get("can_submit"),
+                               "graded_submission_exist": course_assignments[i].get("graded_submission_exist"),
+                               "can_submit": course_assignments[i].get("can_submit"),
+                               "graded_submissions_exist": course_assignments[i].get("graded_submission_exist"),
+                               "module_id": None,
+                               "module_name": None,
+                               "content": extract_links_from_html(course_assignments[i].get("description") or "")
+                            }]
+         else:
+            break
+         page_number += 1
+      #
+      # getting assignments
+
+      # getting quizzes
+      # 
+      page_number = 1
+      
+      while True:
+         course_quizzes = requests.get(f"{API_URL}/courses/{course_id}/quizzes", params={"enrollment_state": "active", "page": page_number, "access_token": {API_TOKEN}}).json()
+
+         if type(course_quizzes) is list and course_quizzes != []:
+            
+            for i in range(len(course_quizzes)):
+                if course_quizzes[i].get("id") not in quizzes_added:
+                    user_data["quizzes"] += [{
+                            "id": course_quizzes[i].get("id"),
+                            "title": course_quizzes[i].get("title"),
+                            "preview_url": course_quizzes[i].get("preview_url"),
+                            "description": course_quizzes[i].get("description"),
+                            "quiz_type": course_quizzes[i].get("quiz_type"),
+                            "time_limit": course_quizzes[i].get("time_limit"),
+                            "allowed_attempts": course_quizzes[i].get("allowed_attempts"),
+                            "points_possible": course_quizzes[i].get("points_possible"),
+                            "due_at": course_quizzes[i].get("due_at"),
+                            "locked_for_user": course_quizzes[i].get("locked_for_user"),
+                            "lock_explanation": course_quizzes[i].get("lock_explanation"),
+                            "module_id": None,
+                            "module_name": None,
+                }]
+         else:
+            break
+         page_number += 1
+      # 
+      # getting quizzes    
+
+      # getting announcements
+      #
+      for i in range(1, 3, 1):
+        announcements = requests.get(f"{API_URL}/announcements", params={"pager": i, "context_codes[]": [f"course_{course_id}"],"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+        for announcement in announcements:
+            user_data["announcements"] += [{
+                "id": announcement.get("id"),
+                "title": announcement.get("title"),
+                "message": announcement.get("message"),
+                "course_id": course_id,
+                "posted_at": announcement.get("posted_at"),
+                "discussion_type": announcement.get("discussion_type"),
+                "course_name": course.get("name")
+            }]
+      #
+      # getting announcements
+
+      # getting calendar events
+      #
+      page_number = 1
+
+      while True:
+         calendar_events = requests.get(f"{API_URL}/calendar_events", params={"page": page_number, "context_codes[]": [f"course_{course_id}"],"enrollment_state": "active"}, headers={"Authorization": f"Bearer: {API_TOKEN}"}).json()
+
+         if type(calendar_events) is list and calendar_events != []:
+            
+            for event in calendar_events:
+                user_data["calendar_events"] += [{
+                    "id": event.get("id"),
+                    "title": event.get("title"),
+                    "start_at": event.get("start_at"),
+                    "end_at": event.get("end_at"),
+                    "description": event.get("description"),
+                    "location_name": event.get("location_name"),
+                    "location_address": event.get("location_address"),
+                    "context_code": event.get("context_code"),
+                    "context_name": event.get("context_name"),
+                    "all_context_codes": event.get("all_context_codes"),
+                    "url": event.get("url")
+                }]
+         else:
+            break
+         page_number += 1
+
+      #
+      # getting calendar events
+      
+      # getting home page
+      #
+      if course.get("syllabus_body") == [] or course.get("syllabus_body") is None or course.get("syllabus_body") == "":
+        try:
+            home_page = requests.get(f"{API_URL}/courses/{course_id}/front_page", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+            course.update({"syllabus_body": home_page.get("front_page")})
+        except Exception as e:
+            print(f"Error getting home page: {e}")
+      #
+      # getting home page
+     
+      # getting syllabi
+      #
+      course_syllabus = course.get("syllabus_body")
+      if course_syllabus:  # Check if syllabus exists
+          if isinstance(course_syllabus, str):
+              # Handle case where syllabus is HTML content with embedded links
+              links = extract_links_from_html(course_syllabus)
+              if links:  # Only process if links were found
+                  final_text = get_text_from_links(links)
+                  # Combine original syllabus with extracted text
+                  course_syllabus = f"{course_syllabus}\n\nExtracted Content:\n{final_text}"
+          elif isinstance(course_syllabus, list):
+              # Handle case where syllabus is a list of direct file links
+              final_text = ""
+              for link in course_syllabus:
+                  # Convert single link to expected format for get_text_from_links
+                  if isinstance(link, str):
+                      filename = link.split('/')[-1]  # Get filename from URL
+                      links = [{filename: link}]
+                      final_text += get_text_from_links(links)
+              course_syllabus = final_text
+          else:
+              print(f"Unexpected syllabus type: {type(course_syllabus)}")
+              course_syllabus = ""
+
+          # Update the course with processed syllabus
+          course.update({"syllabus_body": course_syllabus})
+          print(f"\nCourse: {course.get('name')}")
+          print(f"Syllabus length: {len(course_syllabus)} characters")
+          print(f"First 200 characters: {course_syllabus[:200]}...")
+      #
+      # getting syllabi
+
+    # Calculate and print the size of user_data in bytes
+    user_data_json = json.dumps(user_data)
+    user_data_size_bytes = len(user_data_json.encode('utf-8'))
+    print(f"\nTotal size of user_data: {user_data_size_bytes:,} bytes")
+    print(f"Size in MB: {user_data_size_bytes / (1024 * 1024):.2f} MB")
+
+    return user_data
+
+get_all_user_data()
