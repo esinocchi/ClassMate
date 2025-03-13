@@ -309,7 +309,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
      #
      while True: 
      #any "while True" function is always meant to go through multiple pages over and over until there's no more data left to retrieve
-         user_courses = requests.get(f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": ["all_courses", "syllabus_body"], "page": page_number, "access_token": {API_TOKEN}}).json() 
+         user_courses = requests.get(f"{API_URL}/courses/", params={"enrollment_state": "active", "include[]": ["all_courses", "syllabus_body"], "page": page_number, "access_token": API_TOKEN}).json() 
          if user_courses == []:
              break
          
@@ -359,7 +359,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        page_number = 1
  
        while True:
-         course_modules = requests.get(f"{API_URL}/courses/{course_id}/modules", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": {API_TOKEN}}).json()
+         course_modules = requests.get(f"{API_URL}/courses/{course_id}/modules", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": API_TOKEN}).json()
          
          #if the course has modules, then add the modules to the user_data dictionary
          if type(course_modules) is list and course_modules != []:
@@ -372,7 +372,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
                 # getting module items
                 #
                 while True:
-                   course_module_items = requests.get(f"{API_URL}/courses/{course_id}/modules/{module_id}/items", params={"enrollment_state": "active", "include[]": "all_courses", "page": module_page_number, "access_token": {API_TOKEN}}).json()
+                   course_module_items = requests.get(f"{API_URL}/courses/{course_id}/modules/{module_id}/items", params={"enrollment_state": "active", "include[]": "all_courses", "page": module_page_number, "access_token": API_TOKEN}).json()
                    
                    #if the module within a course has module items, then add the module items to the user_data dictionary
                    if type(course_module_items) is list and course_module_items != []:
@@ -384,11 +384,12 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
                         
                          if item_type == "File":
                              files_added += [module_item.get("content_id")]
-                             file = requests.get(f"{API_URL}/files/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                             file = requests.get(f"{API_URL}/files/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": API_TOKEN}).json()
                              user_data["files"] += [{
                                  "course_id": course_id,
                                  "id": file.get("id"),
-                                 "type": file.get("type"),
+                                 "type": "file",
+                                 "file_extension": get_file_type(file.get("display_name") or ""),
                                  "folder_id": file.get("folder_id"),
                                  "display_name": file.get("display_name"),
                                  "filename": file.get("filename"),
@@ -403,7 +404,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
                            }]
                          elif item_type == "Assignment":
                              assignments_added += [module_item.get("content_id")]
-                             assignment = requests.get(f"{API_URL}/courses/{course_id}/assignments/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                             assignment = requests.get(f"{API_URL}/courses/{course_id}/assignments/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": API_TOKEN}).json()
                              user_data["assignments"] += [{
                                 "id": assignment.get("id"),
                                 "type": assignment.get("type"),
@@ -424,7 +425,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
                              }]
                          elif item_type == "Quiz":
                             quizzes_added += [module_item.get("content_id")]
-                            quiz = requests.get(f"{API_URL}/courses/{course_id}/quizzes/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+                            quiz = requests.get(f"{API_URL}/courses/{course_id}/quizzes/{module_item.get('content_id')}", params={"enrollment_state": "active", "access_token": API_TOKEN}).json()
                             user_data["quizzes"] += [{
                                 "id": quiz.get("id"),
                                 "title": quiz.get("title"),
@@ -464,7 +465,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        page_number = 1
  
        while True:
-          course_files = requests.get(f"{API_URL}/courses/{course_id}/files", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": {API_TOKEN}}).json()
+          course_files = requests.get(f"{API_URL}/courses/{course_id}/files", params={"enrollment_state": "active", "include[]": "all_courses", "page": page_number, "access_token": API_TOKEN}).json()
           
           if type(course_files) is list and course_files != []:
              
@@ -481,10 +482,14 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
                 
                 #stores the file object if the file is not already in the files_added list
                 if course_files[i].get("id") not in files_added:
+                   # Get file extension using your existing function
+                   file_extension = get_file_type(course_files[i].get("display_name") or "")
+                   
                    user_data["files"] += [{
                          "course_id": course_id,
                          "id": course_files[i].get("id"),
-                         "type": course_files[i].get("type"),
+                         "type": "file",  # Explicitly set type to 'file'
+                         "file_extension": file_extension,  # Store the extension in a separate field
                          "folder_id": course_files[i].get("folder_id"),
                          "display_name": course_files[i].get("display_name"),
                          "filename": course_files[i].get("filename"),
@@ -508,7 +513,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        page_number = 1
        
        while True:
-          course_assignments = requests.get(f"{API_URL}/courses/{course_id}/assignments", params={"enrollment_state": "active", "page": page_number, "access_token": {API_TOKEN}}).json()
+          course_assignments = requests.get(f"{API_URL}/courses/{course_id}/assignments", params={"enrollment_state": "active", "page": page_number, "access_token": API_TOKEN}).json()
  
           if type(course_assignments) is list and course_assignments != []:
              
@@ -546,7 +551,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        page_number = 1
        
        while True:
-          course_quizzes = requests.get(f"{API_URL}/courses/{course_id}/quizzes", params={"enrollment_state": "active", "page": page_number, "access_token": {API_TOKEN}}).json()
+          course_quizzes = requests.get(f"{API_URL}/courses/{course_id}/quizzes", params={"enrollment_state": "active", "page": page_number, "access_token": API_TOKEN}).json()
  
           if type(course_quizzes) is list and course_quizzes != []:
              
@@ -580,7 +585,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        #
        print("  - Getting announcements...")
        for i in range(1, 3, 1):
-         announcements = requests.get(f"{API_URL}/announcements", params={"pager": i, "context_codes[]": [f"course_{course_id}"],"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+         announcements = requests.get(f"{API_URL}/announcements", params={"pager": i, "context_codes[]": [f"course_{course_id}"],"enrollment_state": "active", "access_token": API_TOKEN}).json()
         
          #if the course has announcements, then add the announcements to the user_data dictionary
          for announcement in announcements:
@@ -632,7 +637,7 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
          
          #try to get the home page to update the syllabus_body
          try:
-             home_page = requests.get(f"{API_URL}/courses/{course_id}/front_page", params={"enrollment_state": "active", "access_token": {API_TOKEN}}).json()
+             home_page = requests.get(f"{API_URL}/courses/{course_id}/front_page", params={"enrollment_state": "active", "access_token": API_TOKEN}).json()
              course.update({"syllabus_body": home_page.get("front_page")})
          except:
              #if the home page is not found, then pass
@@ -667,6 +672,11 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
        # updating syllabi
  
      print("\n=== SECTION 3: Finalizing Data Collection ===")
+     
+     # Remove duplicates from all collections
+     print("  - Removing duplicate entries...")
+     user_data = remove_duplicates(user_data)
+     
      user_data_json = json.dumps(user_data)
      user_data_size_bytes = len(user_data_json.encode('utf-8'))
      print(f"\nTotal size of user_data: {user_data_size_bytes:,} bytes")
@@ -674,3 +684,43 @@ def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_data: di
      print("\n=== Data Collection Complete ===")
  
      return user_data
+
+def remove_duplicates(user_data: dict) -> dict:
+    """
+    Remove duplicate items from all collections in the user_data dictionary.
+    Items are considered duplicates if they have the same ID.
+    
+    Args:
+        user_data: The complete user data dictionary
+        
+    Returns:
+        The user data dictionary with duplicates removed
+    """
+    # Collections that need duplicate checking
+    collections = ['files', 'assignments', 'announcements', 'quizzes', 'calendar_events']
+    
+    for collection in collections:
+        if collection in user_data:
+            # Track seen IDs and unique items
+            seen_ids = set()
+            unique_items = []
+            duplicates_removed = 0
+            
+            for item in user_data[collection]:
+                # Get the ID of the item
+                item_id = str(item.get('id'))
+                
+                # If we haven't seen this ID before, add it to our unique items
+                if item_id and item_id not in seen_ids:
+                    seen_ids.add(item_id)
+                    unique_items.append(item)
+                else:
+                    duplicates_removed += 1
+            
+            # Replace the collection with the deduplicated list
+            user_data[collection] = unique_items
+            
+            if duplicates_removed > 0:
+                print(f"    - Removed {duplicates_removed} duplicate {collection}")
+    
+    return user_data
