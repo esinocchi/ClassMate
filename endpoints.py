@@ -21,6 +21,8 @@ class ContextEntry(BaseModel):
 
 class ContextEntry2(BaseModel):
     role: str
+    id: str
+    domain: str
     content: List[str]
     classes: List[str]
 
@@ -48,5 +50,5 @@ async def mainPipelineEntry(contextArray: ContextObject):
 async def returnPromptContext(studentID, college):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
-    classes = []
+    classes = ["cmpsc311", "cmpeng270", "math250"] #create sample list
     return {'classes': classes}
