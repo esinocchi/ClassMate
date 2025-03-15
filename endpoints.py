@@ -25,7 +25,7 @@ class ContextEntry2(BaseModel):
     classes: List[str]
 
 class ContextObject(BaseModel):
-    __root__: List[Union[ContextEntry, ContextEntry2]]
+    context: List[Union[ContextEntry, ContextEntry2]]
 
 
 # Root directory for testing connection
@@ -42,7 +42,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
         contextArray.context[0].content[0] = "sample response"  # Update the content of the first entry
 
     # Go through method routes and include meta-data for output format (pdf out for example)
-    return contextArray  # Return the modified ContextObject
+    return contextArray.context  # Return the modified Context
 
 @app.get('/endpoints/pullClasses')
 async def returnPromptContext(studentID, college):

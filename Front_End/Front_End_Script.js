@@ -127,7 +127,7 @@ async function handlePrompt() {
                 promptPairs[1].content.unshift(prompt);
 
                 try {
-                    const updated = await mainPipelineEntry(JSON.stringify(promptPairs)); // Update memory of response based on pipeline return
+                    const updated = await mainPipelineEntry({context: promptPairs}); // Update memory of response based on pipeline return
                     response = updated[0].content[0]; // Update response for display
                     
                     // Save updated list back to local storage
