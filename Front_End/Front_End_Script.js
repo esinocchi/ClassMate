@@ -287,7 +287,7 @@ function rebuildPage() {
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         let context = result.Context_CanvasAI || [{"role": "assistant", "content": []},{"role": "user", "content": [], "classes": []}];
         for (let i = context[0].content.length - 1; i >= 0; i--) {
-            addMemoryBox(context[0].content[i], context[1].content[i]); //reload chat history context based on storage
+            addMemoryBox(context[1].content[i], context[0].content[i]); //reload chat history context based on storage
         };
 
         for (let i = context[1].classes.length - 1; i >= 0; i--) {
