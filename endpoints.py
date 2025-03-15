@@ -1,22 +1,21 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List
+from typing import List, Union
 
 app = FastAPI()
 
-# Pydantic JSON models
 class ContextEntry(BaseModel):
     role: str
     content: List[str]
-    classes: List[str]  # Added 'classes' field
 
 class ContextEntry2(BaseModel):
     role: str
     content: List[str]
-
+    classes: List[str]
 
 class ContextObject(BaseModel):
-    context: List[ContextEntry, ContextEntry2]
+    context: List[Union[ContextEntry, ContextEntry2]]
+
 
 # Root directory for testing connection
 @app.get('/')
