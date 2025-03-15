@@ -123,7 +123,7 @@ async function handlePrompt() {
 
                 
 
-                promptPairs[0].content.unshift(""); // Add the new prompt to the front
+                promptPairs[0].content.unshift("holder response"); // Add the new prompt to the front
                 promptPairs[1].content.unshift(prompt);
 
                 try {
@@ -347,7 +347,7 @@ function getURL() {
 
 
 async function mainPipelineEntry(contextJSON) {
-    console.log("FETCHING COMENSE");
+    console.log(`FETCHING COMENSE with: ${contextJSON}`);
     try {
         const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry`,{
             method: 'POST',

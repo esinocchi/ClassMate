@@ -24,7 +24,7 @@ class ContextEntry2(BaseModel):
     classes: List[str]
 
 class ContextObject(BaseModel):
-    context: List[Union[ContextEntry, ContextEntry2]]
+    __root__: List[Union[ContextEntry, ContextEntry2]]
 
 
 # Root directory for testing connection
