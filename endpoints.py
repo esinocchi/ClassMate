@@ -10,8 +10,13 @@ class ContextEntry(BaseModel):
     content: List[str]
     classes: List[str]  # Added 'classes' field
 
+class ContextEntry2(BaseModel):
+    role: str
+    content: List[str]
+
+
 class ContextObject(BaseModel):
-    context: List[ContextEntry]
+    context: List[ContextEntry, ContextEntry2]
 
 # Root directory for testing connection
 @app.get('/')
