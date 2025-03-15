@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 load_dotenv()
 
 API_URL = "https://psu.instructure.com/api/v1"
-API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+API_TOKEN = os.getenv("CANVAS_TOKEN")
 
 
 class DataHandler:
@@ -214,11 +214,8 @@ def run_tests():
         domain = "psu.instructure.com"
         
         # Using actual course IDs from your Canvas courses
-        courses_selected = [            
-            2372294,
-            2381676,
-            2361510,
-            2361723]
+        courses_selected = [2379517, 2361957, 2361815, 2364485, 2361972]
+
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Set base_dir to CanvasAI root
         
         print("\n=== DataHandler Test Suite ===\n")
