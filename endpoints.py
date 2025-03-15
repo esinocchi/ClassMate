@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import json
 
 app = FastAPI()
 
@@ -9,9 +10,15 @@ async def root():
 
 #enter main prompt pipeline and return response
 @app.get('/endpoints/mainPipelineEntry')
-async def mainPipelineEntry(prompt, promptContect, classesContext):
+async def mainPipelineEntry(contextObj): #contextObj is JSON object
+    contextarray = json.loads(contextObj)
+    print(contextarray)
+
+    #functoinality to update responses
+    contextarray[0]["context"][0] = "sample response"
+    
     #go through method routes and include meta data for output format (pdf out for example)
-    return {'response': prompt}
+    return json.dumps(contextarray)
 
 @app.get('/endpoints/pullClasses')
 async def returnPromptContext(studentID, college):
