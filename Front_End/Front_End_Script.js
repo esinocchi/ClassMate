@@ -94,7 +94,7 @@ document.addEventListener("keydown", function(event) {
 
 //reload past chats and class settings on page load
 window.addEventListener("load", () => {
-    rebuildPage();  //  *** check into this function
+    rebuildPage();
 });
 
 //main functionality for prompt handling
@@ -110,13 +110,13 @@ async function handlePrompt() {
     try {
 
         // Wait for the promptPairs to be updated in local storage
-        await new Promise(async (resolve) => {
+        await new Promise((resolve, reject) => {
             chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
                 // Default to an empty prompt pair structure if "Context_CanvasAI" doesn't exist
                 let promptPairs = result.Context_CanvasAI || [{"role": "assistant", "content": []},{"role": "user", "content": [], "classes": []}];
 
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
-                if (promptPairs[0].content > 19) {
+                if (promptPairs[0].content.length > 19) {
                     promptPairs[0].content.pop();
                     promptPairs[1].content.pop();
                 }
@@ -126,12 +126,17 @@ async function handlePrompt() {
                 promptPairs[0].content.unshift(""); // Add the new prompt to the front
                 promptPairs[1].content.unshift(prompt);
 
-                const updatedPromptPairs = await mainPipelineEntry(JSON.stringify(promptPairs)); //update memory of response based on pipeline return
-
-                response = updatedPromptPairs[0].content[0]; // update response for display
-
-                // Save updated list back to local storage
-                chrome.storage.local.set({ Context_CanvasAI: updatedPromptPairs }, resolve);
+                try {
+                    const updated = await mainPipelineEntry(JSON.stringify(promptPairs)); // Update memory of response based on pipeline return
+                    response = updated[0].content[0]; // Update response for display
+                    
+                    // Save updated list back to local storage
+                    chrome.storage.local.set({ Context_CanvasAI: updated }, function() {
+                        resolve(updated); // Resolve the promise with updated data
+                });
+                } catch (error) {
+                    reject(error); // Reject the promise in case of error in mainPipelineEntry
+                }
             });
         });
 
@@ -344,7 +349,19 @@ function getURL() {
 async function mainPipelineEntry(contextJSON) {
     console.log("FETCHING COMENSE");
     try {
-        const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry?=${contextJSON}`);  // Correct the URL here
+        const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry`,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', 
+            },
+            body: JSON.stringify(contextJSON),
+        }); 
+
+        //check for error
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
         const data = await response.json();  // Wait for the JSON data
         console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
         return data;  // Return the data

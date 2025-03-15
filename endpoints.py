@@ -1,24 +1,33 @@
 from fastapi import FastAPI
-import json
+from pydantic import BaseModel
+from typing import List
 
 app = FastAPI()
 
-#root directory for testing connection
+# Pydantic JSON models
+class ContextEntry(BaseModel):
+    role: str
+    content: List[str]
+    classes: List[str]  # Added 'classes' field
+
+class ContextObject(BaseModel):
+    context: List[ContextEntry]
+
+# Root directory for testing connection
 @app.get('/')
 async def root():
     return {'response': 'Sample API Return'}
 
-#enter main prompt pipeline and return response
-@app.get('/endpoints/mainPipelineEntry')
-async def mainPipelineEntry(contextObj): #contextObj is JSON object
-    contextarray = json.loads(contextObj)
-    print(contextarray)
+# Enter main prompt pipeline and return response
+@app.post('/endpoints/mainPipelineEntry')
+async def mainPipelineEntry(contextArray: ContextObject): 
+    # Functionality to update responses
+    # Here we assume you want to update the first context entry's content
+    if len(contextArray.context) > 0:  # Ensure there's at least one entry
+        contextArray.context[0].content[0] = "sample response"  # Update the content of the first entry
 
-    #functoinality to update responses
-    contextarray[0]["context"][0] = "sample response"
-    
-    #go through method routes and include meta data for output format (pdf out for example)
-    return json.dumps(contextarray)
+    # Go through method routes and include meta-data for output format (pdf out for example)
+    return contextArray  # Return the modified ContextObject
 
 @app.get('/endpoints/pullClasses')
 async def returnPromptContext(studentID, college):
