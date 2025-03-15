@@ -8,7 +8,8 @@ app = FastAPI()
 # Add CORSMiddleware to allow cross-origin requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://psu.instructure.com"],  # Allowed origin(s)
+    allow_origins=["https://psu.instructure.com", 
+                   "https://canvasclassmate.me"],  # Allowed origins
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
