@@ -18,8 +18,13 @@ import aiofiles
 
 load_dotenv()
 
+<<<<<<< HEAD
 API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
+=======
+API_URL = "https://psu.instructure.com/api/v1"
+API_TOKEN = os.getenv("CANVAS_TOKEN")
+>>>>>>> fd925ace6cff1cde0886a4b74daa0cf999a18719
 
 
 class DataHandler:
@@ -326,9 +331,43 @@ class DataHandler:
         self.user_data["current_chat_context"] = ""
         return self.save_user_data()
 
+<<<<<<< HEAD
 response = requests.get(
 f"{API_URL}/users/self",
         headers={"Authorization": f"Bearer {API_TOKEN}"}
+=======
+def run_tests():
+    """
+    Test suite simulating real user flow:
+    1. First time user setup (new DataHandler with course selection)
+    2. Later session (loading existing user data into new DataHandler)
+    3. Updating data and testing other functions
+    """
+    try:
+        # Test Setup
+        user = requests.get(f"{API_URL}/users/self", headers={"Authorization": f"Bearer {API_TOKEN}"}).json()
+        user_id = user.get("id")
+        domain = "psu.instructure.com"
+        
+        # Using actual course IDs from your Canvas courses
+        courses_selected = [2379517, 2361957, 2361815, 2364485, 2361972]
+
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Set base_dir to CanvasAI root
+        
+        print("\n=== DataHandler Test Suite ===\n")
+
+        print("=== Scenario 1: First Time User Setup ===")
+        
+        # Test 1: First Time User Creation
+        print("\nTest 1: Creating new DataHandler for first time user...")
+        first_handler = DataHandler(
+            id=user_id,
+            domain=domain,
+            token=API_TOKEN,
+            short_name="Test User",
+            courses_selected=courses_selected,
+            base_dir=base_dir  # Using actual base directory
+>>>>>>> fd925ace6cff1cde0886a4b74daa0cf999a18719
         )
 user = response.json()
 user_id = user.get("id")
