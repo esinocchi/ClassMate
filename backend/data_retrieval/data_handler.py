@@ -1,5 +1,6 @@
 import io
 from docx import Document 
+import aiohttp
 import requests
 import os
 import time
@@ -11,81 +12,128 @@ from get_all_user_data import get_all_user_data
 from bs4 import BeautifulSoup
 from PIL import Image
 from urllib.parse import urlparse
+import asyncio
+import aiofiles
 
 
 load_dotenv()
 
-API_URL = "https://psu.instructure.com/api/v1"
+API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("CANVAS_API_TOKEN")
 
 
 class DataHandler:
-    def __init__(self, id, domain, token, short_name="", courses_selected=[], base_dir=""):
+    def __init__(self, id, domain, token = "", short_name="", courses_selected=[]):
         """
-        Initialize DataHandler with user credentials and settings
+        Initialize DataHandler with user credentials and settings.
 
         ================================================
 
-        The minimum required parameters are id, domain, token, and base_dir.
-        
+        The minimum required parameters are `id`, `domain`, and `token`. 
+        The `short_name` and `courses_selected` parameters are optional.
+
+        ================================================
+
+        Parameters:
+        -----------
+        id : int
+            The unique identifier for the user (Canvas user ID).
+        domain : str
+            The domain of the Canvas instance (e.g., "psu.instructure.com").
+        token : str, optional
+            The API token for authenticating with the Canvas API. If not provided, 
+            it will be retrieved from the environment variables.
+        short_name : str, optional
+            A short name or display name for the user (e.g., "John Doe").
+        courses_selected : list, optional
+            A list of course IDs that the user has selected for data retrieval.
+
         ================================================
 
         Examples of parameters:
+        -----------------------
         id = 1234567890
         domain = "psu.instructure.com"
         token = "1234567890"
         short_name = "John Doe"
         courses_selected = [1234567890, 1234567891, 1234567892]
-        base_dir = "/path/to/base/directory"
-        
-        ================================================
-
-        if this is the first time a user is added, * initialize with courses_selected: list *
-
-        if this isn't the first time, * grab the courses_selected from the user_data file *
-        
-        domain example: psu.instructure.com
 
         ================================================
 
-        get_user_data_path() description:
-        - get the path to the user's data file
-        - if the user's data file doesn't exist, create it
-        - if the user's data file does exist, load it
+        Notes:
+        ------
+        - If this is the first time a user is added, initialize with `courses_selected` as a list of course IDs.
+        - If this isn't the first time, the `courses_selected` will be loaded from the user's data file.
+        - The `domain` should be the full domain (e.g., "psu.instructure.com"), but only the subdomain (e.g., "psu") will be used internally.
 
-        upload_data() description:
-        - converts user_data into json and uploads it into the individual user's data file
-
-        initiate_user_data() description:
-        - grabs user info from canvas api
-        - creates user_data dictionary
-        - uploads user_data to the user's data file
-
-        grab_user_data() description:   
-        - grabs the user_data from the user's data file
-        - updates the instance variables with the user_data
-
-        update_user_data() description:
-        - grabs the user_data from the user's data file
-        - updates the user_data with fresh data from canvas api
-
-        update_chat_context() description:
-        - updates the chat_context in the user_data dictionary
-
-        delete_chat_context() description:
-        - deletes the chat_context in the user_data dictionary
-        
         ================================================
 
+        Methods:
+        --------
+        _get_user_data_path():
+            - Returns the full path to the user's data file.
+            - If the user's data file doesn't exist, it will be created.
+
+        save_user_data():
+            - Saves the current user data to the user's data file synchronously.
+            - Returns a success message or an error message if the save fails.
+
+        initiate_user_data():
+            - Initializes the user_data dictionary with basic structure.
+            - Retrieves user info from the Canvas API and populates the user_data dictionary.
+            - Saves the initialized user data to the user's data file.
+
+        grab_user_data():
+            - Loads the user_data from the user's data file.
+            - Updates the instance variables with the loaded user_data.
+            - Returns the loaded user_data or an error message if the file is not found.
+
+        update_user_data():
+            - Updates the user data from the Canvas API asynchronously in the background.
+            - Starts the update process and returns immediately, allowing the update to run in the background.
+            - Updates the user_data dictionary with fresh data from the Canvas API and saves it to the user's data file.
+
+        update_chat_context(chat_context: str):
+            - Updates the `current_chat_context` field in the user_data dictionary with the provided chat context.
+            - Saves the updated user data to the user's data file.
+
+        delete_chat_context():
+            - Clears the `current_chat_context` field in the user_data dictionary.
+            - Saves the updated user data to the user's data file.
+
+        ================================================
+
+        Example Usage:
+        --------------
+        # Initialize the DataHandler with user credentials
+        handler = DataHandler(user_id, domain, API_TOKEN, courses_selected=courses_selected)
+
+        # Initiate user data (first-time setup)
+        handler.initiate_user_data()
+
+        # Grab user data from the file
+        user_data = handler.grab_user_data()
+
+        # Update user data in the background
+        handler.update_user_data()
+
+        # Update chat context
+        handler.update_chat_context("Current chat context")
+
+        # Delete chat context
+        handler.delete_chat_context()
+
+        ================================================
         """
         self.id = id
         self.name = short_name
         self.API_TOKEN = token
         self.domain = domain.split('.')[0]  # Just get 'psu' from 'psu.instructure.com'
-        self.base_dir = base_dir
+        self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.API_URL = f"https://{domain}/api/v1"
         self.courses_selected = courses_selected
         self.time_token_updated = time.time()
+        self.user_data = None
         
         # Get the path to the main CanvasAI directory (2 levels up from this file)
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -101,34 +149,47 @@ class DataHandler:
         """
         return os.path.join(self.data_dir, self.domain, str(self.id), "user_data.json")
 
-    def upload_data(self, user_data: dict):
+    def save_user_data(self):
         """
-        Converts user_data into json and uploads it into the individual user's data file
+        Save user data to file synchronously
         """
         file_path = self._get_user_data_path()
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         
         try:
             with open(file_path, "w") as f:
-                json.dump(user_data, f, indent=4)
-            return "User data uploaded successfully"
-        except:
-            return "Error uploading user data"
+                json.dump(self.user_data, f, indent=4)
+            return "User data saved successfully"
+        except Exception as e:
+            return f"Error saving user data: {str(e)}"
     
     def initiate_user_data(self):
         """
         Initiates the user_data dictionary with basic structure
         """
         try:
-            user_info = requests.get(
-                f"{self.API_URL}/users/self",
-                headers={"Authorization": f"Bearer {self.API_TOKEN}"}
-            )
-            user_info.raise_for_status()
-            user_info = user_info.json()
+            # Define the async function for the API call
+            async def get_user_info():
+                async with aiohttp.ClientSession() as session:
+                    headers = {"Authorization": f"Bearer {self.API_TOKEN}"}
+                    async with session.get(f"{self.API_URL}/users/self", headers=headers) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            raise ValueError(f"Failed to get user info: {error_text}")
+                        
+                        return await response.json()
             
+            # Run the async function in a new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                user_info = loop.run_until_complete(get_user_info())
+            finally:
+                loop.close()
+            
+            # Process the results synchronously
             self.name = user_info["short_name"]
-            user_data = {
+            self.user_data = {
                 "user_metadata": {
                     "id": self.id,
                     "name": self.name,
@@ -146,8 +207,7 @@ class DataHandler:
                 "current_chat_context": ""
             }
             
-            self.upload_data(user_data)
-            return "User data initiated successfully"
+            return self.save_user_data()
         except Exception as e:
             print(f"Error details: {str(e)}")
             return f"Error initiating user data: {str(e)}"
@@ -162,175 +222,131 @@ class DataHandler:
             
         try:
             with open(file_path, "r") as f:
-                user_data = json.load(f)
+                self.user_data = json.load(f)
             
             # Update instance variables from loaded data
-            metadata = user_data["user_metadata"]
+            metadata = self.user_data["user_metadata"]
             self.name = metadata["name"]
             self.courses_selected = metadata["courses_selected"]
+            self.API_TOKEN = metadata["token"]
             
-            return user_data
-        except:
-            return "Error grabbing user data"
+            return self.user_data
+        except Exception as e:
+            return f"Error grabbing user data: {str(e)}"
 
     def update_user_data(self):
         """
-        Updates the user_data dictionary with fresh data from Canvas
+        Updates the user data from Canvas by running get_all_user_data asynchronously in the background.
+        This function starts the update process and returns immediately, allowing the update to run in the background.
         """
-        user_data = self.grab_user_data()
-        user_data = get_all_user_data(self.base_dir, self.API_URL, self.API_TOKEN, user_data, self.courses_selected)
-        self.upload_data(user_data)
-        return "User data updated successfully"
-    
+        try:
+            # First ensure we have current user data
+            if self.user_data is None:
+                self.grab_user_data()
+            
+            # Define the background update coroutine
+            async def background_update():
+                try:
+                    print("\n=== Starting Background Update ===")
+                    start_time = time.time()
+                    
+                    # Verify we have valid courses selected
+                    if not self.courses_selected:
+                        print("⚠️ No courses are selected for update")
+                        print("Current courses in user_data:", self.user_data["user_metadata"]["courses_selected"])
+                        return
+                        
+                    print(f"Updating data for {len(self.courses_selected)} courses: {self.courses_selected}")
+                    
+                    # Get fresh data from Canvas
+                    updated_data = await get_all_user_data(
+                        self.base_dir,
+                        self.API_URL,
+                        self.API_TOKEN,
+                        self.user_data,
+                        self.courses_selected
+                    )
+                    
+                    # Update the user data and timestamp
+                    self.user_data = updated_data
+                    self.user_data["user_metadata"]["updated_at"] = time.time()
+                    
+                    # Save the updated data
+                    self.save_user_data()
+                    
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    print(f"\n=== Background Update Complete ===")
+                    print(f"Duration: {duration:.2f} seconds")
+                    print(f"Successfully updated data for {len(self.courses_selected)} courses")
+                    
+                except ValueError as ve:
+                    print(f"\n⚠️ Update failed: {str(ve)}")
+                    print("Your courses_selected list may need to be updated with current course IDs.")
+                    
+                except Exception as e:
+                    print(f"\n❌ Error in background update: {str(e)}")
+                    raise
+
+            def run_async_update():
+                """Run the async update in a new event loop in a separate thread"""
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(background_update())
+                finally:
+                    loop.close()
+
+            # Start the background update in a separate thread
+            import threading
+            update_thread = threading.Thread(target=run_async_update)
+            update_thread.daemon = True  # Allow the program to exit even if thread is running
+            update_thread.start()
+            
+        except Exception as e:
+            print(f"Error starting background update: {str(e)}")
+
     def update_chat_context(self, chat_context: str):
         """
         Updates the chat_context in the user_data dictionary
         """
-        user_data = self.grab_user_data()
-        user_data["current_chat_context"] = chat_context
-        self.upload_data(user_data)
-        return "Chat context updated successfully"
+        if self.user_data is None:
+            self.grab_user_data()
+        
+        self.user_data["current_chat_context"] = chat_context
+        return self.save_user_data()
 
     def delete_chat_context(self):
         """
         Deletes the chat_context in the user_data dictionary
         """
-        user_data = self.grab_user_data()
-        user_data["current_chat_context"] = ""
-        self.upload_data(user_data)
-        return "Chat context deleted successfully"
+        if self.user_data is None:
+            self.grab_user_data()
+            
+        self.user_data["current_chat_context"] = ""
+        return self.save_user_data()
 
-def run_tests():
-    """
-    Test suite simulating real user flow:
-    1. First time user setup (new DataHandler with course selection)
-    2. Later session (loading existing user data into new DataHandler)
-    3. Updating data and testing other functions
-    """
-    try:
-        # Test Setup
-        user = requests.get(f"{API_URL}/users/self", headers={"Authorization": f"Bearer {API_TOKEN}"}).json()
-        user_id = user.get("id")
-        domain = "psu.instructure.com"
-        
-        # Using actual course IDs from your Canvas courses
-        courses_selected = [            
-            2372294,
-            2381676,
-            2361510,
-            2361723]
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Set base_dir to CanvasAI root
-        
-        print("\n=== DataHandler Test Suite ===\n")
-
-        print("=== Scenario 1: First Time User Setup ===")
-        
-        # Test 1: First Time User Creation
-        print("\nTest 1: Creating new DataHandler for first time user...")
-        first_handler = DataHandler(
-            id=user_id,
-            domain=domain,
-            token=API_TOKEN,
-            short_name="Test User",
-            courses_selected=courses_selected,
-            base_dir=base_dir  # Using actual base directory
+response = requests.get(
+f"{API_URL}/users/self",
+        headers={"Authorization": f"Bearer {API_TOKEN}"}
         )
-        print("✓ First time DataHandler created")
-
-        # Test 2: Initialize New User Data
-        print("\nTest 2: Initializing first time user data...")
-        init_result = first_handler.initiate_user_data()
-        print(f"Result: {init_result}")
-        if "successfully" in init_result:
-            print("✓ First time user data initialized")
-            print(f"Initialized with {len(courses_selected)} courses: {courses_selected}")
-        else:
-            print("✗ First time user data initialization failed")
-            return
-
-        print("\n=== Scenario 2: Returning User Session ===")
-
-        # Test 3: Create New Handler Instance (simulating new session)
-        print("\nTest 3: Creating new DataHandler for existing user...")
-        returning_handler = DataHandler(
-            id=user_id,
-            domain=domain,
-            token=API_TOKEN,
-            base_dir=base_dir  # Using actual base directory
-        )
-        print("✓ New session DataHandler created")
-
-        # Test 4: Load Existing User Data
-        print("\nTest 4: Loading existing user data...")
-        existing_data = returning_handler.grab_user_data()
-        if isinstance(existing_data, dict):
-            print("✓ Existing user data loaded successfully")
-            loaded_courses = existing_data["user_metadata"]["courses_selected"]
-            print(f"Found {len(loaded_courses)} selected courses: {loaded_courses}")
-            print(f"Last updated: {time.ctime(existing_data['user_metadata']['updated_at'])}")
-        else:
-            print("✗ Failed to load existing user data")
-            return
-
-        print("\n=== Scenario 3: Testing Data Operations ===")
-
-        # Test 5: Update User Data
-        print("\nTest 5: Updating user data from Canvas...")
-        update_result = returning_handler.update_user_data()
-        print(f"Update result: {update_result}")
-        if "successfully" in update_result:
-            print("✓ User data updated from Canvas")
-        else:
-            print("✗ User data update failed")
-
-        # Test 6: Chat Context Operations
-        print("\nTest 6: Testing chat context operations...")
+user = response.json()
+user_id = user.get("id")
+domain = "psu.instructure.com"
         
-        # 6.1: Set chat context
-        test_context = "Test chat context for returning user"
-        context_update = returning_handler.update_chat_context(test_context)
-        if "successfully" in context_update:
-            print("✓ Chat context set successfully")
-        else:
-            print("✗ Failed to set chat context")
+    # Using actual course IDs from your Canvas courses
+courses_selected = [            
+        2372294,
+        2381676,
+        2361510,
+        2361723
+    ]
+    
+    #initiation
 
-        # 6.2: Verify chat context
-        verify_data = returning_handler.grab_user_data()
-        if verify_data["current_chat_context"] == test_context:
-            print("✓ Chat context verified")
-        else:
-            print("✗ Chat context verification failed")
 
-        # 6.3: Delete chat context
-        delete_result = returning_handler.delete_chat_context()
-        if "successfully" in delete_result:
-            print("✓ Chat context deleted")
-        else:
-            print("✗ Failed to delete chat context")
 
-        # Test 7: Verify Final Data Structure
-        print("\nTest 7: Verifying data structure integrity...")
-        final_data = returning_handler.grab_user_data()
-        required_keys = [
-            "user_metadata", "courses", "files", "announcements",
-            "assignments", "quizzes", "calendar_events", "current_chat_context"
-        ]
-        missing_keys = [key for key in required_keys if key not in final_data]
-        if not missing_keys:
-            print("✓ Data structure integrity maintained")
-            print("Final courses selected:", final_data["user_metadata"]["courses_selected"])
-        else:
-            print(f"✗ Missing keys in data structure: {missing_keys}")
 
-        print("\n=== Test Suite Complete ===")
-        print("All scenarios tested successfully!")
-
-    except Exception as e:
-        print(f"\n❌ Test suite failed with error: {str(e)}")
-        raise
-
-if __name__ == "__main__":
-    run_tests()
 
 
 
