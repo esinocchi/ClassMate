@@ -1,19 +1,20 @@
 import os 
 from dotenv import load_dotenv
-import requests
+import aiohttp
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 load_dotenv()
 
-canvas_api_url= os.getenv("CANVAS_API_URL")
+canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 
-def find_events(
+async def find_events(
     canvas_base_url: str,
     access_token: str,
-    course_code: str
+    course_code: str,
+    session: aiohttp.ClientSession = None
 ) -> list:
     """
     Retrieve calendar events from the Canvas API for a specific course code from now until the next 3 months.
@@ -23,6 +24,7 @@ def find_events(
                                (e.g., 'https://canvas.instructure.com').
         access_token (str): Your Canvas API access token.
         course_code (str): The course code to filter the calendar events (e.g., 'course_123').
+        session (aiohttp.ClientSession, optional): An existing aiohttp session to use.
 
     Returns:
         list: Raw calendar events from the Canvas API
@@ -52,16 +54,23 @@ def find_events(
     }
 
     # Make the API call
-    response = requests.get(url, headers=headers, params=params)
-    response.raise_for_status()
-    
-    # Get the raw response
-    events = response.json()
+    should_close_session = False
+    if session is None:
+        session = aiohttp.ClientSession()
+        should_close_session = True
+
+    try:
+        async with session.get(url, headers=headers, params=params) as response:
+            response.raise_for_status()
+            events = await response.json()
+    finally:
+        if should_close_session:
+            await session.close()
     
     # Return the raw events list
     return events if isinstance(events, list) else events.get('calendar_events', [])
 
-def create_event(
+async def create_event(
         canvas_base_url: str,
         access_token: str,
         context_code: str,
@@ -76,7 +85,6 @@ def create_event(
         duplicate_interval: int = None,
         duplicate_frequency: str = None,
         duplicate_append_iterator: bool = None,
-
     ) -> dict:
     """
     Create a calendar event using the Canvas API.
@@ -102,7 +110,7 @@ def create_event(
         dict: The JSON response from the Canvas API if the request is successful.
 
     Raises:
-        requests.exceptions.HTTPError: If the Canvas API returns an unsuccessful status code.
+        aiohttp.ClientError: If the Canvas API returns an unsuccessful status code.
     """
     if end_at is None:
         all_day = True
@@ -129,7 +137,7 @@ def create_event(
     if location_address:
         data["calendar_event[location_address]"] = location_address
 
-     # Add duplicate event options if provided
+    # Add duplicate event options if provided
     if duplicate_count is not None:
         data["calendar_event[duplicate][count]"] = duplicate_count
     if duplicate_interval is not None:
@@ -139,25 +147,31 @@ def create_event(
     if duplicate_append_iterator is not None:
         data["calendar_event[duplicate][append_iterator]"] = "true" if duplicate_append_iterator else "false"
 
-    response = requests.post(url, headers=headers, data=data)
-    response.raise_for_status()
-    return response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, data=data) as response:
+            response.raise_for_status()
+            return await response.json()
 
 
 if __name__ == "__main__":
+    import asyncio
+    
     # Replace these with your actual Canvas details
     canvas_base_url = canvas_api_url
     access_token = canvas_api_token
     course_code = "course_2372294"
 
-    try:
-        events = find_events(canvas_base_url, access_token, course_code)
-        
-        print("\nFound Events:")
-        print("-" * 50)
-        
-        for event in events:
-            print(event)
-        
-    except requests.exceptions.HTTPError as err:
-        print("An HTTP error occurred:", err)
+    async def main():
+        try:
+            events = await find_events(canvas_base_url, access_token, course_code)
+            
+            print("\nFound Events:")
+            print("-" * 50)
+            
+            for event in events:
+                print(event)
+            
+        except aiohttp.ClientError as err:
+            print("An HTTP error occurred:", err)
+
+    asyncio.run(main())

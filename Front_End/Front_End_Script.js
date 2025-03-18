@@ -101,46 +101,52 @@ window.addEventListener("load", () => {
 async function handlePrompt() {
     // Get and remove value from the prompt entry box
     let prompt = promptEntryBox.value;
-    let response = ''; // Default response can be set here, e.g. "sample response"
+    let response = '';
     promptEntryBox.value = ''; // Clear the prompt entry box
-    promptValues = [];
-    promptEntryBox.select(); // Select the input box to prepare for the next prompt
 
     if (!prompt) {
         return;
     }
+    try {
 
-    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
-        // Default to an empty array if "previousChats_CanvasAI" doesn't exist
-        let promptPairs = result.previousChats_CanvasAI || [];
+        // Wait for the promptPairs to be updated in local storage
+        await new Promise((resolve, reject) => {
+            chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
+                // Default to an empty prompt pair structure if "Context_CanvasAI" doesn't exist
+                let promptPairs = result.Context_CanvasAI || [{"role": "assistant", "content": []},{"role": "user", "id": "", "domain": "", "content": [], "classes": []}];
 
-        // If the list is longer than 20, pop the last one and add the new prompt-response pair
-        if (promptPairs.length > 19) {
-            promptPairs.pop(); 
-        }
-        
-        promptPairs.unshift([prompt, "sample response"]); 
+                // If the list is longer than 20, pop the last index and add the new prompt-response pair
+                if (promptPairs[0].content.length > 19) {
+                    promptPairs[0].content.pop();
+                    promptPairs[1].content.pop();
+                }
 
-        // Save updated list back to local storage
-        chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {
+                
+
+                promptPairs[0].content.unshift("holder response"); // Add the new prompt to the front
+                promptPairs[1].content.unshift(prompt);
+
+                try {
+                    const updated = await mainPipelineEntry({context: promptPairs}); // Update memory of response based on pipeline return
+                    response = updated[0].content[0]; // Update response for display
+                    
+                    // Save updated list back to local storage
+                    chrome.storage.local.set({ Context_CanvasAI: updated }, function() {
+                        resolve(updated); // Resolve the promise with updated data
+                });
+                } catch (error) {
+                    reject(error); // Reject the promise in case of error in mainPipelineEntry
+                }
+            });
         });
-    });
 
-    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
-        // Check if there is an error or if the data is not found
-        if (chrome.runtime.lastError) {
-            console.error("Error retrieving data:", chrome.runtime.lastError);
-            return; // Exit if there's an error
-        }
-        // Load the data into the local variable
-        promptValues = result.previousChats_CanvasAI || []; 
-    });
+        addMemoryBox(prompt, response); //add memory box for display
 
-    const APIdata = await sampleAPI(promptValues);
+    } catch (error) {
+        console.error("Error during prompt handling:", error);
+    }
 
-    // Create a new box to hold the prompt and response
-    const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
-    addMemoryBox(prompt, APIdat);
+    promptEntryBox.select(); // Select the input box to prepare for the next prompt
 }
 
 //open settings window
@@ -212,12 +218,12 @@ function addClassSetting(classID, checked) {
         const isChecked = event.target.checked;
 
         //pull local storage data based on ID of event triggerer
-        chrome.storage.local.get(["ClassSelections_CanvasAI"], function(result) {
-            let ClassSelections = result.ClassSelections_CanvasAI || [];
-            for (let i = ClassSelections.length - 1; i >= 0; i--) {
-                if(ClassSelections[i][0] == checkboxName.replace("active-checkBox-", "")){
-                    ClassSelections[i][1] = isChecked;
-                    chrome.storage.local.set({ ClassSelections_CanvasAI: ClassSelections}, function() {});
+        chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+            let Context = result.Context_CanvasAI || [{"role": "assistant", "content": []},{"role": "user", "id": "", "domain": "", "content": [], "classes": []}];;
+            for (let i = Context[1].classes.length - 1; i >= 0; i--) {
+                if(Context[1].classes[i][0] == checkboxName.replace("active-checkBox-", "")){
+                    Context[1].classes[i][1] = isChecked;
+                    chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
                     break;
                 }
             }
@@ -278,32 +284,46 @@ function addMemoryBox(prompt, response) {
 
 //rebuild class selections and past chats
 function rebuildPage() {
-    chrome.storage.local.get(["previousChats_CanvasAI"], function(result) {
-        let promptPairs = result.previousChats_CanvasAI || [];
-        for (let i = promptPairs.length - 1; i >= 0; i--) {
-            addMemoryBox(promptPairs[i][0], promptPairs[i][1]);
+    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        let context = result.Context_CanvasAI || [{"role": "assistant", "content": []},{"role": "user", "id": "", "domain": "", "content": [], "classes": []}];
+        for (let i = context[0].content.length - 1; i >= 0; i--) {
+            addMemoryBox(context[1].content[i], context[0].content[i]); //reload chat history context based on storage
         };
-    });
 
-    chrome.storage.local.get(["ClassSelections_CanvasAI"], function(result) {
-        let ClassSelections = result.ClassSelections_CanvasAI || [];
-        for (let i = ClassSelections.length - 1; i >= 0; i--) {
-            addClassSetting(ClassSelections[i][0], ClassSelections[i][1]);
-        }; 
-    });
+        for (let i = context[1].classes.length - 1; i >= 0; i--) {
+            addClassSetting(context[1].classes[i][0], context[1].classes[i][1]); //reload classes based on storage
+        };
+    }); 
 }
 
 //process new list of classes and update memory
 function processClassList(classes) {
     //process list in form [class, checked] into chrome memory
-    chrome.storage.local.set({ ClassSelections_CanvasAI: classes}, function() {});
+    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        // Default to an empty structure if "Context_CanvasAI" doesn't exist
+        let context = result.Context_CanvasAI || [{"role": "assistant", "content": []}, {"role": "user", "content": [], "classes": []}];
+        
+        // Modify the classes portion of the structure
+        context[1].classes = classes;
+    
+        // Save the updated structure
+        chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
+    });
 }
 
 //clear chat memory
 function clearMemory() {
     //set memory == to 0
-    let promptPairs = []
-    chrome.storage.local.set({ previousChats_CanvasAI: promptPairs }, function() {});
+    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        // Default to an empty structure if "Context_CanvasAI" doesn't exist
+        let context = result.Context_CanvasAI || [{"role": "assistant", "content": []}, {"role": "user", "content": [], "classes": []}];
+        
+        // Modify the context portion of the structure
+        context[1].content = [];
+    
+        // Save the updated structure
+        chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
+    });
 
     let parent = document.getElementById("dynamicBoxesContainer"); 
     // Loop through children in reverse order and remove
@@ -318,31 +338,42 @@ function getURL() {
     return currentUrl;    
 }
 
-//pull states of classes
-function getCheckboxStates() {
-    const checkboxes = document.querySelectorAll('input[type="checkbox"][data-class-id]');
-    const checkboxStates = new Set();
+//below this are await helper functions
 
-    checkboxes.forEach(checkbox => {
-        const classId = checkbox.getAttribute('data-class-id');
-        const state = checkbox.checked ? 'checked' : 'unchecked';
-        checkboxStates.add([classId, state]);
-    });
-
-    return checkboxStates;
-}
 
 
 
 //below this is API calls
 
 
-async function sampleAPI() {
+async function mainPipelineEntry(contextJSON) {
     try {
-        const response = await fetch('https://3.133.153.53:8000/');  // Correct the URL here
+        const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry`,{
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', 
+            },
+            body: JSON.stringify(contextJSON),
+        }); 
+
+        //check for error
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
         const data = await response.json();  // Wait for the JSON data
         console.log(data);  // { Sample: 'Sample API Return', Example: 'Sample Response' }
         return data;  // Return the data
+    } catch (error) {
+        console.error('Error calling API:', error);
+        return false;  // Return false if there's an error
+    }
+}
+
+async function retrieveClassList(studentID, ) {
+    try {
+        const response = await fetch(`https://canvasclassmate.me/endpoints/pullClasses?`)
+
     } catch (error) {
         console.error('Error calling API:', error);
         return false;  // Return false if there's an error
