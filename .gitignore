@@ -2,3 +2,5 @@ myenv/
 canvas.db
 .env
 user_data/.DS_Store
+*.pyc
+
