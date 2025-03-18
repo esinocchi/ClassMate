@@ -1,4 +1,6 @@
-myenv/
+venv/
 canvas.db
 .env
 user_data/.DS_Store
+.vscode/
+.zshrc
