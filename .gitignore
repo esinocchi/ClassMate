@@ -4,3 +4,4 @@ canvas.db
 user_data/.DS_Store
 .vscode/
 .zshrc
+.gitignore

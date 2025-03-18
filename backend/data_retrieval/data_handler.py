@@ -18,13 +18,8 @@ import aiofiles
 
 load_dotenv()
 
-<<<<<<< HEAD
-API_URL = os.getenv("API_URL")
-API_TOKEN = os.getenv("CANVAS_API_TOKEN")
-=======
 API_URL = "https://psu.instructure.com/api/v1"
 API_TOKEN = os.getenv("CANVAS_TOKEN")
->>>>>>> fd925ace6cff1cde0886a4b74daa0cf999a18719
 
 
 class DataHandler:
@@ -331,11 +326,6 @@ class DataHandler:
         self.user_data["current_chat_context"] = ""
         return self.save_user_data()
 
-<<<<<<< HEAD
-response = requests.get(
-f"{API_URL}/users/self",
-        headers={"Authorization": f"Bearer {API_TOKEN}"}
-=======
 def run_tests():
     """
     Test suite simulating real user flow:
@@ -365,21 +355,13 @@ def run_tests():
             domain=domain,
             token=API_TOKEN,
             short_name="Test User",
-            courses_selected=courses_selected,
-            base_dir=base_dir  # Using actual base directory
->>>>>>> fd925ace6cff1cde0886a4b74daa0cf999a18719
+            courses_selected=courses_selected
         )
-user = response.json()
-user_id = user.get("id")
-domain = "psu.instructure.com"
         
-    # Using actual course IDs from your Canvas courses
-courses_selected = [            
-        2372294,
-        2381676,
-        2361510,
-        2361723
-    ]
+        # Add more test code here
+        
+    except Exception as e:
+        print(f"Error in tests: {e}")
     
     #initiation
 
