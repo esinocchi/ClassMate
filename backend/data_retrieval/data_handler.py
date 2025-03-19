@@ -8,7 +8,7 @@ import json
 import fitz  # PyMuPDF
 import pytesseract
 from dotenv import load_dotenv 
-from get_all_user_data import get_all_user_data
+from .get_all_user_data import get_all_user_data
 from bs4 import BeautifulSoup
 from PIL import Image
 from urllib.parse import urlparse
@@ -18,12 +18,12 @@ import aiofiles
 
 load_dotenv()
 
-API_URL = "https://psu.instructure.com/api/v1"
-API_TOKEN = os.getenv("CANVAS_TOKEN")
+API_URL = os.getenv("API_URL")
+API_TOKEN = os.getenv("CANVAS_API_TOKEN")
 
 
 class DataHandler:
-    def __init__(self, id, domain, token = "", short_name="", courses_selected=[]):
+    def __init__(self, id, domain, token = "", short_name="", courses_selected={}):
         """
         Initialize DataHandler with user credentials and settings.
 
@@ -45,7 +45,7 @@ class DataHandler:
             it will be retrieved from the environment variables.
         short_name : str, optional
             A short name or display name for the user (e.g., "John Doe").
-        courses_selected : list, optional
+        courses_selected : dictionary, optional
             A list of course IDs that the user has selected for data retrieval.
 
         ================================================
@@ -56,13 +56,13 @@ class DataHandler:
         domain = "psu.instructure.com"
         token = "1234567890"
         short_name = "John Doe"
-        courses_selected = [1234567890, 1234567891, 1234567892]
+        courses_selected = {1234567890: "Course 1", 1234567891: "Course 2", 1234567892: "Course 3"}
 
         ================================================
 
         Notes:
         ------
-        - If this is the first time a user is added, initialize with `courses_selected` as a list of course IDs.
+        - If this is the first time a user is added, initialize with `courses_selected` as a dictionary of course IDs paired with course names.
         - If this isn't the first time, the `courses_selected` will be loaded from the user's data file.
         - The `domain` should be the full domain (e.g., "psu.instructure.com"), but only the subdomain (e.g., "psu") will be used internally.
 
@@ -133,7 +133,6 @@ class DataHandler:
         self.API_URL = f"https://{domain}/api/v1"
         self.courses_selected = courses_selected
         self.time_token_updated = time.time()
-        self.user_data = None
         
         # Get the path to the main CanvasAI directory (2 levels up from this file)
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -149,7 +148,7 @@ class DataHandler:
         """
         return os.path.join(self.data_dir, self.domain, str(self.id), "user_data.json")
 
-    def save_user_data(self):
+    def save_user_data(self, user_data):
         """
         Save user data to file synchronously
         """
@@ -158,7 +157,7 @@ class DataHandler:
         
         try:
             with open(file_path, "w") as f:
-                json.dump(self.user_data, f, indent=4)
+                json.dump(user_data, f, indent=4)
             return "User data saved successfully"
         except Exception as e:
             return f"Error saving user data: {str(e)}"
@@ -189,7 +188,7 @@ class DataHandler:
             
             # Process the results synchronously
             self.name = user_info["short_name"]
-            self.user_data = {
+            user_data = {
                 "user_metadata": {
                     "id": self.id,
                     "name": self.name,
@@ -207,7 +206,7 @@ class DataHandler:
                 "current_chat_context": ""
             }
             
-            return self.save_user_data()
+            return self.save_user_data(user_data)
         except Exception as e:
             print(f"Error details: {str(e)}")
             return f"Error initiating user data: {str(e)}"
@@ -222,15 +221,15 @@ class DataHandler:
             
         try:
             with open(file_path, "r") as f:
-                self.user_data = json.load(f)
+                user_data = json.load(f)
             
             # Update instance variables from loaded data
-            metadata = self.user_data["user_metadata"]
+            metadata = user_data["user_metadata"]
             self.name = metadata["name"]
             self.courses_selected = metadata["courses_selected"]
             self.API_TOKEN = metadata["token"]
             
-            return self.user_data
+            return user_data
         except Exception as e:
             return f"Error grabbing user data: {str(e)}"
 
@@ -240,39 +239,37 @@ class DataHandler:
         This function starts the update process and returns immediately, allowing the update to run in the background.
         """
         try:
-            # First ensure we have current user data
-            if self.user_data is None:
-                self.grab_user_data()
-            
             # Define the background update coroutine
+            
+            
             async def background_update():
                 try:
                     print("\n=== Starting Background Update ===")
                     start_time = time.time()
+
+                    user_data = self.grab_user_data()
                     
                     # Verify we have valid courses selected
                     if not self.courses_selected:
                         print("⚠️ No courses are selected for update")
-                        print("Current courses in user_data:", self.user_data["user_metadata"]["courses_selected"])
                         return
                         
                     print(f"Updating data for {len(self.courses_selected)} courses: {self.courses_selected}")
                     
                     # Get fresh data from Canvas
-                    updated_data = await get_all_user_data(
+                    updated_user_data = await get_all_user_data(
                         self.base_dir,
                         self.API_URL,
                         self.API_TOKEN,
-                        self.user_data,
-                        self.courses_selected
+                        user_data,
+                        courses_selected=self.courses_selected
                     )
                     
                     # Update the user data and timestamp
-                    self.user_data = updated_data
-                    self.user_data["user_metadata"]["updated_at"] = time.time()
+                    updated_user_data["user_metadata"]["updated_at"] = time.time()
                     
                     # Save the updated data
-                    self.save_user_data()
+                    self.save_user_data(updated_user_data)
                     
                     end_time = time.time()
                     duration = end_time - start_time
@@ -310,62 +307,35 @@ class DataHandler:
         """
         Updates the chat_context in the user_data dictionary
         """
-        if self.user_data is None:
-            self.grab_user_data()
+        user_data = self.grab_user_data()
         
-        self.user_data["current_chat_context"] = chat_context
-        return self.save_user_data()
+        user_data["current_chat_context"] = chat_context
+        return self.save_user_data(user_data)
 
     def delete_chat_context(self):
         """
         Deletes the chat_context in the user_data dictionary
         """
-        if self.user_data is None:
-            self.grab_user_data()
+        user_data = self.grab_user_data()
             
-        self.user_data["current_chat_context"] = ""
-        return self.save_user_data()
-
+        user_data["current_chat_context"] = ""
+        return self.save_user_data(user_data)
     
-def run_tests():
-    """
-    Test suite simulating real user flow:
-    1. First time user setup (new DataHandler with course selection)
-    2. Later session (loading existing user data into new DataHandler)
-    3. Updating data and testing other functions
-    """
-    try:
-        # Test Setup
-        user = requests.get(f"{API_URL}/users/self", headers={"Authorization": f"Bearer {API_TOKEN}"}).json()
-        user_id = user.get("id")
-        domain = "psu.instructure.com"
-        
-        # Using actual course IDs from your Canvas courses
-        courses_selected = [2379517, 2361957, 2361815, 2364485, 2361972]
-
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Set base_dir to CanvasAI root
-        
-        print("\n=== DataHandler Test Suite ===\n")
-
-        print("=== Scenario 1: First Time User Setup ===")
-        
-        # Test 1: First Time User Creation
-        print("\nTest 1: Creating new DataHandler for first time user...")
-        first_handler = DataHandler(
-            id=user_id,
-            domain=domain,
-            token=API_TOKEN,
-            short_name="Test User",
-            courses_selected=courses_selected
-        )
-        
-        # Add more test code here
-        
-    except Exception as e:
-        print(f"Error in tests: {e}")
+    def update_courses_selected(self, courses_selected: dict):
+        """
+        Updates the courses_selected in the user_data dictionary
+        """
+        user_data = self.grab_user_data()
+        user_data["courses_selected"] = courses_selected
+        return self.save_user_data(user_data)
     
-    #initiation
-
+    def update_token(self, token: str):
+        """
+        Updates the token in the user_data dictionary
+        """
+        user_data = self.grab_user_data()
+        user_data["token"] = token
+        return self.save_user_data(user_data)
 
 
 
