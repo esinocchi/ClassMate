@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -15,6 +17,7 @@ sys.path.append(str(root_dir))
 # from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
+from vectordb.vectordatabase import search as vectordb_search
 
 load_dotenv()
 
@@ -22,6 +25,43 @@ load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
+
+# Pydantic classes for structured output
+class SearchParameters(BaseModel):
+    course_id: str = Field(..., description="Course ID or 'all_courses'")
+    time_range: Literal["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"] = Field(
+        description="Temporal context for search"
+    )
+    item_types: List[Literal["assignment", "file", "quiz", "announcement", "event", "syllabus"]] = Field(
+        description="Types of Canvas items to search for"
+    )
+    specific_dates: Optional[List[str]] = Field(
+        None, description="ISO format dates (YYYY-MM-DD) mentioned in query"
+    )
+    keywords: List[str] = Field(description="Additional search terms like 'midterm', 'HW2', 'Quiz 3'")
+
+class VectorDBSearch(BaseModel):
+    search_parameters: SearchParameters
+    query: str = Field(description="User's original query for semantic search")
+
+class CreateEvent(BaseModel):
+    context_code: str = Field(description="The context code (e.g., 'course_123' or 'user_456') for the event.")
+    title: str = Field(description="Title of the event.")
+    start_at: str = Field(description="Start date/time in ISO8601 format.")
+    end_at: Optional[str] = Field(None, description="End date/time in ISO8601 format.")
+    description: Optional[str] = Field(None, description="Description of the event.")
+    location_name: Optional[str] = Field(None, description="Name of the location.")
+    location_address: Optional[str] = Field(None, description="Address of the location.")
+    all_day: Optional[bool] = Field(False, description="Indicates if the event lasts all day.")
+    duplicate_count: Optional[int] = Field(None, description="Number of times to duplicate the event (max 200).")
+    duplicate_interval: Optional[int] = Field(None, description="Interval between duplicates; defaults to 1.")
+    duplicate_frequency: Optional[Literal["daily", "weekly", "monthly"]] = Field(None, description="Frequency at which to duplicate the event.")
+    duplicate_append_iterator: Optional[bool] = Field(None, description="If true, an increasing counter will be appended to the event title for each duplicate (e.g., Event 1, Event 2, etc.).")
+
+# Define the complete function response model
+class FunctionResponse(BaseModel):
+    function: Literal["vectordb_search", "create_event"]
+    parameters: VectorDBSearch | CreateEvent
 
 class ConversationHandler:
     def __init__(self, student_name, student_id, courses):
@@ -31,50 +71,87 @@ class ConversationHandler:
         self.canvas_api_url = canvas_api_url
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
+        
+        # Define valid types and time range definitions
+        self.valid_types = ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+        self.time_range_definitions = {
+            "FUTURE": {
+                "description": "Upcoming items",
+                "logic": "item > now",
+                "weight": 1.2
+            },
+            "RECENT_PAST": {
+                "description": "Past 7 days",
+                "logic": "now - 7d <= item <= now",
+                "weight": 1.1
+            },
+            "EXTENDED_PAST": {
+                "description": "Past 30 days",
+                "logic": "now - 30d <= item <= now", 
+                "weight": 0.95
+            },
+            "ALL_TIME": {
+                "description": "Any time",
+                "logic": "item exists",
+                "weight": 1.0
+            }
+        }
 
     def define_functions(self):
         """Returns a list of function definitions for the OpenAI API"""
         functions = [
-            # {
-            #     "name": "find_events_and_assignments",
-            #     "description": "Retrieve calendar events and assignments from the Canvas API using the specified parameters.",
-            #     "parameters": {
-            #         "type": "object",
-            #         "properties": {
-            #             "keywords": {
-            #                 "type": "array",
-            #                 "items": {
-            #                     "type": "string"
-            #                 },
-            #                 "description": """A list of keywords derived from the user's prompt to guide the vector database search.
-            #                   This list must include:
-            #                   - **Item Types:** e.g., 'assignment', 'calendar events', 'syllabus'.
-            #                   - **Date Ranges:** Dates converted to ISO8601 format (e.g., '2012-07-01T23:59:00-06:00', '2012-07-08T16:00:00-06:00').
-            #                   - **Course Names with IDs:** Include both the course name and its course ID (e.g., 'physics course_2372294', 'statistics course_2381676').
-            #                   - **Synonyms or Related Terms:** For example, if 'exam' is mentioned, also include 'midterm' and 'final'.
-            #                   Keep the list concise (around 10 items) to ensure focused retrieval."""
-            #             }
-            #         },
-            #         "required": ["keywords"]
-            #     }
-            # },
-            # {
-            #     "name": "find_syllabus",
-            #     "description": "Retrieve syllabus from the Canvas API using the specified parameters.",
-            #     "parameters": {
-            #         "type": "object",
-            #         "properties": {
-            #             "keywords": {
-            #                 "type": "array",
-            #                 "items": {
-            #                     "type": "string"
-            #                 },
-            #                 "description": "A list of keywords derived from the user's prompt to guide the vector database search. This list must include:\n\n- **Item Types:** e.g., 'assignment', 'calendar events', 'syllabus'.\n- **Date Ranges:** Dates converted to ISO8601 format (e.g., '2012-07-01T23:59:00-06:00', '2012-07-08T16:00:00-06:00').\n- **Course Names with IDs:** Include both the course name and its course ID (e.g., 'physics course_2372294', 'statistics course_2381676').\n- **Synonyms or Related Terms:** For example, if 'exam' is mentioned, also include 'midterm' and 'final'.\n\nKeep the list concise (around 10 items) to ensure focused retrieval."
-            #             }
-            #         },
-            #         "required": ["keywords"]
-            #     }
-            # },
+            {
+                "name": "vectordb_search",
+                "description": "Search for Canvas materials using vector embeddings for semantic retrieval.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "search_parameters": {
+                            "type": "object",
+                            "properties": {
+                                "course_id": {
+                                    "type": "string",
+                                    "description": "Course ID or 'all_courses'"
+                                },
+                                "time_range": {
+                                    "type": "string", 
+                                    "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
+                                    "description": "Temporal context for search"
+                                },
+                                "item_types": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                    },
+                                    "description": "Types of Canvas items to search for"
+                                },
+                                "specific_dates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO format dates (YYYY-MM-DD) mentioned in query"
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string" 
+                                    },
+                                    "description": "Additional search terms like 'midterm', 'HW2', 'Quiz 3'"
+                                }
+                            },
+                            "required": ["course_id", "time_range", "item_types"]
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "User's original query for semantic search"
+                        }
+                    },
+                    "required": ["search_parameters", "query"]
+                }
+            },
             {
                 "name": "create_event",
                 "description": "Create a calendar event or multiple events using the Canvas API.",
@@ -155,10 +232,25 @@ class ConversationHandler:
     #     course_ids = [str(course_id) for course_id in self.courses.values()]
     #     return chat_bot.context_retrieval.retrieve_syllabus(query, course_ids)
 
+    def validate_keywords(self, keywords):
+        """Validates keywords and enables fail-safes"""
+        # Course ID check
+        if keywords[0] not in self.courses.values() and keywords[0] != "all_courses":
+            keywords[0] = "all_courses"
+        
+        # Time range update
+        valid_ranges = ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"]
+        if len(keywords) > 1 and keywords[1] not in valid_ranges:
+            keywords[1] = "ALL_TIME"
+        if len(keywords) > 2 and keywords[2] not in self.valid_types:
+            keywords[2] = "all_types"
+        return keywords[:10]
     
     def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         current_time = datetime.now(timezone.utc).isoformat()
+        
+        # Generate the system context with enhanced instructions
         system_context = f"""You are a highly professional and task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You have access to a dictionary of {self.student_name}'s courses, where each key is the course name and each value is the corresponding course ID: {self.courses}. 
             Your role is to assist with a variety of school-related tasks including coursework help, study note creation, video transcription, and retrieving specific information from the Canvas LMS (such as syllabus details, assignment deadlines, and course updates).
 
@@ -166,20 +258,71 @@ class ConversationHandler:
             When creating events or working with dates, use this as your reference point for "now".
             All dates and times should be in ISO8601 format.
 
-            When a user's question requires additional information that is not immediately available, you must call the appropriate retrieval function. In such cases, extract a concise list of keywords from the user's prompt that captures the essential details needed for the search. The list must include:
-            - **Item Types:** Terms such as "assignment", "calendar events", "syllabus", etc.
-            - **Date Ranges:** Convert any dates provided into ISO8601 format (e.g., "2012-07-01T23:59:00-06:00").
-            - **Course Names with IDs:** For any course mentioned by the user, include both the course name and its corresponding course ID (e.g., "physics course_2372294").
-            - **Synonyms or Related Terms:** For example, if the user mentions "exam", also include "midterm" and "final".
+            When a user's question requires additional information that is not immediately available, you must call the appropriate retrieval function. If no function call is needed, you will answer the user's question directly. In the case that a function call is needed, extract a concise list of keywords from the user's prompt that captures the essential details needed for the search. Here are the guidelines for the keywords:
+            1. Extract these COMPULSORY elements:
+                - **Item Types:** Assign an item type or types from the following options: {self.valid_types}
+                - **Time Range:** Assign a time range from the following options: {self.time_range_definitions}
+                - **Course:** For any course mentioned by the user, include both the course name and its corresponding course ID. The course name and ids are found in {self.courses}.
+                - **Synonyms or Related Terms:** For example, if the user mentions "exam", also include "midterm" and "final".
 
-            Aim to generate a focused keyword list of about 10 items. These guidelines must be applied consistently across all retrieval functions.
+            2. Keyword List Rules:
+                - The first 3 items MUST be [Course ID, Time Range, [Item Type(s)]]
+                - Include synonyms or related terms if applicable
+                - Max 10 items in the list
+
+            3. Specific Cases:
+                **Time Range Examples:**
+                    - 'Due tomorrow' → FUTURE
+                    - 'Posted yesterday' → RECENT_PAST
+                    - 'From two weeks ago' → EXTENDED_PAST
+                    - 'Any syllabus for the course' → ALL_TIME
+
+                **When specific dates are mentioned:**
+                    - Include both time range AND ISO date
+                    - Example: 'What assingments have March 25th as a deadline' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25']
+                    - Example: 'What is due in the last week of March' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25', '2025-03-31']
+
+            4. Fail-Safes:
+                **Time Range FAIL-SAFE:**
+                    - If uncertain for the time range, use ALL_TIME for the time range.
+                **Course FAIL-SAFE:**
+                    - If uncertain for the course, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
+
+            5. Example Keyword List:
+                - 'Physics homework due next week' → ['2372294', 'FUTURE', '[assignment]', 'homework', 'physics', '2025-04-01']
+                - 'Readings from last month in Physcology' → ['29381676', 'EXTENDED_PAST', '[file]', 'reading', 'psychology']
 
             The current year is 2025.
             Adhere to the following principles:
             - **Professionalism:** Maintain a strictly professional tone and disregard nonsensical or irrelevant queries.
             - **Accuracy:** Deliver precise, reliable, and well-structured responses.
             - **Ethics:** Do not assist with any requests that could enable academic dishonesty.
-            - **Clarity:** Use plain and accessible language suitable for all academic levels."""
+            - **Clarity:** Use plain and accessible language suitable for all academic levels.
+        """
+
+        # Add vectordb search instructions
+        vectordb_search_instructions = """
+        For Canvas material search queries, you MUST respond with a valid JSON object in this exact format:
+
+        Example: "What physics assignments are due next week?"
+        Response must be:
+        {
+        "function": "vectordb_search",
+        "parameters": {
+            "search_parameters": {
+                "course_id": "2372294",
+                "time_range": "FUTURE",
+                "item_types": ["assignment"],
+                "specific_dates": ["2025-04-01", "2025-04-07"],
+                "keywords": ["physics", "homework"]
+            },
+            "query": "What physics assignments are due next week?"
+        }
+        }
+
+        Your JSON response MUST be valid and conform exactly to this structure.
+        """
+        system_context += vectordb_search_instructions
 
         functions = self.define_functions()
         
@@ -190,6 +333,7 @@ class ConversationHandler:
         function_mapping = {
             # "find_events_and_assignments": self.find_events_and_assignments,
             # "find_syllabus": self.find_syllabus,
+            "vectordb_search": vectordb_search,
             "create_event": create_event
         }
 
@@ -199,61 +343,71 @@ class ConversationHandler:
         
         chat.extend(chat_history)
 
+        # Use response_format parameter to get structured JSON output
         chat_completion = client.chat.completions.create(
             model='gpt-4o-mini',
             messages=chat,
-            functions=functions,
-            function_call="auto",
+            response_format={"type": "json_object", "schema": FunctionResponse.model_json_schema()},
             temperature=.3,
             max_tokens=1024
         )
+        
         response_message = chat_completion.choices[0].message
+        response_content = response_message.content
+        
+        try:
+            response_data = json.loads(response_content)
+            
+            # Check if there's a function call in the response
+            if "function" in response_data:
+                # Function is called and output used for api context
+                function_name = response_data["function"]
+                arguments = response_data["parameters"]
+                
+                # Add necessary API parameters
+                if function_name == "vectordb_search":
+                    # Extract keywords from the search parameters if they exist
+                    if "search_parameters" in arguments and "keywords" in arguments["search_parameters"]:
+                        arguments["search_parameters"]["keywords"] = self.validate_keywords(
+                            arguments["search_parameters"]["keywords"]
+                        )
+                
+                arguments["canvas_base_url"] = self.canvas_api_url
+                arguments["access_token"] = self.canvas_api_token
 
-        # Checks to see if a function call is needed in order to answer the user's prompt
-        if response_message.function_call:
-            # Function is called and output used for api context
-            function_call = response_message.function_call
-            function_name = function_call.name
-            arguments = json.loads(function_call.arguments)
-            arguments["canvas_base_url"] = self.canvas_api_url
-            arguments["access_token"] = self.canvas_api_token
+                print("\n=== Debug Information ===")
+                print(f"Function being called: {function_name}")
+                print(f"Arguments being passed:")
+                print(json.dumps(arguments, indent=2))
+                print(f"Canvas API URL: {self.canvas_api_url}")
+                print("Access Token: " + "*" * len(self.canvas_api_token))  # Don't print actual token for security
+                print("========================\n")
 
-            print("\n=== Debug Information ===")
-            print(f"Function being called: {function_name}")
-            print(f"Arguments being passed:")
-            print(json.dumps(arguments, indent=2))
-            print(f"Canvas API URL: {self.canvas_api_url}")
-            print("Access Token: " + "*" * len(self.canvas_api_token))  # Don't print actual token for security
-            print("========================\n")
+                if function_name in function_mapping:
+                    try:
+                        result = function_mapping[function_name](**arguments)
+                    except Exception as e:
+                        print("\n=== Error Details ===")
+                        print(f"Error Type: {type(e).__name__}")
+                        print(f"Error Message: {str(e)}")
+                        print("===================\n")
+                        raise
+                else:
+                    result = json.dumps({"error": f"Function '{function_name}' not implemented."})
 
-            if function_name in function_mapping:
-                try:
-                    result = function_mapping[function_name](**arguments)
-                except Exception as e:
-                    print("\n=== Error Details ===")
-                    print(f"Error Type: {type(e).__name__}")
-                    print(f"Error Message: {str(e)}")
-                    print("===================\n")
-                    raise
-            else:
-                result = json.dumps({"error": f"Function '{function_name}' not implemented."})
+                chat.append({
+                    'role': "function",
+                    "name": function_name,
+                    "content": json.dumps(result)
+                })
 
-            chat.append({
-                'role': "function",
-                "name": function_name,
-                "content": json.dumps(result)
-            })
-
-
-            # Context is then passed back to the api in order for it to respond to the user
-            final_completion = client.chat.completions.create(
-                model='gpt-4o-mini',
-                messages=chat,
-                functions=functions,
-                function_call="auto",
-                temperature=0.3,
-                max_tokens=1024
-            )
+                # Context is then passed back to the api in order for it to respond to the user
+                final_completion = client.chat.completions.create(
+                    model='gpt-4o-mini',
+                    messages=chat,
+                    temperature=0.3,
+                    max_tokens=1024
+                )
 
             # Final response after function call
             final_message = final_completion.choices[0].message.content
@@ -268,7 +422,7 @@ class ConversationHandler:
             return_value = [{"message":final_message, "function": [function_name, json.dumps(result)] }]
             return return_value
         
-        else:
+        except Exception as e:
             # If no function was called then the api's response to the user's prompt is returned
              
             chat_to_return = json.loads(chat_history)
@@ -281,10 +435,3 @@ class ConversationHandler:
             })
 
             return [{"message":response_message.content, "function": [""] }]
-        
-        
-
-
-
-
-
