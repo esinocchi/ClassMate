@@ -1,8 +1,6 @@
 import os 
 from dotenv import load_dotenv
-import openai
 from openai import OpenAI
-import requests
 import json
 import sys
 from pathlib import Path
@@ -15,6 +13,7 @@ sys.path.append(str(root_dir))
 # from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
+from endpoints import ContextObject
 
 load_dotenv()
 
@@ -155,7 +154,14 @@ class ConversationHandler:
     #     course_ids = [str(course_id) for course_id in self.courses.values()]
     #     return chat_bot.context_retrieval.retrieve_syllabus(query, course_ids)
 
-    
+    def transform_user_message(self, contextArray: ContextObject):
+        chat_history = []
+        for i in range(len(contextArray.context["content"][1]["content"])):
+            chat_history.append({"role": "user", "content":contextArray.context["content"][1]["content"][i]})
+            if contextArray.context["content"][0]["content"][i]["function"] != [""]:
+                chat_history.append({"role": "function","name":contextArray.context["content"][0]["content"][i]["function"][0], "content": contextArray.context["content"][0]["content"][i]["function"][1]})
+            chat_history.append({"role": "assistant", "content":contextArray.context["content"][0]["content"][i]["message"]})
+        
     def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         current_time = datetime.now(timezone.utc).isoformat()
