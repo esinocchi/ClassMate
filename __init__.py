@@ -1,0 +1,3 @@
+"""
+CanvasAI package initialization
+""" 

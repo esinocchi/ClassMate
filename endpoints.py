@@ -3,6 +3,12 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Union
+import asyncio
+from backend.data_retrieval.data_handler import DataHandler
+from dotenv import load_dotenv
+import os
+import time
+load_dotenv()
 
 app = FastAPI()
 
@@ -59,11 +65,26 @@ async def mainPipelineEntry(contextArray: ContextObject):
     return contextArray.context  # Return the modified Context
 
 @app.get('/endpoints/pullClasses')
-async def returnPromptContext(studentID, domain):
+async def returnPromptContext(studentID, college):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
-    classes = ["cmpsc311", "cmpeng270", "math250"] #create sample list
+    
+    #pull user data from database given parameters
+    handler = DataHandler(studentID, college)
+    user_data = handler.grab_user_data()
+    
+    #pull classes from user data
+    classes = user_data["user_metadata"]["courses_selected"]
+
     return {'classes': classes}
+
+
+@app.get('/endpoints/oauth2')
+async def oauth2():
+    #hardcode token until we have access to developer keys to run oauth2
+    token = os.getenv("CANVAS_API_TOKEN")
+    return {'token': token}
+
 
 @app.get('/endpoints/pullUser')
 async def returnUserID(token):
