@@ -142,9 +142,7 @@ class ConversationHandler:
         ]
         return functions
     
-    def retrieve_chat_history(self):
-        """Retrieve chat history using the context_retrieval module"""
-        return chat_bot.context_retrieval.retrieve_chat_history()
+    
 
     # def find_events_and_assignments(self, query: str):
     #     """Find events and assignments using the context_retrieval module"""
@@ -157,8 +155,8 @@ class ConversationHandler:
     #     course_ids = [str(course_id) for course_id in self.courses.values()]
     #     return chat_bot.context_retrieval.retrieve_syllabus(query, course_ids)
 
-
-    def process_user_message(self, chat_history: str):
+    
+    def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         current_time = datetime.now(timezone.utc).isoformat()
         system_context = f"""You are a highly professional and task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You have access to a dictionary of {self.student_name}'s courses, where each key is the course name and each value is the corresponding course ID: {self.courses}. 
@@ -199,7 +197,7 @@ class ConversationHandler:
             {"role": "system", "content": system_context},
         ]
         
-        chat.extend(json.loads(chat_history))
+        chat.extend(chat_history)
 
         chat_completion = client.chat.completions.create(
             model='gpt-4o-mini',
@@ -245,14 +243,8 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
-            chat_to_return = json.loads(chat_history)
 
-            chat_to_return.append({
-                'role': "function",
-                "name": function_name,
-                "content": json.dumps(result)
-            })
-    
+
             # Context is then passed back to the api in order for it to respond to the user
             final_completion = client.chat.completions.create(
                 model='gpt-4o-mini',
@@ -273,7 +265,9 @@ class ConversationHandler:
                 'role': "user",
                 "content": final_message
             })
-            return chat_to_return
+            return_value = [{"message":final_message, "function": [function_name, json.dumps(result)] }]
+            return return_value
+        
         else:
             # If no function was called then the api's response to the user's prompt is returned
              
@@ -285,7 +279,10 @@ class ConversationHandler:
                 'role': "user",
                 "content": response_message.content
             })
-            return chat_to_return
+
+            return [{"message":response_message.content, "function": [""] }]
+        
+        
 
 
 
