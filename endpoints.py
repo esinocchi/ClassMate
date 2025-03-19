@@ -61,13 +61,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
     #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
 
-
-    chat_history = []
-    for i in range(len(contextArray.context["content"][1]["content"])):
-        chat_history.append({"role": "user", "content":contextArray.context["content"][1]["content"][i]})
-        if contextArray.context["content"][0]["content"][i]["function"] != [""]:
-            chat_history.append({"role": "function","name":contextArray.context["content"][0]["content"][i]["function"][0], "content": contextArray.context["content"][0]["content"][i]["function"][1]})
-        chat_history.append({"role": "assistant", "content":contextArray.context["content"][0]["content"][i]["message"]})
+    chat_history = conversation_handler.transform_user_message(contextArray)
     
     handler = DataHandler()
     user_data = handler.grab_data()
