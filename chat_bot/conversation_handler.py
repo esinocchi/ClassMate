@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
 
 # Add the project root directory to Python path
@@ -15,8 +15,32 @@ sys.path.append(str(root_dir))
 # from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
-from vectordb.vectordatabase import search as vectordb_search
-from endpoints import ContextObject
+#from vectordb.vectordatabase import VectorDatabase
+
+# Define the context models locally
+class ContextPair(BaseModel):
+    message: str
+    function: List[str]
+
+class ContextEntry(BaseModel):
+    role: str
+    content: List[ContextPair]
+
+class ClassesDict(BaseModel):
+    id: str
+    name: str
+    selected: str
+
+class ContextEntry2(BaseModel):
+    role: str
+    id: str
+    domain: str
+    recentDOCS: List[str]
+    content: List[str]
+    classes: List[ClassesDict]
+
+class ContextObject(BaseModel):
+    context: List[Union[ContextEntry, ContextEntry2]]
 
 load_dotenv()
 
@@ -81,6 +105,9 @@ class ConversationHandler:
                 "weight": 1.0
             }
         }
+
+        # Initialize VectorDatabase
+        #self.vector_db = VectorDatabase("user_data2.json")  # Make sure this path is correct
 
     def define_functions(self):
         """Returns a list of function definitions for the OpenAI API"""
@@ -231,17 +258,37 @@ class ConversationHandler:
             keywords[2] = "all_types"
         return keywords[:10]
     def transform_user_message(self, contextArray: ContextObject):
+        print("\n=== TRANSFORM USER MESSAGE: Starting ===")
         chat_history = []
-        for i in range(len(contextArray.context["content"][1]["content"])):
-            chat_history.append({"role": "user", "content":contextArray.context["content"][1]["content"][i]})
-            if contextArray.context["content"][0]["content"][i]["function"] != [""]:
-                chat_history.append({"role": "function","name":contextArray.context["content"][0]["content"][i]["function"][0], "content": contextArray.context["content"][0]["content"][i]["function"][1]})
-            chat_history.append({"role": "assistant", "content":contextArray.context["content"][0]["content"][i]["message"]})
         
-    def process_user_message(self, chat_history: dict):
+        print("=== TRANSFORM USER MESSAGE: Parsing context array ===")
+        print(f"Context Array Structure:")
+        print(json.dumps(contextArray, indent=2))
+        print(f"\nNumber of user messages: {len(contextArray['context'][1]['content'])}")
+        print(f"Number of assistant responses: {len(contextArray['context'][0]['content'])}")
+        
+        print("\n=== TRANSFORM USER MESSAGE: Processing messages ===")
+        for i in range(len(contextArray["context"][1]["content"])):
+            print(f"\nProcessing message pair {i + 1}:")
+            print(f"User message: {contextArray['context'][1]['content'][i]}")
+            chat_history.append({"role": "user", "content":contextArray["context"][1]["content"][i]})
+            
+            print(f"Assistant content: {json.dumps(contextArray['context'][0]['content'][i], indent=2)}")
+            if contextArray["context"][0]["content"][i]["function"] and contextArray["context"][0]["content"][i]["function"] != [""]:
+                print(f"Function detected: {contextArray['context'][0]['content'][i]['function']}")
+                chat_history.append({"role": "function","name":contextArray["context"][0]["content"][i]["function"][0], "content": contextArray["context"][0]["content"][i]["function"][1]})
+            chat_history.append({"role": "assistant", "content":contextArray["context"][0]["content"][i]["message"]})
+        
+        print("\n=== TRANSFORM USER MESSAGE: Final chat history ===")
+        print(json.dumps(chat_history, indent=2))
+        print("=== TRANSFORM USER MESSAGE: Complete ===\n")
+        return chat_history
+    async def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
+        print("\n=== PROCESS USER MESSAGE: Starting ===")
         current_time = datetime.now(timezone.utc).isoformat()
         
+        print("=== PROCESS USER MESSAGE: Generating system context ===")
         # Generate the system context with enhanced instructions
         system_context = f"""You are a highly professional and task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You have access to a dictionary of {self.student_name}'s courses, where each key is the course name and each value is the corresponding course ID: {self.courses}. 
             Your role is to assist with a variety of school-related tasks including coursework help, study note creation, video transcription, and retrieving specific information from the Canvas LMS (such as syllabus details, assignment deadlines, and course updates).
@@ -254,7 +301,7 @@ class ConversationHandler:
             1. Extract these COMPULSORY elements:
                 - **Item Types:** Assign an item type or types from the following options: {self.valid_types}
                 - **Time Range:** Assign a time range from the following options: {self.time_range_definitions}
-                - **Course:** For any course mentioned by the user, include both the course name and its corresponding course ID. The course name and ids are found in {self.courses}.
+                - **Course:** For any course mentioned by the user, include both the course name and its corresponding course ID. The course name and ids are found in {self.courses}. If a 
                 - **Synonyms or Related Terms:** For example, if the user mentions "exam", also include "midterm" and "final".
 
             2. Keyword List Rules:
@@ -278,8 +325,8 @@ class ConversationHandler:
                 **Time Range FAIL-SAFE:**
                     - If uncertain for the time range, use ALL_TIME for the time range.
                 **Course FAIL-SAFE:**
-                    - If uncertain for the course, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
-
+                    - If no course is mentioned for the course keyword, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
+                    - If a course is mentioned but does not match up exactly with the courses in {self.courses}, match it to the closest course.
             5. Example Keyword List:
                 - 'Physics homework due next week' → ['2372294', 'FUTURE', '[assignment]', 'homework', 'physics', '2025-04-01']
                 - 'Readings from last month in Physcology' → ['29381676', 'EXTENDED_PAST', '[file]', 'reading', 'psychology']
@@ -289,6 +336,7 @@ class ConversationHandler:
             - **Accuracy:** Deliver precise, reliable, and well-structured responses.
             - **Ethics:** Do not assist with any requests that could enable academic dishonesty.
             - **Clarity:** Use plain and accessible language suitable for all academic levels.
+
         """
         
 
@@ -325,7 +373,7 @@ class ConversationHandler:
         function_mapping = {
             # "find_events_and_assignments": self.find_events_and_assignments,
             # "find_syllabus": self.find_syllabus,
-            "vectordb_search": vectordb_search,
+            #"vectordb_search": self.vector_db.search,
             "create_event": create_event
         }
 
@@ -335,85 +383,75 @@ class ConversationHandler:
         
         chat.extend(chat_history)
 
-        # Use response_format parameter to get structured JSON output
+        print("=== PROCESS USER MESSAGE: Making first API call ===")
+        # First API call to get function call or direct response
         chat_completion = client.chat.completions.create(
             model='gpt-4o-mini',
             messages=chat,
             functions=functions,
-            response_format={"type": "json_object", "schema": FunctionResponse.model_json_schema()},
+            #response_format={"type": "json_object", "schema": FunctionResponse.model_json_schema()},
             temperature=.3,
             max_tokens=1024
         )
         
         response_message = chat_completion.choices[0].message
         response_content = response_message.content
+        print("\n=== First API Response Details ===")
+        print("Complete response object:")
+        print(f"Response message: {response_message}")
+        print(f"Response content: {response_content}")
+        print(f"Response message dict: {response_message.__dict__}")
+        print("================================\n")
         
-        try:
-            response_data = json.loads(response_content)
+        print("\n=== PROCESS USER MESSAGE: Processing API response ===")
+        # Check if there's a function call in the response
+        function_call = response_message.function_call
+
+        if function_call:
+            print(f"Function call detected: {function_call.name}")
+            function_name = function_call.name
+            arguments = json.loads(function_call.arguments)
             
-            # Check if there's a function call in the response
-            if "function" in response_data:
-                # Function is called and output used for api context
-                function_name = response_data["function"]
-                arguments = response_data["parameters"]
-                
-                # Add necessary API parameters
-                if function_name == "vectordb_search":
-                    # Extract keywords from the search parameters if they exist
-                    if "search_parameters" in arguments and "keywords" in arguments["search_parameters"]:
-                        arguments["search_parameters"]["keywords"] = self.validate_keywords(
-                            arguments["search_parameters"]["keywords"]
-                        )
-                
-                arguments["canvas_base_url"] = self.canvas_api_url
-                arguments["access_token"] = self.canvas_api_token
+            print("=== PROCESS USER MESSAGE: Preparing function call ===")
+            if function_name == "vectordb_search":
+                if "search_parameters" in arguments and "keywords" in arguments["search_parameters"]:
+                    arguments["search_parameters"]["keywords"] = self.validate_keywords(
+                        arguments["search_parameters"]["keywords"]
+                    )
+            
+            arguments["canvas_base_url"] = self.canvas_api_url
+            arguments["access_token"] = self.canvas_api_token
 
-                print("\n=== Debug Information ===")
-                print(f"Function being called: {function_name}")
-                print(f"Arguments being passed:")
-                print(json.dumps(arguments, indent=2))
-                print(f"Canvas API URL: {self.canvas_api_url}")
-                print("Access Token: " + "*" * len(self.canvas_api_token))  # Don't print actual token for security
-                print("========================\n")
+            print("\n=== PROCESS USER MESSAGE: Executing function ===")
+            if function_name in function_mapping:
+                result = await function_mapping[function_name](**arguments)
+                print(f"Function result: {json.dumps(result, indent=2)}")
+            else:
+                result = json.dumps({"error": f"Function '{function_name}' not implemented."})
 
-                if function_name in function_mapping:
-                    try:
-                        result = function_mapping[function_name](**arguments)
-                    except Exception as e:
-                        print("\n=== Error Details ===")
-                        print(f"Error Type: {type(e).__name__}")
-                        print(f"Error Message: {str(e)}")
-                        print("===================\n")
-                        raise
-                else:
-                    result = json.dumps({"error": f"Function '{function_name}' not implemented."})
+            print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
+            chat.append({
+                'role': "function",
+                "name": function_name,
+                "content": json.dumps(result)
+            })
 
-                chat.append({
-                    'role': "function",
-                    "name": function_name,
-                    "content": json.dumps(result)
-                })
-
-                # Context is then passed back to the api in order for it to respond to the user
-                final_completion = client.chat.completions.create(
-                    model='gpt-4o-mini',
-                    messages=chat,
-                    functions=functions,
-                    temperature=0.3,
-                    max_tokens=1024
-                )
-
-            # Final response after function call
+            # Context is then passed back to the api in order for it to respond to the user
+            final_completion = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=chat,
+                functions=functions,
+                temperature=0.3,
+                max_tokens=1024
+            )
             final_message = final_completion.choices[0].message.content
+            print(f"Second API Response: {final_message}")
             
-           
-            
-            
-            return_value = [{"message":final_message, "function": [function_name, json.dumps(result)] }]
-            return return_value
+            return_value = [{"message": final_message, "function": [function_name, json.dumps(result)]}]
+        else:
+            print("=== PROCESS USER MESSAGE: No function call needed ===")
+            return_value = [{"message": response_content, "function": [""]}]
         
-        except Exception as e:
-            # If no function was called then the api's response to the user's prompt is returned
-             
-            return [{"message":response_content, "function": [""] }]
-            x
+        print("=== PROCESS USER MESSAGE: Complete ===\n")
+        return return_value
+            
