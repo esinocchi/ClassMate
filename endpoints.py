@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Union
@@ -15,16 +16,27 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+
+class ContextPair(BaseModel):
+    message: str
+    function: List[str]
+
 class ContextEntry(BaseModel):
     role: str
-    content: List[str]
+    content: List[ContextPair]
+
+class ClassesDict(BaseModel):
+    id: str
+    name: str
+    selected: str
 
 class ContextEntry2(BaseModel):
     role: str
     id: str
     domain: str
+    recentDOCS: List[str]
     content: List[str]
-    classes: List[str]
+    classes: List[ClassesDict]
 
 class ContextObject(BaseModel):
     context: List[Union[ContextEntry, ContextEntry2]]
@@ -47,8 +59,18 @@ async def mainPipelineEntry(contextArray: ContextObject):
     return contextArray.context  # Return the modified Context
 
 @app.get('/endpoints/pullClasses')
-async def returnPromptContext(studentID, college):
+async def returnPromptContext(studentID, domain):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     classes = ["cmpsc311", "cmpeng270", "math250"] #create sample list
     return {'classes': classes}
+
+@app.get('/endpoints/pullUser')
+async def returnUserID(token):
+
+    return 
+
+@app.get('/endpoints/mainPipelineEntry/getPDF')
+async def  pdfPull(pdfID):
+
+    return 
