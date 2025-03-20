@@ -30,7 +30,7 @@ root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
 # Import our modules
-from vectordb.db import VectorDatabase
+from db import VectorDatabase
 from backend.data_retrieval.data_handler import DataHandler
 
 def get_canvas_data():
