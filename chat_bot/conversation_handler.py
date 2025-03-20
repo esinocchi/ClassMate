@@ -15,7 +15,7 @@ sys.path.append(str(root_dir))
 # from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
-#from vectordb.vectordatabase import VectorDatabase
+from vectordb.vectordatabase import VectorDatabase
 
 # Define the context models locally
 class ContextPair(BaseModel):
@@ -50,33 +50,15 @@ canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 # Pydantic classes for structured output
-class SearchParameters(BaseModel):
-    course_id: str = Field(..., description="Course ID or 'all_courses'")
-    time_range: Literal["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"] = Field(
-        description="Temporal context for search"
-    )
-    item_types: List[Literal["assignment", "file", "quiz", "announcement", "event", "syllabus"]] = Field(
-        description="Types of Canvas items to search for"
-    )
-    specific_dates: Optional[List[str]] = Field(
-        None, description="ISO format dates (YYYY-MM-DD) mentioned in query"
-    )
-    keywords: List[str] = Field(description="Additional search terms like 'midterm', 'HW2', 'Quiz 3'")
-
-class VectorDBSearch(BaseModel):
-    search_parameters: SearchParameters
-    query: str = Field(description="User's original query for semantic search")
 
 # Define the complete function response model
-class FunctionResponse(BaseModel):
-    function: Literal["vectordb_search", "create_event"]
-    parameters: VectorDBSearch 
 
 class ConversationHandler:
-    def __init__(self, student_name, student_id, courses):
+    def __init__(self, student_name, student_id, courses,domain):
         self.student_name = student_name
-        self.student_id = student_id
+        self.student_id = f"user_{student_id}"
         self.courses = courses
+        self.domain = domain
         self.canvas_api_url = canvas_api_url
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
@@ -107,12 +89,67 @@ class ConversationHandler:
         }
         self.generality = "HIGH"
 
-        # Initialize VectorDatabase
-        #self.vector_db = VectorDatabase("user_data2.json")  # Make sure this path is correct
 
     def define_functions(self):
         """Returns a list of function definitions for the OpenAI API"""
         functions = [
+            {
+                "name": "find_events_and_assignments",
+                "description": "Search for Canvas materials using vector embeddings for semantic retrieval.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "search_parameters": {
+                            "type": "object",
+                            "properties": {
+                                "course_id": {
+                                    "type": "string",
+                                    "description": "Course ID or 'all_courses'"
+                                },
+                                "time_range": {
+                                    "type": "string", 
+                                    "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
+                                    "description": "Temporal context for search"
+                                },
+                                "generality": {
+                                    "type": "string",
+                                    "enum": ["HIGH"],
+                                    "description": "Generality of the search"
+                                },
+                                "item_types": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                    },
+                                    "description": "This should always be [assignment,events,announcement]"
+                                },
+                                "specific_dates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO format dates (YYYY-MM-DD) mentioned in query"
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string" 
+                                    },
+                                    "description": "Additional search terms like 'midterm', 'HW2', 'Quiz 3'"
+                                },
+                                "query": {
+                                    "type": "string",
+                                    "description": "User's original query for semantic search"
+                                }
+                            },
+                        },
+                        
+                    },
+                    "required": ["search_parameters"]
+                }
+            },
             {
                 "name": "vectordb_search",
                 "description": "Search for Canvas materials using vector embeddings for semantic retrieval.",
@@ -178,7 +215,7 @@ class ConversationHandler:
                     "properties": {
                         "context_code": {
                             "type": "string",
-                            "description": "This should always be the students user id."
+                            "description": "This should always be the students user id. This should be in the form user_idnumbe"
                         },
                         "title": {
                             "type": "string",
@@ -263,7 +300,7 @@ class ConversationHandler:
 
             2. Keyword List Rules:
                 - Keyword list should contain keywords that are relevant to the user's query, but should not be the same as any of the Compulsory elemnts mentioned in step 1. 
-                - For example: If somebody asks you to retrieve all assignments related to Hooke's law, the keyword list should be ['Hooke's law',]
+                - For example: If somebody asks you to retrieve all assignments related to Hooke's law, the keyword list should be ['Hooke's law']
                 - Include synonyms or related terms if applicable
                 - Max 10 items in the list
 
@@ -285,10 +322,7 @@ class ConversationHandler:
                 **Course FAIL-SAFE:**
                     - If no course is mentioned for the course keyword, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
                     - If a course is mentioned but does not match up exactly with the courses in {self.courses}, match it to the closest course.
-            5. Example Keyword List:
-                - 'Physics homework due next week' → ['2372294', 'FUTURE', '[assignment]', 'homework', 'physics', '2025-04-01']
-                - 'Readings from last month in Physics ' → ['29381676', 'EXTENDED_PAST', '[file]', 'reading', 'psychology']
-
+          
             For Canvas material search queries, you MUST respond with a valid JSON object in this exact format:
 
             Example: "What physics assignments are due next week?"
@@ -302,8 +336,9 @@ class ConversationHandler:
                     "specific_dates": ["2025-04-01", "2025-04-07"],
                     "keywords": ["physics", "homework"],
                     "generality": "HIGH"
-                    }},
                     "query": "What physics assignments are due next week?"
+                    }},
+                    
             }}
             }}
 
@@ -313,20 +348,25 @@ class ConversationHandler:
             the arguments to be generated are defined in the description of the function list. 
 
             If you do not need to call a function, then respond to the user accordingly. 
+            If the last item in the chat history is a function call, then respond to the user's previous message using . 
         """
         return system_context
     
 
-    # def find_events_and_assignments(self, query: str):
-    #     """Find events and assignments using the context_retrieval module"""
-    #     # Convert course IDs to strings
-    #     course_ids = [str(course_id) for course_id in self.courses.values()]
-    #     return chat_bot.context_retrieval.retrieve_events_and_assignments(query, course_ids)
+    def find_events_and_assignments(self, search_parameters: dict):
+        """Find events and assignments using the vector search function"""
+        from backend.vectordb.vectordatabase import search
+        user_id_number = self.student_id.split("_")[1]
 
-    # def find_syllabus(self, query: str):
-    #     """Find syllabus using the context_retrieval module"""
-    #     course_ids = [str(course_id) for course_id in self.courses.values()]
-    #     return chat_bot.context_retrieval.retrieve_syllabus(query, course_ids)
+        vector_db = VectorDatabase(f"user_data/psu/{user_id_number}/user_data.json")
+        events_and_assignments = vector_db.search(search_parameters)
+        
+        return events_and_assignments
+
+    def find_syllabus(self, query: str):
+        """Find syllabus using the context_retrieval module"""
+        course_ids = [str(course_id) for course_id in self.courses.values()]
+        return chat_bot.context_retrieval.retrieve_syllabus(query, course_ids)
 
     def validate_keywords(self, keywords):
         """Validates keywords and enables fail-safes"""
@@ -363,7 +403,8 @@ class ConversationHandler:
             if contextArray["context"][0]["content"][i]["function"] and contextArray["context"][0]["content"][i]["function"] != [""]:
                 print(f"Function detected: {contextArray['context'][0]['content'][i]['function']}")
                 chat_history.append({"role": "function","name":contextArray["context"][0]["content"][i]["function"][0], "content": contextArray["context"][0]["content"][i]["function"][1]})
-            chat_history.append({"role": "assistant", "content":contextArray["context"][0]["content"][i]["message"]})
+            if len(contextArray["context"][0]["content"])-1 != i:
+                chat_history.append({"role": "assistant", "content":contextArray["context"][0]["content"][i]["message"]})
         
         print("\n=== TRANSFORM USER MESSAGE: Final chat history ===")
         print(json.dumps(chat_history, indent=2))
@@ -395,13 +436,14 @@ class ConversationHandler:
         ]
         
         chat.extend(chat_history)
-
+        print(chat)
         print("=== PROCESS USER MESSAGE: Making first API call ===")
         # First API call to get function call or direct response
         chat_completion = client.chat.completions.create(
             model='gpt-4o-mini',
             messages=chat,
             functions=functions,
+            function_call = "auto",
             temperature=.3,
             max_tokens=1024
         )
@@ -447,6 +489,7 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
+            print(chat)
 
             # Context is then passed back to the api in order for it to respond to the user
             final_completion = client.chat.completions.create(
@@ -456,13 +499,18 @@ class ConversationHandler:
                 temperature=0.3,
                 max_tokens=1024
             )
+            print("\n=== First API Response Details ===")
+            print("Complete response object:")
+            print(f"Response message: {final_completion.choices[0].message}")
+            print(f"Response content: {final_completion.choices[0].message.content}")
+            print(f"Response message dict: {vars(final_completion.choices[0].message)}")
+            print("================================\n")
+
             final_message = final_completion.choices[0].message.content
-            print(f"Second API Response: {final_message}")
-            
             return_value = [{"message": final_message, "function": [function_name, json.dumps(result)]}]
         else:
             print("=== PROCESS USER MESSAGE: No function call needed ===")
-            return_value = [{"message": response_content, "function": [""]}]
+            return_value = [{"message": response_content , "function": [""]}]
         
         print("=== PROCESS USER MESSAGE: Complete ===\n")
         return return_value

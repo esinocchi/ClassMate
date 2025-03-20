@@ -60,55 +60,66 @@ async def root():
 async def mainPipelineEntry(contextArray: ContextObject): 
     #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
+    #chat_requirements = check_chat_requirements(contextArray)
+    chat_requirements = "None"
+    if chat_requirements == "None":
+            
 
-    print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-    
-    handler = DataHandler()
-    user_data = handler.grab_data()
-    user_name = user_data["user_metadata"]["name"]
-    
-    print("=== STAGE 2: Processing context data ===")
-    # Handle both dictionary and Pydantic model access
-    context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
-    user_context = context_data['context'][1]
-    user_id = user_context['id']
-    courses = {}  # Changed to a single dictionary
+        print("\n=== STAGE 1: Starting mainPipelineEntry ===")
+        context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
+        user_context = context_data['context'][1]
+        user_id = user_context['id']
+        user_domain = user_context['domain']
+        
+        handler = DataHandler(user_id, user_domain)
+        user_data = handler.grab_user_data()
+        user_name = user_data["user_metadata"]["name"]
+        
+        print("=== STAGE 2: Processing context data ===")
+        # Handle both dictionary and Pydantic model access
+        
+        courses = {}  # Changed to a single dictionary
 
-    for class_info in user_context['classes']:
-        if class_info['selected'] == 'true':
-            # Remove 'course_' prefix from ID and store as a simple key-value pair
-            course_id = class_info['id'].replace('course_', '')
-            courses[class_info['name']] = course_id
-    
-    print("=== STAGE 3: Initializing ConversationHandler ===")
-    conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses)
-    
-    print("=== STAGE 4: Transforming user message ===")
-    chat_history = conversation_handler.transform_user_message(context_data)
-    
-    print("=== STAGE 5: Processing chat history ===")
-    response = await conversation_handler.process_user_message(chat_history)
-    
-    print("=== STAGE 6: Returning response ===\n")
-    return response  # Return the modified Context
+        for class_info in user_context['classes']:
+            if class_info['selected'] == 'true':
+                # Remove 'course_' prefix from ID and store as a simple key-value pair
+                course_id = class_info['id'].replace('course_', '')
+                courses[class_info['name']] = course_id
+        
+        print("=== STAGE 3: Initializing ConversationHandler ===")
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain)
+        
+        print("=== STAGE 4: Transforming user message ===")
+        chat_history = conversation_handler.transform_user_message(context_data)
+        
+        print("=== STAGE 5: Processing chat history ===")
+        response = await conversation_handler.process_user_message(chat_history)
+        
+        print("=== STAGE 6: Returning response ===\n")
+        return response  # Return the modified Context
+    else:
+        return[{"message": chat_requirements,"function":""}]
+
 
 
 @app.get('/endpoints/pullClasses')
-async def returnPromptContext(studentID, college):
+async def pullClasses(user_id, college):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     
     #pull user data from database given parameters
-    handler = DataHandler(studentID, college)
+    handler = DataHandler(user_id, college)
     user_data = handler.grab_user_data()
     
     #pull classes from user data
     classes = user_data["user_metadata"]["courses_selected"]
 
-    return {'classes': classes.keys()}
+    #classes are returned in the format {course_id: course_name}
+    return {'classes': classes}
 
 
-@app.put('/endpoints/initate_user')
+# call this endpoint to force a user to re-authenticate whenever browser cache is empty
+@app.get('/endpoints/initate_user')
 async def initate_user(domain: str):
     #hardcode token until we have access to developer keys to run oauth2
     #we will redirect to oauth page later
@@ -127,19 +138,38 @@ async def initate_user(domain: str):
     
     #if user has no saved data, initiate user data
     else:
-        handler = DataHandler(user_id, domain, token)
+        courses_selected = {
+            "2372294": "PHYS 211: Mechanics (UP; Spring 2025)",
+            "2381676": "STAT 318.001 Spring 202",
+            "2361510": "EARTH 101, Section 001: Natural Disasters (22511--UP---P-EARTH---101-------001-)",
+            "2361723": "GEOG 2N, Section 001: Apocalyptic Geographies (22511--UP---P-GEOG----2N--------001-)"
+        }
+        
+        handler = DataHandler(user_id, domain, token, courses_selected=courses_selected)
         handler.initiate_user_data()
         handler.update_user_data()
 
-    return {'response': 'User initiated'}
+    return {'user_id': user_id}
 
+def check_chat_requirements(contextArray: ContextObject):
+    #check if user has selected any courses
+    #check if user has a valid user id
+    user_context = contextArray.context[1]
+    
+    #if there are no courses selected, redirect user to select courses in the settings page and return error message
+    if user_context['classes'] == []:
+        
+        return "select at least one course"
+   
+    
+    #if user has no user id, redirect user to oauth page and return error message
+    elif user_context["id"] == "":
+        
+        return "re-authenticate with Canvas"
+    
+    #if user has all requirements, return "None" as in no chat requirements
+    else:
+        return "None"
 
-@app.get('/endpoints/pullUser')
-async def returnUserID(token):
+    
 
-    return 
-
-@app.get('/endpoints/mainPipelineEntry/getPDF')
-async def  pdfPull(pdfID):
-
-    return 

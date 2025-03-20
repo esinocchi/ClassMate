@@ -1,4 +1,4 @@
-myenv/
+myenv-3.9/
 canvas.db
 .env
 user_data/.DS_Store
@@ -6,3 +6,5 @@ user_data/.DS_Store
 .vscode/
 .zshrc
 .gitignore
+get-pip.py
+chroma_data/

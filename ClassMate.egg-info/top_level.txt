@@ -1,4 +1,0 @@
-backend
-chatbot
-pipeline
-vectordb
