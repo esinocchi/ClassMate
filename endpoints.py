@@ -57,10 +57,30 @@ async def root():
 # Enter main prompt pipeline and return response
 @app.post('/endpoints/mainPipelineEntry', response_model=ContextObject)
 async def mainPipelineEntry(contextArray: ContextObject): 
+    """
+    This endpoint is the main entry point for the chatbot.
+    It will check if the user has any chat requirements, and if not, it will process the user's message.
+    If the user has chat requirements, it will return an error message.
+
+    ===============================================
+    
+    inputs:
+    contextArray: ContextObject
+
+    outputs:
+    ContextObject or {"message": str}
+
+    ===============================================
+
+    This endpoint is called when the user sends a message to the chatbot.
+    """
+   
     #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     #chat_requirements = check_chat_requirements(contextArray)
-    chat_requirements = "None"
+    chat_requirements = check_chat_requirements(contextArray)
+    
+
     if chat_requirements == "None":
             
 
@@ -103,6 +123,22 @@ async def mainPipelineEntry(contextArray: ContextObject):
 
 @app.get('/endpoints/pullCourses')
 async def pullCourses(user_id, domain):
+    """
+    This endpoint is used to pull courses from the canvas api and return for display.
+
+    ===============================================
+
+    inputs:
+    user_id: int eg. 1242323
+    domain: str eg. "psu.instructure.com"
+
+    outputs:
+    {"courses": List[ClassesDict]}
+
+    ===============================================
+
+    Call this endpoint when the user first loads the settings page.
+    """
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     
@@ -142,6 +178,23 @@ async def pullCourses(user_id, domain):
 
 @app.post('/endpoints/pushCourses')
 async def pushCourses(user_id, domain, courses: List[ClassesDict]):
+    """
+    This endpoint is used to push courses to the database.
+
+    ===============================================
+
+    inputs:
+    user_id: int
+    domain: str
+    courses: List[ClassesDict]
+
+    outputs:
+    {"message": str}
+
+    ===============================================
+
+    Call this endpoint when the user selects or deselects a course then clicks the save button.
+    """
     #push courses to database
     #courses are returned in the format {course_id: course_name}
     courses_selected = {}
@@ -162,6 +215,23 @@ async def pushCourses(user_id, domain, courses: List[ClassesDict]):
 # call this endpoint to force a user to re-authenticate whenever browser cache is empty
 @app.get('/endpoints/initate_user')
 async def initate_user(domain: str):
+    """
+    This endpoint is used to force a user to re-authenticate and generate a new token.
+    
+    call this endpoint when the token is expired, or when the user_id is not found in the database.
+
+    ===============================================
+    
+    inputs:
+    domain: str
+
+    outputs:
+    {"user_id": int}
+    
+    ===============================================
+
+    check on reload of page if user_id --IS NOT-- found in database, and if so, call this endpoint.
+    """
     #hardcode token until we have access to developer keys to run oauth2
     #we will redirect to oauth page later
     token = await oauthTokenGenerator()
@@ -192,12 +262,44 @@ async def initate_user(domain: str):
 
 @app.put('/endpoints/deleteUserDataContext')
 async def deleteUserDataContext(user_id, domain):
+    """
+    This endpoint is used to delete the user data context.
+
+    ===============================================
+
+    inputs:
+    user_id: int
+    domain: str
+
+    outputs:
+    message: str
+
+    ===============================================
+
+    call this endpoint whenever the chat memory is cleared.
+    """
     handler = DataHandler(user_id, domain)
     handler.delete_chat_context()
     return {'message': "User data context cleared"}
 
 @app.put('/endpoints/checkAndUpdateUserData')
 async def checkAndUpdateUserData(user_id, domain):
+    """
+    This endpoint is used to check if the user data is outdated and update it if necessary.
+
+    ===============================================
+
+    inputs:
+    user_id: int
+    domain: str
+
+    outputs:
+    {"message": str}
+
+    ===============================================
+
+    check on reload of page if user_id --IS-- found in database, and if so, call this endpoint.
+    """
     handler = DataHandler(user_id, domain)
     user_data = handler.grab_user_data()
 
@@ -215,12 +317,27 @@ async def checkAndUpdateUserData(user_id, domain):
         return {"message": "User data not updated"}
 
 def check_chat_requirements(contextArray: ContextObject):
+    """
+    This function is used to check if the user has any chat requirements missing
+
+    ===============================================
+
+    inputs:
+    contextArray: ContextObject
+
+    outputs:
+    message: str
+
+    ===============================================
+
+    this function is called in the mainPipelineEntry endpoint.
+    """
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if check_user_data_update(user_context['id'], user_context['domain']):
+    if check_update_status(user_context['id'], user_context['domain']):
         return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
@@ -229,13 +346,37 @@ def check_chat_requirements(contextArray: ContextObject):
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
 
-@app.get('/endpoints/check_user_data_update')
-async def check_user_data_update(user_id, domain):
+@app.get('/endpoints/check_update_status')
+async def check_update_status(user_id, domain):
+    """
+    This endpoint is used to check if the user data is currently being updated.
+
+    ===============================================
+
+    inputs:
+    user_id: int
+    domain: str
+
+    outputs:
+    is_updating: bool
+
+    ===============================================
+
+    call this endpoint whenever a user tries to update courses_selected, 
+    main pipline entry handles the case of when user tries to chat while update is in progress.
+    """
     handler = DataHandler(user_id, domain)
     user_data = handler.grab_user_data()
     return user_data["user_metadata"]["is_updating"]
 
 async def oauthTokenGenerator():
+    """
+    token generator for oauth2
+    
+    ===============================================
+
+    hardcoded token until we have access to developer keys to run oauth2
+    """
     #we will use oauth2 to generate a token
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
