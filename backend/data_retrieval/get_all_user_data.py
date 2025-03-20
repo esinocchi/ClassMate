@@ -767,4 +767,57 @@ async def get_all_user_data(BASE_DIR: str, API_URL: str, API_TOKEN: str, user_da
     print(f"Size in MB: {user_data_size_bytes / (1024 * 1024):.2f} MB")
     print("\n=== Data Collection Complete ===")
 
+    duplicates = check_for_duplicates(user_data)
+    print(f"\nDuplicates: {duplicates}")
+
     return user_data
+
+
+def check_for_duplicates(user_data):
+    """
+    Checks for duplicate entries in the user_data dictionary.
+    
+    Parameters:
+    -----------
+    user_data : dict
+        The user data dictionary containing courses, files, announcements, assignments, quizzes, etc.
+        
+    Returns:
+    --------
+    dict
+        A dictionary containing counts of duplicates found in each category.
+    """
+    duplicate_counts = {
+        "courses": 0,
+        "files": 0,
+        "announcements": 0,
+        "assignments": 0,
+        "quizzes": 0,
+        "calendar_events": 0
+    }
+    
+    # Check each category for duplicates
+    for category in duplicate_counts.keys():
+        if category not in user_data or not isinstance(user_data[category], list):
+            continue
+            
+        # Use sets to track IDs we've seen
+        seen_ids = set()
+        unique_items = []
+        
+        for item in user_data[category]:
+            if not isinstance(item, dict) or "id" not in item:
+                unique_items.append(item)
+                continue
+                
+            item_id = item["id"]
+            if item_id in seen_ids:
+                duplicate_counts[category] += 1
+            else:
+                seen_ids.add(item_id)
+                unique_items.append(item)
+        
+        # Replace the original list with the deduplicated list
+        user_data[category] = unique_items
+    
+    return duplicate_counts
