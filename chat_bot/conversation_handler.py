@@ -105,6 +105,7 @@ class ConversationHandler:
                 "weight": 1.0
             }
         }
+        self.generality = "HIGH"
 
         # Initialize VectorDatabase
         #self.vector_db = VectorDatabase("user_data2.json")  # Make sure this path is correct
@@ -129,6 +130,11 @@ class ConversationHandler:
                                     "type": "string", 
                                     "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
                                     "description": "Temporal context for search"
+                                },
+                                "generality": {
+                                    "type": "string",
+                                    "enum": ["HIGH"],
+                                    "description": "Generality of the search"
                                 },
                                 "item_types": {
                                     "type": "array",
@@ -231,6 +237,84 @@ class ConversationHandler:
         ]
         return functions
     
+    def define_system_context(self):
+        current_time = datetime.now(timezone.utc).isoformat()
+        
+        system_context = f"""You are a highly professional and task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You have access to a dictionary of {self.student_name}'s courses, where each key is the course name and each value is the corresponding course ID: {self.courses}. 
+            
+        Your role is to assist with a variety of school-related tasks including coursework help, study note creation, video transcription, and retrieving specific information from the Canvas LMS (such as syllabus details, assignment deadlines, and course updates).
+        Adhere to the following principles:
+            - **Professionalism:** Maintain a strictly professional tone and disregard nonsensical or irrelevant queries.
+            - **Accuracy:** Deliver precise, reliable, and well-structured responses.
+            - **Ethics:** Do not assist with any requests that could enable academic dishonesty.
+            - **Clarity:** Use plain and accessible language suitable for all academic levels.
+
+            The current UTC time is: {current_time}
+            When creating events or working with dates, use this as your reference point for "now".
+            All dates and times should be in ISO8601 format.
+
+            When a user's question requires additional information that is not immediately available, you must call the appropriate retrieval function that is listed in the function list given to you. In the case that a function call is needed, extract a concise list of keywords from the user's prompt that captures the essential details needed for the search. Here are the guidelines for the keywords:
+
+            1. Extract these COMPULSORY elements:
+                - **Item Types:** Assign an item type or types from the following options: {self.valid_types}
+                - **Time Range:** Assign a time range from the following options: {self.time_range_definitions}
+                - **Course:** For any course mentioned by the user, include both the course name and its corresponding course ID. The course name and ids are found in {self.courses}.
+                - **Synonyms or Related Terms:** For example, if the user mentions "exam", also include "midterm" and "final".
+
+            2. Keyword List Rules:
+                - Keyword list should contain keywords that are relevant to the user's query, but should not be the same as any of the Compulsory elemnts mentioned in step 1. 
+                - For example: If somebody asks you to retrieve all assignments related to Hooke's law, the keyword list should be ['Hooke's law',]
+                - Include synonyms or related terms if applicable
+                - Max 10 items in the list
+
+            3. Specific Cases:
+                **Time Range Examples:**
+                    - 'Due tomorrow' → FUTURE
+                    - 'Posted yesterday' → RECENT_PAST
+                    - 'From two weeks ago' → EXTENDED_PAST
+                    - 'Any syllabus for the course' → ALL_TIME
+
+                **When specific dates are mentioned:**
+                    - Include both time range AND ISO date
+                    - Example: 'What assignments have March 25th as a deadline' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25']
+                    - Example: 'What is due in the last week of March' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25', '2025-03-31']
+
+            4. Fail-Safes:
+                **Time Range FAIL-SAFE:**
+                    - If uncertain for the time range, use ALL_TIME for the time range.
+                **Course FAIL-SAFE:**
+                    - If no course is mentioned for the course keyword, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
+                    - If a course is mentioned but does not match up exactly with the courses in {self.courses}, match it to the closest course.
+            5. Example Keyword List:
+                - 'Physics homework due next week' → ['2372294', 'FUTURE', '[assignment]', 'homework', 'physics', '2025-04-01']
+                - 'Readings from last month in Physics ' → ['29381676', 'EXTENDED_PAST', '[file]', 'reading', 'psychology']
+
+            For Canvas material search queries, you MUST respond with a valid JSON object in this exact format:
+
+            Example: "What physics assignments are due next week?"
+            Arguments must be:
+            {{
+            "parameters": {{
+                "search_parameters": {{
+                    "course_id": "2372294",
+                    "time_range": "FUTURE",
+                    "item_types": ["assignment"],
+                    "specific_dates": ["2025-04-01", "2025-04-07"],
+                    "keywords": ["physics", "homework"],
+                    "generality": "HIGH"
+                    }},
+                    "query": "What physics assignments are due next week?"
+            }}
+            }}
+
+            Your JSON response MUST be valid and conform exactly to this structure.
+
+            If you do not need to use a retrieval function, but they ask you to create an event,
+            the arguments to be generated are defined in the description of the function list. 
+
+            If you do not need to call a function, then respond to the user accordingly. 
+        """
+        return system_context
     
 
     # def find_events_and_assignments(self, query: str):
@@ -257,6 +341,8 @@ class ConversationHandler:
         if len(keywords) > 2 and keywords[2] not in self.valid_types:
             keywords[2] = "all_types"
         return keywords[:10]
+    
+
     def transform_user_message(self, contextArray: ContextObject):
         print("\n=== TRANSFORM USER MESSAGE: Starting ===")
         chat_history = []
@@ -268,7 +354,7 @@ class ConversationHandler:
         print(f"Number of assistant responses: {len(contextArray['context'][0]['content'])}")
         
         print("\n=== TRANSFORM USER MESSAGE: Processing messages ===")
-        for i in range(len(contextArray["context"][1]["content"])):
+        for i in range(len(contextArray["context"][1]["content"])-1):
             print(f"\nProcessing message pair {i + 1}:")
             print(f"User message: {contextArray['context'][1]['content'][i]}")
             chat_history.append({"role": "user", "content":contextArray["context"][1]["content"][i]})
@@ -283,87 +369,14 @@ class ConversationHandler:
         print(json.dumps(chat_history, indent=2))
         print("=== TRANSFORM USER MESSAGE: Complete ===\n")
         return chat_history
+    
     async def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         print("\n=== PROCESS USER MESSAGE: Starting ===")
-        current_time = datetime.now(timezone.utc).isoformat()
         
         print("=== PROCESS USER MESSAGE: Generating system context ===")
         # Generate the system context with enhanced instructions
-        system_context = f"""You are a highly professional and task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You have access to a dictionary of {self.student_name}'s courses, where each key is the course name and each value is the corresponding course ID: {self.courses}. 
-            Your role is to assist with a variety of school-related tasks including coursework help, study note creation, video transcription, and retrieving specific information from the Canvas LMS (such as syllabus details, assignment deadlines, and course updates).
-
-            The current UTC time is: {current_time}
-            When creating events or working with dates, use this as your reference point for "now".
-            All dates and times should be in ISO8601 format.
-
-            When a user's question requires additional information that is not immediately available, you must call the appropriate retrieval function. If no function call is needed, you will answer the user's question directly. In the case that a function call is needed, extract a concise list of keywords from the user's prompt that captures the essential details needed for the search. Here are the guidelines for the keywords:
-            1. Extract these COMPULSORY elements:
-                - **Item Types:** Assign an item type or types from the following options: {self.valid_types}
-                - **Time Range:** Assign a time range from the following options: {self.time_range_definitions}
-                - **Course:** For any course mentioned by the user, include both the course name and its corresponding course ID. The course name and ids are found in {self.courses}. If a 
-                - **Synonyms or Related Terms:** For example, if the user mentions "exam", also include "midterm" and "final".
-
-            2. Keyword List Rules:
-                - The first 3 items MUST be [Course ID, Time Range, [Item Type(s)]]
-                - Include synonyms or related terms if applicable
-                - Max 10 items in the list
-
-            3. Specific Cases:
-                **Time Range Examples:**
-                    - 'Due tomorrow' → FUTURE
-                    - 'Posted yesterday' → RECENT_PAST
-                    - 'From two weeks ago' → EXTENDED_PAST
-                    - 'Any syllabus for the course' → ALL_TIME
-
-                **When specific dates are mentioned:**
-                    - Include both time range AND ISO date
-                    - Example: 'What assingments have March 25th as a deadline' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25']
-                    - Example: 'What is due in the last week of March' → ['all_courses', 'FUTURE', '[assignment]', '2025-03-25', '2025-03-31']
-
-            4. Fail-Safes:
-                **Time Range FAIL-SAFE:**
-                    - If uncertain for the time range, use ALL_TIME for the time range.
-                **Course FAIL-SAFE:**
-                    - If no course is mentioned for the course keyword, use "all_courses" for the course keyword. An example prompt where this would be applicable is "What assignments do I have in all my classes the last week of March?"
-                    - If a course is mentioned but does not match up exactly with the courses in {self.courses}, match it to the closest course.
-            5. Example Keyword List:
-                - 'Physics homework due next week' → ['2372294', 'FUTURE', '[assignment]', 'homework', 'physics', '2025-04-01']
-                - 'Readings from last month in Physcology' → ['29381676', 'EXTENDED_PAST', '[file]', 'reading', 'psychology']
-
-            Adhere to the following principles:
-            - **Professionalism:** Maintain a strictly professional tone and disregard nonsensical or irrelevant queries.
-            - **Accuracy:** Deliver precise, reliable, and well-structured responses.
-            - **Ethics:** Do not assist with any requests that could enable academic dishonesty.
-            - **Clarity:** Use plain and accessible language suitable for all academic levels.
-
-        """
-        
-
-        # Add vectordb search instructions
-        vectordb_search_instructions = """
-        For Canvas material search queries, you MUST respond with a valid JSON object in this exact format:
-
-        Example: "What physics assignments are due next week?"
-        Response must be:
-        {
-        "function": "vectordb_search",
-        "parameters": {
-            "search_parameters": {
-                "course_id": "2372294",
-                "time_range": "FUTURE",
-                "item_types": ["assignment"],
-                "specific_dates": ["2025-04-01", "2025-04-07"],
-                "keywords": ["physics", "homework"]
-            },
-            "query": "What physics assignments are due next week?"
-        }
-        }
-
-        Your JSON response MUST be valid and conform exactly to this structure.
-        """
-        system_context += vectordb_search_instructions
-
+        system_context = self.define_system_context()
         functions = self.define_functions()
         
         client = OpenAI(
@@ -389,7 +402,6 @@ class ConversationHandler:
             model='gpt-4o-mini',
             messages=chat,
             functions=functions,
-            #response_format={"type": "json_object", "schema": FunctionResponse.model_json_schema()},
             temperature=.3,
             max_tokens=1024
         )
