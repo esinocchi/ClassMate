@@ -337,6 +337,12 @@ class DataHandler:
         user_data["token"] = token
         return self.save_user_data(user_data)
 
+    def has_saved_data(self):
+        """
+        Checks if the user has saved data
+        """
+        file_path = self._get_user_data_path()
+        return os.path.exists(file_path)
 
 
 
