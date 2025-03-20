@@ -117,6 +117,11 @@ async function handlePrompt() {
                 // Default to an empty prompt pair structure if "Context_CanvasAI" doesn't exist
                 let promptPairs = result.Context_CanvasAI || dataHolder;
 
+                //check if the id is already stored
+                if (promptPairs[1].id == "") {
+                    //add code to call api
+                }
+
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
                 if (promptPairs[0].content.length > 19) {
                     promptPairs[0].content.pop();
@@ -300,7 +305,10 @@ function addMemoryBox(prompt, response) {
 //rebuild class selections and past chats
 function rebuildPage() {
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        //update domain each reload
         let context = result.Context_CanvasAI || dataHolder;
+        context[1].domain = getURL();
+
         for (let i = context[0].content.length - 1; i >= 0; i--) {
             addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
         };
