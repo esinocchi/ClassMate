@@ -59,37 +59,46 @@ async def root():
 async def mainPipelineEntry(contextArray: ContextObject): 
     #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
+    #chat_requirements = check_chat_requirements(contextArray)
+    chat_requirements = "None"
+    if chat_requirements == "None":
+            
 
-    print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-    
-    handler = DataHandler()
-    user_data = handler.grab_data()
-    user_name = user_data["user_metadata"]["name"]
-    
-    print("=== STAGE 2: Processing context data ===")
-    # Handle both dictionary and Pydantic model access
-    context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
-    user_context = context_data['context'][1]
-    user_id = user_context['id']
-    courses = {}  # Changed to a single dictionary
+        print("\n=== STAGE 1: Starting mainPipelineEntry ===")
+        context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
+        user_context = context_data['context'][1]
+        user_id = user_context['id']
+        user_domain = user_context['domain']
+        
+        handler = DataHandler(user_id, user_domain)
+        user_data = handler.grab_user_data()
+        user_name = user_data["user_metadata"]["name"]
+        
+        print("=== STAGE 2: Processing context data ===")
+        # Handle both dictionary and Pydantic model access
+        
+        courses = {}  # Changed to a single dictionary
 
-    for class_info in user_context['classes']:
-        if class_info['selected'] == 'true':
-            # Remove 'course_' prefix from ID and store as a simple key-value pair
-            course_id = class_info['id'].replace('course_', '')
-            courses[class_info['name']] = course_id
-    
-    print("=== STAGE 3: Initializing ConversationHandler ===")
-    conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses)
-    
-    print("=== STAGE 4: Transforming user message ===")
-    chat_history = conversation_handler.transform_user_message(context_data)
-    
-    print("=== STAGE 5: Processing chat history ===")
-    response = await conversation_handler.process_user_message(chat_history)
-    
-    print("=== STAGE 6: Returning response ===\n")
-    return response  # Return the modified Context
+        for class_info in user_context['classes']:
+            if class_info['selected'] == 'true':
+                # Remove 'course_' prefix from ID and store as a simple key-value pair
+                course_id = class_info['id'].replace('course_', '')
+                courses[class_info['name']] = course_id
+        
+        print("=== STAGE 3: Initializing ConversationHandler ===")
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain)
+        
+        print("=== STAGE 4: Transforming user message ===")
+        chat_history = conversation_handler.transform_user_message(context_data)
+        
+        print("=== STAGE 5: Processing chat history ===")
+        response = await conversation_handler.process_user_message(chat_history)
+        
+        print("=== STAGE 6: Returning response ===\n")
+        return response  # Return the modified Context
+    else:
+        return[{"message": chat_requirements,"function":""}]
+
 
 
 @app.get('/endpoints/pullClasses')
