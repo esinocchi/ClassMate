@@ -42,7 +42,7 @@ class ContextEntry2(BaseModel):
     role: str
     id: str
     domain: str
-    recentDOCS: List[str]
+    recentDocs: List[str]
     content: List[str]
     classes: List[ClassesDict]
 
