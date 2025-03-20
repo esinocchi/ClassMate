@@ -191,6 +191,7 @@ class DataHandler:
                     "token": self.API_TOKEN,
                     "domain": self.domain,
                     "updated_at": time.time(),
+                    "token_updated_at": time.time(),
                     "courses_selected": self.courses_selected
                 },
                 "courses": [],
@@ -322,7 +323,8 @@ class DataHandler:
         Updates the courses_selected in the user_data dictionary
         """
         user_data = self.grab_user_data()
-        user_data["courses_selected"] = courses_selected
+        user_data["user_metadata"]["courses_selected"] = courses_selected
+
         return self.save_user_data(user_data)
     
     def update_token(self, token: str):
@@ -330,7 +332,9 @@ class DataHandler:
         Updates the token in the user_data dictionary
         """
         user_data = self.grab_user_data()
-        user_data["token"] = token
+        user_data["user_metadata"]["token"] = token
+        user_data["user_metadata"]["token_updated_at"] = time.time()
+        
         return self.save_user_data(user_data)
 
     def has_saved_data(self):
@@ -338,6 +342,7 @@ class DataHandler:
         Checks if the user has saved data
         """
         file_path = self._get_user_data_path()
+        
         return os.path.exists(file_path)
 
 

@@ -102,20 +102,57 @@ async def mainPipelineEntry(contextArray: ContextObject):
 
 
 
-@app.get('/endpoints/pullClasses')
-async def pullClasses(user_id, college):
+@app.get('/endpoints/pullCourses')
+async def pullCourses(user_id, domain):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     
     #pull user data from database given parameters
-    handler = DataHandler(user_id, college)
+    handler = DataHandler(user_id, domain)
+
     user_data = handler.grab_user_data()
     
-    #pull classes from user data
-    classes = user_data["user_metadata"]["courses_selected"]
+    #pull courses selected from user data
+    courses_selected = user_data["user_metadata"]["courses_selected"]
+    all_courses = []
+    courses_added = []    
+    
+    #only one course is in each course object, but we still need to iterate through the course object to get the course id and course name
+    for course_id, course_name in courses_selected.items():
+            course_formatted = ClassesDict(id=course_id, name=course_name, selected="true")
+            all_courses += [course_formatted]
+            courses_added += [course_id]
+    
+    #pull all classes from canvas api
+    courses = requests.get(f"https://{domain}/api/v1/courses/{course_id}/assignments", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}).json()
+
+    #iterate through all classes and if not in courses_added, add to all_classes
+    for course in courses:
+
+        if course["id"] not in courses_added:
+            course_formatted = ClassesDict(id=course["id"], name=course["name"], selected="false")
+            all_courses += [course_formatted]
 
     #classes are returned in the format {course_id: course_name}
-    return {'classes': classes}
+    return {'courses': all_courses}
+
+@app.post('/endpoints/pushCourses')
+async def pushCourses(user_id, domain, courses: List[ClassesDict]):
+    #push courses to database
+    #courses are returned in the format {course_id: course_name}
+    courses_selected = {}
+    #for each ClassesDict object, if selected is true, add to courses_selected dictionary
+    for course in courses:
+        
+        if course.selected == "true":
+            courses_selected[course.id] = course.name
+    
+    handler = DataHandler(user_id, domain)
+    handler.update_courses_selected(courses_selected)
+    #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
+    handler.update_user_data()
+
+    return {'message': "Courses pushed to database"}
 
 
 # call this endpoint to force a user to re-authenticate whenever browser cache is empty
@@ -123,7 +160,7 @@ async def pullClasses(user_id, college):
 async def initate_user(domain: str):
     #hardcode token until we have access to developer keys to run oauth2
     #we will redirect to oauth page later
-    token = os.getenv("CANVAS_API_TOKEN")
+    token = await oauthTokenGenerator()
 
     #get user id from canvas api
     user_info = requests.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"})
@@ -138,38 +175,52 @@ async def initate_user(domain: str):
     
     #if user has no saved data, initiate user data
     else:
-        courses_selected = {
-            "2372294": "PHYS 211: Mechanics (UP; Spring 2025)",
-            "2381676": "STAT 318.001 Spring 202",
-            "2361510": "EARTH 101, Section 001: Natural Disasters (22511--UP---P-EARTH---101-------001-)",
-            "2361723": "GEOG 2N, Section 001: Apocalyptic Geographies (22511--UP---P-GEOG----2N--------001-)"
-        }
-        
-        handler = DataHandler(user_id, domain, token, courses_selected=courses_selected)
+        handler = DataHandler(user_id, domain, token)
         handler.initiate_user_data()
-        handler.update_user_data()
 
     return {'user_id': user_id}
+
+@app.put('/endpoints/deleteUserDataContext')
+async def deleteUserDataContext(user_id, domain):
+    handler = DataHandler(user_id, domain)
+    handler.delete_chat_context()
+    return {'message': "User data context cleared"}
+
+@app.put('/endpoints/checkAndUpdateUserData')
+async def checkAndUpdateUserData(user_id, domain):
+    handler = DataHandler(user_id, domain)
+    user_data = handler.grab_user_data()
+
+    #check if token is expired
+    if time.time() - user_data["user_metadata"]["token_updated_at"] > 3600:
+        token = await oauthTokenGenerator()
+        handler.update_token(token)
+
+    #check if user data is outdated
+    if time.time() - user_data["user_metadata"]["last_updated"] > 21600:
+        handler.update_user_data()
+        return {"message": "User data updated"}
+    
+    else:
+        return {"message": "User data not updated"}
 
 def check_chat_requirements(contextArray: ContextObject):
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
     
-    #if there are no courses selected, redirect user to select courses in the settings page and return error message
+    #if there are no courses selected, tell user to select courses in the settings page by returning error message
     if user_context['classes'] == []:
-        
-        return "select at least one course"
-   
-    
-    #if user has no user id, redirect user to oauth page and return error message
-    elif user_context["id"] == "":
-        
-        return "re-authenticate with Canvas"
-    
+        return "Please select at least one course in the settings page"
     #if user has all requirements, return "None" as in no chat requirements
-    else:
-        return "None"
+    return "None"
+
+async def oauthTokenGenerator():
+    #we will use oauth2 to generate a token
+    #for now, we will use a hardcoded token
+    token = os.getenv("CANVAS_API_TOKEN")
+    return token
+
 
     
 
