@@ -1,4 +1,4 @@
-dataHolder = [{"role": "assistant", "content": [{"message":"", "function": [""]}]},{"role": "user", "id": "", "domain": getURL(),"recentDocs": [], "content": [], "classes": [{"id": "", "name": "", "selected": ""}]}];
+dataHolder = [{"role": "assistant", "content": [{"message": "", "function": ""}]},{"role": "user", "id": "", "domain": getURL(),"recentDOCS": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": ""}]}];
 
 // Create a container div for the box
 let closed = true;
@@ -128,14 +128,21 @@ async function handlePrompt() {
                     promptPairs[1].content.pop();
                 }
 
-                
 
                 promptPairs[0].content.unshift({"message": "holder response", 
                                                 "function": "holder function"}); // Add the new prompt to the front
                 promptPairs[1].content.unshift(prompt);
 
                 try {
+
+                    console.log({context: promptPairs})
                     const updated = await mainPipelineEntry({context: promptPairs}); // Update memory of response based on pipeline return
+
+                    //remove initial filler empty strings
+                    if(updated[1].content[updated[1].content.length - 1] == "") {
+                        updated[1].content.pop()
+                        updated[0].content.pop()
+                    }
                     response = updated[0].content[0].message; // Update response for display
                     
                     // Save updated list back to local storage
@@ -307,6 +314,7 @@ function rebuildPage() {
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         //update domain each reload
         let context = result.Context_CanvasAI || dataHolder;
+        console.log(context);
         context[1].domain = getURL();
 
         for (let i = context[0].content.length - 1; i >= 0; i--) {
@@ -348,7 +356,7 @@ function clearMemory() {
         let context = result.Context_CanvasAI || dataHolder;
         
         // Modify the context portion of the structure
-        context[1].content = [];
+        context[1].content = [""];
         context[0].content = [{"message":"", "function": [""]}];
     
         // Save the updated structure

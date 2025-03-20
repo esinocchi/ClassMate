@@ -56,7 +56,7 @@ async def root():
     return {'response': 'Sample API Return'}
 
 # Enter main prompt pipeline and return response
-@app.post('/endpoints/mainPipelineEntry')
+@app.post('/endpoints/mainPipelineEntry', response_model=ContextObject)
 async def mainPipelineEntry(contextArray: ContextObject): 
     #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
