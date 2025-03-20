@@ -7,19 +7,12 @@ import time
 import json
 import fitz  # PyMuPDF
 import pytesseract
-from dotenv import load_dotenv 
 from .get_all_user_data import get_all_user_data
 from bs4 import BeautifulSoup
 from PIL import Image
 from urllib.parse import urlparse
 import asyncio
 import aiofiles
-
-
-load_dotenv()
-
-API_URL = os.getenv("API_URL")
-API_TOKEN = os.getenv("CANVAS_API_TOKEN")
 
 
 class DataHandler:
@@ -343,10 +336,6 @@ class DataHandler:
         """
         file_path = self._get_user_data_path()
         return os.path.exists(file_path)
-
-
-
-
 
 
 

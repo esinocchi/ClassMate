@@ -94,21 +94,23 @@ async def mainPipelineEntry(contextArray: ContextObject):
 
 
 @app.get('/endpoints/pullClasses')
-async def returnPromptContext(studentID, college):
+async def pullClasses(user_id, college):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     
     #pull user data from database given parameters
-    handler = DataHandler(studentID, college)
+    handler = DataHandler(user_id, college)
     user_data = handler.grab_user_data()
     
     #pull classes from user data
     classes = user_data["user_metadata"]["courses_selected"]
 
-    return {'classes': classes.keys()}
+    #classes are returned in the format {course_id: course_name}
+    return {'classes': classes}
 
 
-@app.put('/endpoints/initate_user')
+# call this endpoint to force a user to re-authenticate whenever browser cache is empty
+@app.get('/endpoints/initate_user')
 async def initate_user(domain: str):
     #hardcode token until we have access to developer keys to run oauth2
     #we will redirect to oauth page later
@@ -127,19 +129,38 @@ async def initate_user(domain: str):
     
     #if user has no saved data, initiate user data
     else:
-        handler = DataHandler(user_id, domain, token)
+        courses_selected = {
+            "2372294": "PHYS 211: Mechanics (UP; Spring 2025)",
+            "2381676": "STAT 318.001 Spring 202",
+            "2361510": "EARTH 101, Section 001: Natural Disasters (22511--UP---P-EARTH---101-------001-)",
+            "2361723": "GEOG 2N, Section 001: Apocalyptic Geographies (22511--UP---P-GEOG----2N--------001-)"
+        }
+        
+        handler = DataHandler(user_id, domain, token, courses_selected=courses_selected)
         handler.initiate_user_data()
         handler.update_user_data()
 
-    return {'response': 'User initiated'}
+    return {'user_id': user_id}
 
+def check_chat_requirements(contextArray: ContextObject):
+    #check if user has selected any courses
+    #check if user has a valid user id
+    user_context = contextArray.context[1]
+    
+    #if there are no courses selected, redirect user to select courses in the settings page and return error message
+    if user_context['classes'] == []:
+        
+        return "select at least one course"
+   
+    
+    #if user has no user id, redirect user to oauth page and return error message
+    elif user_context["id"] == "":
+        
+        return "re-authenticate with Canvas"
+    
+    #if user has all requirements, return "None" as in no chat requirements
+    else:
+        return "None"
 
-@app.get('/endpoints/pullUser')
-async def returnUserID(token):
+    
 
-    return 
-
-@app.get('/endpoints/mainPipelineEntry/getPDF')
-async def  pdfPull(pdfID):
-
-    return 
