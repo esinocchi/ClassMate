@@ -133,123 +133,122 @@ class VectorDatabase:
             text_parts.append(f"Course ID: {course_id}")
         
         # Handle different document types
-        match doc_type:
-            case 'File':
-                # For files, prioritize the display_name by placing it at the beginning
-                display_name = doc.get('display_name', '')
-                if display_name:
-                    # Normalize the display name to improve matching
-                    normalized_name = self._normalize_text(display_name)
-                    # Add the name at the beginning for emphasis
-                    text_parts.insert(0, f"Filename: {normalized_name}")
-                    # Also add it as a title for better matching
-                    text_parts.insert(0, f"Title: {normalized_name}")
-                
-                for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
-                             'updated_at', 'locked', 'lock_explanation']:
-                    if field in doc and doc[field] is not None: # error prevention
-                        # Normalize any text fields to handle special characters
-                        if isinstance(doc[field], str):
-                            value = self._normalize_text(doc[field])
-                        else:
-                            value = doc[field]
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-                
-            case 'Assignment':
-                # For assignments, prioritize the name by placing it at the beginning
-                name = doc.get('name', '')
-                if name:
-                    # Normalize the name to improve matching
-                    normalized_name = self._normalize_text(name)
-                    # Add the name at the beginning for emphasis
-                    text_parts.insert(0, f"Assignment: {normalized_name}")
-                    text_parts.insert(0, f"Title: {normalized_name}")
-                
-                for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
-                             'submission_types', 'can_submit', 'graded_submissions_exist']:
-                    if field in doc and doc[field] is not None: # error prevention
-                        if field == 'submission_types' and isinstance(doc[field], list):
-                            # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
-                            text_parts.append(f"Submission Types: {', '.join(doc[field])}")
-                        else:
-                            # Normalize any text fields
-                            if isinstance(doc[field], str):
-                                value = self._normalize_text(doc[field])
-                            else:
-                                value = doc[field]
-                            # e.g. HW2 (name) -> Name: HW2
-                            text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-                
-                # Handle content field which might contain extracted links
-                content = doc.get('content', [])
-                if content and isinstance(content, list):
-                    text_parts.append("Content Link(s): \n")
-                    for item in content:
-                        if isinstance(item, str):
-                            text_parts.append(f'\t{item}\n')
-                
-            case 'Announcement':
-                # For announcements, prioritize the title by placing it at the beginning
-                title = doc.get('title', '')
-                if title:
-                    # Normalize the title to improve matching
-                    normalized_title = self._normalize_text(title)
-                    # Add the title at the beginning for emphasis
-                    text_parts.insert(0, f"Announcement: {normalized_title}")
-                    text_parts.insert(0, f"Title: {normalized_title}")
-                
-                for field in ['title', 'message', 'posted_at', 'course_id']:
-                    if field in doc and doc[field] is not None: # error prevention
+        if doc_type == 'File':
+            # For files, prioritize the display_name by placing it at the beginning
+            display_name = doc.get('display_name', '')
+            if display_name:
+                # Normalize the display name to improve matching
+                normalized_name = self._normalize_text(display_name)
+                # Add the name at the beginning for emphasis
+                text_parts.insert(0, f"Filename: {normalized_name}")
+                # Also add it as a title for better matching
+                text_parts.insert(0, f"Title: {normalized_name}")
+            
+            for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
+                            'updated_at', 'locked', 'lock_explanation']:
+                if field in doc and doc[field] is not None: # error prevention
+                    # Normalize any text fields to handle special characters
+                    if isinstance(doc[field], str):
+                        value = self._normalize_text(doc[field])
+                    else:
+                        value = doc[field]
+                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+            
+        elif doc_type == 'Assignment':
+            # For assignments, prioritize the name by placing it at the beginning
+            name = doc.get('name', '')
+            if name:
+                # Normalize the name to improve matching
+                normalized_name = self._normalize_text(name)
+                # Add the name at the beginning for emphasis
+                text_parts.insert(0, f"Assignment: {normalized_name}")
+                text_parts.insert(0, f"Title: {normalized_name}")
+            
+            for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
+                            'submission_types', 'can_submit', 'graded_submissions_exist']:
+                if field in doc and doc[field] is not None: # error prevention
+                    if field == 'submission_types' and isinstance(doc[field], list):
+                        # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
+                        text_parts.append(f"Submission Types: {', '.join(doc[field])}")
+                    else:
                         # Normalize any text fields
                         if isinstance(doc[field], str):
                             value = self._normalize_text(doc[field])
                         else:
                             value = doc[field]
+                        # e.g. HW2 (name) -> Name: HW2
                         text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-                
-            case 'Quiz':
-                # For quizzes, prioritize the title by placing it at the beginning
-                title = doc.get('title', '')
-                if title:
-                    # Normalize the title to improve matching
-                    normalized_title = self._normalize_text(title)
-                    # Add the title at the beginning for emphasis
-                    text_parts.insert(0, f"Quiz: {normalized_title}")
-                    text_parts.insert(0, f"Title: {normalized_title}")
-                
-                for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
-                             'allowed_attempts', 'points_possible', 'due_at', 
-                             'locked_for_user', 'lock_explanation']:
-                    if field == 'time_limit' and isinstance(doc[field], int):
-                        text_parts.append(f"Time Limit: {doc[field]} minutes")
-                    elif field in doc and doc[field] is not None:
-                        # Normalize any text fields
-                        if isinstance(doc[field], str):
-                            value = self._normalize_text(doc[field])
-                        else:
-                            value = doc[field]
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-                
-            case 'Event':
-                # For events, prioritize the title by placing it at the beginning
-                title = doc.get('title', '')
-                if title:
-                    # Normalize the title to improve matching
-                    normalized_title = self._normalize_text(title)
-                    # Add the title at the beginning for emphasis
-                    text_parts.insert(0, f"Event: {normalized_title}")
-                    text_parts.insert(0, f"Title: {normalized_title}")
-                
-                for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
-                             'location_address', 'context_code', 'context_name', 
-                             'all_context_codes', 'url']:
-                    if field in doc and doc[field] is not None:
-                        # Normalize any text fields
-                        if isinstance(doc[field], str):
-                            value = self._normalize_text(doc[field])
-                        else:
-                            value = doc[field]
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+            
+            # Handle content field which might contain extracted links
+            content = doc.get('content', [])
+            if content and isinstance(content, list):
+                text_parts.append("Content Link(s): \n")
+                for item in content:
+                    if isinstance(item, str):
+                        text_parts.append(f'\t{item}\n')
+            
+        elif doc_type == 'Announcement':
+            # For announcements, prioritize the title by placing it at the beginning
+            title = doc.get('title', '')
+            if title:
+                # Normalize the title to improve matching
+                normalized_title = self._normalize_text(title)
+                # Add the title at the beginning for emphasis
+                text_parts.insert(0, f"Announcement: {normalized_title}")
+                text_parts.insert(0, f"Title: {normalized_title}")
+            
+            for field in ['title', 'message', 'posted_at', 'course_id']:
+                if field in doc and doc[field] is not None: # error prevention
+                    # Normalize any text fields
+                    if isinstance(doc[field], str):
+                        value = self._normalize_text(doc[field])
+                    else:
+                        value = doc[field]
+                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+            
+        elif doc_type == 'Quiz':
+            # For quizzes, prioritize the title by placing it at the beginning
+            title = doc.get('title', '')
+            if title:
+                # Normalize the title to improve matching
+                normalized_title = self._normalize_text(title)
+                # Add the title at the beginning for emphasis
+                text_parts.insert(0, f"Quiz: {normalized_title}")
+                text_parts.insert(0, f"Title: {normalized_title}")
+            
+            for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
+                            'allowed_attempts', 'points_possible', 'due_at', 
+                            'locked_for_user', 'lock_explanation']:
+                if field == 'time_limit' and isinstance(doc[field], int):
+                    text_parts.append(f"Time Limit: {doc[field]} minutes")
+                elif field in doc and doc[field] is not None:
+                    # Normalize any text fields
+                    if isinstance(doc[field], str):
+                        value = self._normalize_text(doc[field])
+                    else:
+                        value = doc[field]
+                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+            
+        elif doc_type == 'Event':
+            # For events, prioritize the title by placing it at the beginning
+            title = doc.get('title', '')
+            if title:
+                # Normalize the title to improve matching
+                normalized_title = self._normalize_text(title)
+                # Add the title at the beginning for emphasis
+                text_parts.insert(0, f"Event: {normalized_title}")
+                text_parts.insert(0, f"Title: {normalized_title}")
+            
+            for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
+                            'location_address', 'context_code', 'context_name', 
+                            'all_context_codes', 'url']:
+                if field in doc and doc[field] is not None:
+                    # Normalize any text fields
+                    if isinstance(doc[field], str):
+                        value = self._normalize_text(doc[field])
+                    else:
+                        value = doc[field]
+                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
         
         # Add module information
         module_id = doc.get('module_id')
@@ -391,20 +390,19 @@ class VectorDatabase:
                     metadata['module_id'] = str(item['module_id'])
                 
                 # Add type-specific metadata fields
-                match doc_type:
-                    case 'file':
+                if doc_type == 'file':
                         metadata['folder_id'] = str(item.get('folder_id', ''))
                     
-                    case 'announcement' | 'assignment' | 'quiz':
-                        if item.get('module_id'):
-                            metadata['module_id'] = str(item.get('module_id', ''))
+                elif doc_type in ['announcement', 'assignment', 'quiz']:
+                    if item.get('module_id'):
+                        metadata['module_id'] = str(item.get('module_id', ''))
                     
-                    case 'event':
-                        # Parse course_id from context_code if available
-                        if 'context_code' in item and item['context_code'].startswith('course_'):
-                            course_id = item['context_code'].replace('course_', '')
-                            item['course_id'] = course_id
-                            metadata['course_id'] = str(course_id)
+                elif doc_type == 'event':
+                    # Parse course_id from context_code if available
+                    if 'context_code' in item and item['context_code'].startswith('course_'):
+                        course_id = item['context_code'].replace('course_', '')
+                        item['course_id'] = course_id
+                        metadata['course_id'] = str(course_id)
                 
                 metadatas.append(metadata)
         

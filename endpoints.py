@@ -1,10 +1,13 @@
 from fastapi import FastAPI
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Union
-import requests
+from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
+import asyncio
 from dotenv import load_dotenv
+import requests
 import os
 import time
 load_dotenv()
@@ -21,16 +24,27 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
+
+class ContextPair(BaseModel):
+    message: str
+    function: List[str]
+
 class ContextEntry(BaseModel):
     role: str
-    content: List[str]
+    content: List[ContextPair]
+
+class ClassesDict(BaseModel):
+    id: str
+    name: str
+    selected: str
 
 class ContextEntry2(BaseModel):
     role: str
     id: str
     domain: str
+    recentDOCS: List[str]
     content: List[str]
-    classes: List[str]
+    classes: List[ClassesDict]
 
 class ContextObject(BaseModel):
     context: List[Union[ContextEntry, ContextEntry2]]
@@ -44,16 +58,43 @@ async def root():
 # Enter main prompt pipeline and return response
 @app.post('/endpoints/mainPipelineEntry')
 async def mainPipelineEntry(contextArray: ContextObject): 
-    # Functionality to update responses
-    # Here we assume you want to update the first context entry's content
-    if len(contextArray.context) > 0:  # Ensure there's at least one entry
-        contextArray.context[0].content[0] = "sample response"  # Update the content of the first entry
+    #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
+    # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
 
-    # Go through method routes and include meta-data for output format (pdf out for example)
-    return contextArray.context  # Return the modified Context
+    print("\n=== STAGE 1: Starting mainPipelineEntry ===")
+    
+    handler = DataHandler()
+    user_data = handler.grab_data()
+    user_name = user_data["user_metadata"]["name"]
+    
+    print("=== STAGE 2: Processing context data ===")
+    # Handle both dictionary and Pydantic model access
+    context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
+    user_context = context_data['context'][1]
+    user_id = user_context['id']
+    courses = {}  # Changed to a single dictionary
+
+    for class_info in user_context['classes']:
+        if class_info['selected'] == 'true':
+            # Remove 'course_' prefix from ID and store as a simple key-value pair
+            course_id = class_info['id'].replace('course_', '')
+            courses[class_info['name']] = course_id
+    
+    print("=== STAGE 3: Initializing ConversationHandler ===")
+    conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses)
+    
+    print("=== STAGE 4: Transforming user message ===")
+    chat_history = conversation_handler.transform_user_message(context_data)
+    
+    print("=== STAGE 5: Processing chat history ===")
+    response = await conversation_handler.process_user_message(chat_history)
+    
+    print("=== STAGE 6: Returning response ===\n")
+    return response  # Return the modified Context
+
 
 @app.get('/endpoints/pullClasses')
-async def pullClasses(studentID, college="psu.instructure.com"):
+async def returnPromptContext(studentID, college):
     #pull access token from database given parameters
     #pull classes from canvas api and return for display
     
@@ -92,3 +133,13 @@ async def initate_user(domain: str):
 
     return {'response': 'User initiated'}
 
+
+@app.get('/endpoints/pullUser')
+async def returnUserID(token):
+
+    return 
+
+@app.get('/endpoints/mainPipelineEntry/getPDF')
+async def  pdfPull(pdfID):
+
+    return 
