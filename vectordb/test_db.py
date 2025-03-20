@@ -30,7 +30,7 @@ root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
 # Import our modules
-from vectordb.db import VectorDatabase
+from db import VectorDatabase
 from backend.data_retrieval.data_handler import DataHandler
 
 def get_canvas_data():
@@ -38,12 +38,14 @@ def get_canvas_data():
 
     # Load environment variables
     load_dotenv()
-    user_id = "7214035"
+    user_id = "7210330"
     domain = os.getenv("CANVAS_DOMAIN")
     token = os.getenv("CANVAS_API_TOKEN")
-    courses_selected = {2361957: "CMPSC 465", 2379517: "CMPSC 311", 2361815: "EARTH 103N", 2361972: "CMPEN331", 2364485: "ACCT 211" }
-
-
+    courses_selected = {
+    2372294: "PHYS 211",
+    2381676: "STAT ",
+    2361723: "APOCCOLYPTIC GEO"
+}
 
     handler = DataHandler(user_id, domain, token, courses_selected=courses_selected)
 
@@ -53,7 +55,7 @@ def get_canvas_data():
     time.sleep(180)
 
 def search_db():
-    db = VectorDatabase('user_data/psu/7214035/user_data.json')
+    db = VectorDatabase('user_data/psu/7210330/user_data.json')
     db.clear_cache()
     db.process_data(force_reload=True)
     output = db.search({

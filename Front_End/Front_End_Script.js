@@ -1,4 +1,4 @@
-dataHolder = [{"role": "assistant", "content": [{"message":"", "function": [""]}]},{"role": "user", "id": "", "domain": getURL(),"recentDocs": [], "content": [], "classes": [{"id": "", "name": "", "selected": ""}]}];
+dataHolder = [{"role": "assistant", "content": [{"message": "", "function": [""]}]},{"role": "user", "id": "", "domain": getURL(), "recentDocs": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": ""}]}];
 
 // Create a container div for the box
 let closed = true;
@@ -102,7 +102,7 @@ window.addEventListener("load", () => {
 //main functionality for prompt handling
 async function handlePrompt() {
     // Get and remove value from the prompt entry box
-    let prompt = promptEntryBox.value;
+    let prompt = promptEntryBox.value.trim();
     let response = '';
     promptEntryBox.value = ''; // Clear the prompt entry box
 
@@ -114,8 +114,12 @@ async function handlePrompt() {
         // Wait for the promptPairs to be updated in local storage
         await new Promise((resolve, reject) => {
             chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
-                // Default to an empty prompt pair structure if "Context_CanvasAI" doesn't exist
                 let promptPairs = result.Context_CanvasAI || dataHolder;
+
+                //check if the id is already stored
+                if (promptPairs[1].id == "") {
+                    //add code to call api
+                }
 
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
                 if (promptPairs[0].content.length > 19) {
@@ -123,19 +127,24 @@ async function handlePrompt() {
                     promptPairs[1].content.pop();
                 }
 
-                
-
-                promptPairs[0].content.unshift({"message": "holder response", 
-                                                "function": "holder function"}); // Add the new prompt to the front
-                promptPairs[1].content.unshift(prompt);
+                if(promptPairs[1].content[0] == ""){
+                    promptPairs[1].content[0] = prompt;
+                } else {
+                    promptPairs[0].content.unshift({"message": "", 
+                                                    "function": [""]}); // Add the new prompt to the front
+                    promptPairs[1].content.unshift(prompt);
+                }
 
                 try {
-                    const updated = await mainPipelineEntry({context: promptPairs}); // Update memory of response based on pipeline return
-                    response = updated[0].content[0].message; // Update response for display
+
+                    console.log({"context": promptPairs})
+                    const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
+
+                    response = updated.context[0].content[0].message; // Update response for display
                     
                     // Save updated list back to local storage
                     chrome.storage.local.set({ Context_CanvasAI: updated }, function() {
-                        resolve(updated); // Resolve the promise with updated data
+                        resolve(updated.context); // Resolve the promise with updated data
                 });
                 } catch (error) {
                     reject(error); // Reject the promise in case of error in mainPipelineEntry
@@ -300,7 +309,11 @@ function addMemoryBox(prompt, response) {
 //rebuild class selections and past chats
 function rebuildPage() {
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        //update domain each reload
         let context = result.Context_CanvasAI || dataHolder;
+        console.log(context);
+        context[1].domain = getURL();
+
         for (let i = context[0].content.length - 1; i >= 0; i--) {
             addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
         };
@@ -340,7 +353,7 @@ function clearMemory() {
         let context = result.Context_CanvasAI || dataHolder;
         
         // Modify the context portion of the structure
-        context[1].content = [];
+        context[1].content = [""];
         context[0].content = [{"message":"", "function": [""]}];
     
         // Save the updated structure
@@ -352,6 +365,8 @@ function clearMemory() {
     [...parent.children].forEach(child => {
         child.remove();
     });
+
+    resetAllMemory()
 }
 
 //pull current URL of website
@@ -360,6 +375,13 @@ function getURL() {
     const parsedUrl = new URL(currentUrl);
     const hostname = parsedUrl.hostname
     return hostname;    
+}
+
+function resetAllMemory() {
+    chrome.storage.local.set({ "Context_CanvasAI": dataHolder }, function() {
+        console.log("memory reset to base model")
+    });
+    
 }
 
 //below this are await helper functions
