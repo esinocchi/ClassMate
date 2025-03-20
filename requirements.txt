@@ -74,7 +74,7 @@ pillow==11.0.0
 pluggy==1.5.0
 posthog==3.7.2
 protobuf==5.28.3
-pulsar-client==3.6.0
+pulsar-client==3.6.1
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
 pydantic>=1.8.0,<2.0.0
