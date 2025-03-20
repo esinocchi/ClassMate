@@ -5,9 +5,8 @@ from pydantic import BaseModel
 from typing import List, Union
 from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
-import asyncio
+import aiohttp
 from dotenv import load_dotenv
-import requests
 import os
 import time
 load_dotenv()
@@ -124,8 +123,13 @@ async def pullCourses(user_id, domain):
             courses_added += [course_id]
     
     #pull all classes from canvas api
-    courses = requests.get(f"https://{domain}/api/v1/courses/{course_id}/assignments", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}).json()
-
+    async with aiohttp.ClientSession() as session:
+       async with session.get(f"https://{domain}/api/v1/courses/{course_id}/assignments", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+        if response.status == 200:
+            courses = await response.json()
+        else:
+            return {"message": "Error pulling courses from canvas api"}
+    
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
@@ -163,8 +167,14 @@ async def initate_user(domain: str):
     token = await oauthTokenGenerator()
 
     #get user id from canvas api
-    user_info = requests.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"})
-    user_id = user_info.json()["id"]
+    async with aiohttp.ClientSession() as session:
+    
+        async with session.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"}) as response:
+            if response.status == 200:
+                user_info = await response.json()
+                user_id = user_info["id"]
+            else:
+                return {"message": "Error pulling user id from canvas api"}
 
     #initialize a new data handler with the token
     handler = DataHandler(user_id, domain)
@@ -208,19 +218,26 @@ def check_chat_requirements(contextArray: ContextObject):
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
+
+    #if user data update is currently in progress, return error message
+    if check_user_data_update(user_context['id'], user_context['domain']):
+        return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
     if user_context['classes'] == []:
-        return "Please select at least one course in the settings page"
+        return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
+
+@app.get('/endpoints/check_user_data_update')
+async def check_user_data_update(user_id, domain):
+    handler = DataHandler(user_id, domain)
+    user_data = handler.grab_user_data()
+    return user_data["user_metadata"]["is_updating"]
 
 async def oauthTokenGenerator():
     #we will use oauth2 to generate a token
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
     return token
-
-
-    
 
