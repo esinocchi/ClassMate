@@ -1,6 +1,7 @@
 myenv-3.9/
 canvas.db
 .env
+.DS_Store
 user_data/.DS_Store
 *.pyc
 .vscode/
