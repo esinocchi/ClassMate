@@ -9,6 +9,7 @@ import fitz  # PyMuPDF
 import pytesseract
 from dotenv import load_dotenv 
 from .get_all_user_data import get_all_user_data
+from .get_all_user_data import check_for_duplicates
 from bs4 import BeautifulSoup
 from PIL import Image
 from urllib.parse import urlparse
@@ -120,7 +121,7 @@ class DataHandler:
         # Update chat context
         handler.update_chat_context("Current chat context")
 
-        # Delete chat context
+        # Delete chat context 
         handler.delete_chat_context()
 
         ================================================
@@ -166,6 +167,8 @@ class DataHandler:
         """
         Initiates the user_data dictionary with basic structure
         """
+        print(f"courses_selected: {self.courses_selected}")
+        
         try:
             # Define the async function for the API call
             async def get_user_info():
@@ -337,6 +340,12 @@ class DataHandler:
         user_data["token"] = token
         return self.save_user_data(user_data)
 
+    def has_saved_data(self):
+        """
+        Checks if the user has saved data
+        """
+        file_path = self._get_user_data_path()
+        return os.path.exists(file_path)
 
 
 

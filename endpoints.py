@@ -7,6 +7,7 @@ from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
 import asyncio
 from dotenv import load_dotenv
+import requests
 import os
 import time
 load_dotenv()
@@ -113,14 +114,33 @@ async def returnPromptContext(studentID, college):
     #pull classes from user data
     classes = user_data["user_metadata"]["courses_selected"]
 
-    return {'classes': classes}
+    return {'classes': classes.keys()}
 
 
-@app.get('/endpoints/oauth2')
-async def oauth2():
+@app.put('/endpoints/initate_user')
+async def initate_user(domain: str):
     #hardcode token until we have access to developer keys to run oauth2
+    #we will redirect to oauth page later
     token = os.getenv("CANVAS_API_TOKEN")
-    return {'token': token}
+
+    #get user id from canvas api
+    user_info = requests.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"})
+    user_id = user_info.json()["id"]
+
+    #initialize a new data handler with the token
+    handler = DataHandler(user_id, domain)
+    
+    #if user has saved data, update the token
+    if handler.has_saved_data():
+        handler.update_token(token)
+    
+    #if user has no saved data, initiate user data
+    else:
+        handler = DataHandler(user_id, domain, token)
+        handler.initiate_user_data()
+        handler.update_user_data()
+
+    return {'response': 'User initiated'}
 
 
 @app.get('/endpoints/pullUser')
