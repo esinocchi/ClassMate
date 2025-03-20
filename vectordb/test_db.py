@@ -55,7 +55,8 @@ def get_canvas_data():
     time.sleep(180)
 
 def search_db():
-    db = VectorDatabase('user_data/psu/7210330/user_data.json')
+    hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
+    db = VectorDatabase('user_data/psu/7210330/user_data.json', hf_api_token=hf_api_token)
     db.clear_cache()
     db.process_data(force_reload=True)
     output = db.search({

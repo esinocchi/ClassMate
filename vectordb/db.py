@@ -40,6 +40,8 @@ import chromadb
 from chromadb.utils import embedding_functions
 import requests
 from datetime import datetime, timedelta, timezone
+from vectordb.embedding_model import create_hf_embedding_function
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -63,7 +65,7 @@ DEFAULT_CACHE_DIR = "chroma_data/"
 DEFAULT_COLLECTION_NAME = "canvas_embeddings"
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = None):
+    def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
@@ -71,6 +73,7 @@ class VectorDatabase:
             json_file_path: Path to the JSON file containing the documents.
             cache_dir: Directory to store ChromaDB data.
             collection_name: Name of the ChromaDB collection. If None, will use user_id from the json file.
+            hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
         self.cache_dir = cache_dir
@@ -91,10 +94,13 @@ class VectorDatabase:
         # Initialize ChromaDB client to store files in disk in cache_dir
         self.client = chromadb.PersistentClient(path=cache_dir)
         
-        # Initialize embedding function (using the same model as before: all-MiniLM-L6-v2)
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        # Use Hugging Face API for embeddings with multilingual-e5-large-instruct model
+        self.hf_api_token = hf_api_token
+        if not self.hf_api_token:
+            raise ValueError("Hugging Face API token is required. Provide it as a parameter or set HUGGINGFACE_API_TOKEN environment variable.")
+        
+        # Custom embedding function using Hugging Face API
+        self.embedding_function = create_hf_embedding_function(self.hf_api_token)
         
         self.documents = [] # stores documents
         self.document_map = {} # Allows O(1) lookup of documents by ID
@@ -123,7 +129,7 @@ class VectorDatabase:
             hnsw:search_ef: determines the size of the dynamic list (default: 100)
             hnsw:m: determines the number of neighbors (edges) each node in the graph can have (default: 16)
             '''
-    
+
     def _preprocess_text_for_embedding(self, doc: Dict[str, Any]) -> str:
         """
         Preprocess document text for embedding.
@@ -429,18 +435,17 @@ class VectorDatabase:
         # Build document relations
         self._build_document_relations(self.documents)
         
-        # Add documents to ChromaDB
-        if ids:
-            try:
-                self.collection.add(
-                    ids=ids,
-                    documents=texts,
-                    metadatas=metadatas
-                )
-                logger.info(f"Added {len(ids)} documents to ChromaDB")
-            except Exception as e:
-                logger.error(f"Error adding documents to ChromaDB: {e}")
-                return False
+        # Generate embeddings first
+        embeddings = self.embedding_function(texts)
+        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
+
+        # Then add to collection with explicit embeddings
+        self.collection.add(
+            ids=ids,
+            embeddings=embeddings,  # Pass pre-computed embeddings
+            documents=texts,
+            metadatas=metadatas
+        )
         
         # Save to cache
         self._save_to_cache()
@@ -859,6 +864,7 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
+            logger.info(f"Executing ChromaDB query with query_text: {query_text}")
             results = self.collection.query(
                 query_texts=[query_text],
                 n_results=top_k * 3,  # Get more results for post-processing
