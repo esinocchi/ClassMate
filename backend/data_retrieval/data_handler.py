@@ -1,19 +1,15 @@
-import io
 from docx import Document 
 import aiohttp
-import requests
 import os
 import time
 import json
-import fitz  # PyMuPDF
-import pytesseract
 from .get_all_user_data import get_all_user_data
-from .get_all_user_data import check_for_duplicates
-from bs4 import BeautifulSoup
-from PIL import Image
 from urllib.parse import urlparse
 import asyncio
-import aiofiles
+import threading
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class DataHandler:
@@ -127,6 +123,8 @@ class DataHandler:
         self.API_URL = f"https://{domain}/api/v1"
         self.courses_selected = courses_selected
         self.time_token_updated = time.time()
+        self.is_updating = False
+        self.update_lock = threading.Lock() 
         
         # Get the path to the main CanvasAI directory (2 levels up from this file)
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -160,8 +158,7 @@ class DataHandler:
         """
         Initiates the user_data dictionary with basic structure
         """
-        print(f"courses_selected: {self.courses_selected}")
-        
+
         try:
             # Define the async function for the API call
             async def get_user_info():
@@ -192,7 +189,8 @@ class DataHandler:
                     "domain": self.domain,
                     "updated_at": time.time(),
                     "token_updated_at": time.time(),
-                    "courses_selected": self.courses_selected
+                    "courses_selected": self.courses_selected,
+                    "is_updating": self.is_updating
                 },
                 "courses": [],
                 "files": [],
@@ -225,7 +223,7 @@ class DataHandler:
             self.name = metadata["name"]
             self.courses_selected = metadata["courses_selected"]
             self.API_TOKEN = metadata["token"]
-            
+            self.is_updating = metadata["is_updating"]
             return user_data
         except Exception as e:
             return f"Error grabbing user data: {str(e)}"
@@ -235,6 +233,14 @@ class DataHandler:
         Updates the user data from Canvas by running get_all_user_data asynchronously in the background.
         This function starts the update process and returns immediately, allowing the update to run in the background.
         """
+        print(f"courses_selected: {self.courses_selected}")
+        print("not updating yet cuh")
+        if self.is_updating:
+            print("Update already in progress")
+            return "Update already in progress"
+        self.set_is_updating(True)
+
+        print("updating now")
         try:
             # Define the background update coroutine
             
@@ -267,6 +273,7 @@ class DataHandler:
                     
                     # Save the updated data
                     self.save_user_data(updated_user_data)
+                    self.set_is_updating(False)
                     
                     end_time = time.time()
                     duration = end_time - start_time
@@ -275,10 +282,12 @@ class DataHandler:
                     print(f"Successfully updated data for {len(self.courses_selected)} courses")
                     
                 except ValueError as ve:
+                    self.set_is_updating(False)
                     print(f"\n⚠️ Update failed: {str(ve)}")
                     print("Your courses_selected list may need to be updated with current course IDs.")
                     
                 except Exception as e:
+                    self.set_is_updating(False)
                     print(f"\n❌ Error in background update: {str(e)}")
                     raise
 
@@ -292,12 +301,13 @@ class DataHandler:
                     loop.close()
 
             # Start the background update in a separate thread
-            import threading
             update_thread = threading.Thread(target=run_async_update)
             update_thread.daemon = True  # Allow the program to exit even if thread is running
             update_thread.start()
             
         except Exception as e:
+            self.set_is_updating(False)
+            
             print(f"Error starting background update: {str(e)}")
 
     def update_chat_context(self, chat_context: str):
@@ -345,6 +355,16 @@ class DataHandler:
         
         return os.path.exists(file_path)
 
+    def set_is_updating(self, is_updating: bool):
+        """
+        Returns the is_updating value
+        """
+        with self.update_lock:
+            user_data = self.grab_user_data()
+            user_data["user_metadata"]["is_updating"] = is_updating
+            self.is_updating = is_updating
+            
+        return self.save_user_data(user_data)
 
 
 
