@@ -8,7 +8,6 @@ from backend.data_retrieval.data_handler import DataHandler
 import asyncio
 from dotenv import load_dotenv
 import requests
-import os
 import time
 load_dotenv()
 

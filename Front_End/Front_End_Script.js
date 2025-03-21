@@ -102,7 +102,7 @@ window.addEventListener("load", () => {
 //main functionality for prompt handling
 async function handlePrompt() {
     // Get and remove value from the prompt entry box
-    let prompt = promptEntryBox.value.trim();
+    let prompt = promptEntryBox.value;
     let response = '';
     promptEntryBox.value = ''; // Clear the prompt entry box
 
@@ -121,29 +121,35 @@ async function handlePrompt() {
                     //add code to call api
                 }
 
+                console.log(promptPairs[1].content)
+
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
                 if (promptPairs[0].content.length > 19) {
                     promptPairs[0].content.pop();
                     promptPairs[1].content.pop();
                 }
-
-                if(promptPairs[1].content[0] == ""){
+                
+                if(promptPairs[1].content[0] === ""){
                     promptPairs[1].content[0] = prompt;
+                    console.log("after change")
+                    console.log(promptPairs)
                 } else {
+                    console.log("appending to old data")
                     promptPairs[0].content.unshift({"message": "", 
                                                     "function": [""]}); // Add the new prompt to the front
                     promptPairs[1].content.unshift(prompt);
                 }
 
+                console.log(promptPairs[1].content)
+
                 try {
-
-                    console.log({"context": promptPairs})
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
-
+                    console.log(updated)
                     response = updated.context[0].content[0].message; // Update response for display
+                    console.log(response)
                     
                     // Save updated list back to local storage
-                    chrome.storage.local.set({ Context_CanvasAI: updated }, function() {
+                    chrome.storage.local.set({ Context_CanvasAI: updated.context}, function() {
                         resolve(updated.context); // Resolve the promise with updated data
                 });
                 } catch (error) {
@@ -311,7 +317,6 @@ function rebuildPage() {
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         //update domain each reload
         let context = result.Context_CanvasAI || dataHolder;
-        console.log(context);
         context[1].domain = getURL();
 
         for (let i = context[0].content.length - 1; i >= 0; i--) {
@@ -381,7 +386,9 @@ function resetAllMemory() {
     chrome.storage.local.set({ "Context_CanvasAI": dataHolder }, function() {
         console.log("memory reset to base model")
     });
-    
+    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        console.log(result.Context_CanvasAI)
+    });
 }
 
 //below this are await helper functions
