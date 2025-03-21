@@ -56,18 +56,18 @@ def get_canvas_data():
 
 def search_db():
     hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
-    db = VectorDatabase('user_data/psu/7210330/user_data.json', hf_api_token=hf_api_token)
+    db = VectorDatabase('user_data/psu/7214035/user_data.json', hf_api_token=hf_api_token)
     db.clear_cache()
     db.process_data(force_reload=True)
     output = db.search({
-                "course_id": "all_courses",
-                "time_range": "FUTURE",
-                "item_types": ["assignment", "event", "announcement"],
-                "specific_dates": ["2025-03-20"],
-                "keywords": ["tomorrow"],
+                "course_id": "2361815",
+                "time_range": "RECENT_PAST",
+                "item_types": ["syllabus"],
+                "specific_dates": [],
+                "keywords": ["office hours"],
                 "generality": "LOW",
-                "query": "Do I have any assingments due tomorrow?"
-            }, top_k=3)
+                "query": "What are the office hours for Earth 103N?"
+            }, top_k=5)
     return output
 
 print(search_db())

@@ -17,10 +17,7 @@ sys.path.append(str(root_dir))
 # from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
-<<<<<<< HEAD
-=======
 from vectordb.db import VectorDatabase
->>>>>>> f5177a335d7bc26a976c7931e75ed933299e80b1
 
 # Define the context models locally
 class ContextPair(BaseModel):
