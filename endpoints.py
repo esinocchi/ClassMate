@@ -9,6 +9,7 @@ import aiohttp
 from dotenv import load_dotenv
 import os
 import time
+import json
 load_dotenv()
 
 app = FastAPI()
@@ -75,18 +76,17 @@ async def mainPipelineEntry(contextArray: ContextObject):
     This endpoint is called when the user sends a message to the chatbot.
     """
    
-    #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
+    #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     #chat_requirements = check_chat_requirements(contextArray)
-    chat_requirements = check_chat_requirements(contextArray)
-    
+    chat_requirements = "None"
 
     if chat_requirements == "None":
             
 
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
         context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
-        user_context = context_data['context'][1]
+        user_context = context_data[1]
         user_id = user_context['id']
         user_domain = user_context['domain']
         
@@ -106,7 +106,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
                 courses[class_info['name']] = course_id
         
         print("=== STAGE 3: Initializing ConversationHandler ===")
-        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain)
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray)
         
         print("=== STAGE 4: Transforming user message ===")
         chat_history = conversation_handler.transform_user_message(context_data)
