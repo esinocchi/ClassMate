@@ -238,6 +238,8 @@ async def initate_user(domain: str):
     #get user id from canvas api
     async with aiohttp.ClientSession() as session:
     
+        print(token)
+
         async with session.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"}) as response:
             if response.status == 200:
                 user_info = await response.json()
@@ -379,5 +381,6 @@ async def oauthTokenGenerator():
     #we will use oauth2 to generate a token
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
+    print(token)
     return token
 

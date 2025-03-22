@@ -267,6 +267,15 @@
     opacity: 0.5;
 }
 
+#SettingsWindow .footer {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    display: flex;          /* Add this line */
+    align-items: center;    /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    width: 100%;
+}
+
   .checkbox-wrapper-49 input[type="checkbox"] {
     display: none;
     visibility: hidden;
