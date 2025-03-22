@@ -7,8 +7,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
-import asyncio
-import concurrent.futures
+
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -113,6 +112,11 @@ class ConversationHandler:
                                     "type": "string", 
                                     "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
                                     "description": "Temporal context for search"
+                                },
+                                 "generality": {
+                                    "type": "string", 
+                                    "enum": ["LOW", "MEDIUM", "HIGH", "SPECIFIC"],
+                                    "description": "Context for how many items to retrieve"
                                 },
                                 "item_types": {
                                     "type": "array",
@@ -231,6 +235,11 @@ class ConversationHandler:
                                     "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
                                     "description": "Temporal context for search"
                                 },
+                                "generality": {
+                                    "type": "string", 
+                                    "enum": ["LOW", "MEDIUM", "HIGH", "SPECIFIC"],
+                                    "description": "Context for how many items to retrieve"
+                                },
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -326,6 +335,7 @@ class ConversationHandler:
                     "search_parameters": {{
                     "course_id": "<course_id>",
                     "time_range": "<FUTURE|RECENT_PAST|EXTENDED_PAST|ALL_TIME>",
+                    "generality": "<LOW|MEDIUM|HIGH|SPECIFIC>",
                     "item_types": ["assignment", "quiz", ...],
                     "specific_dates": ["YYYY-MM-DD", "YYYY-MM-DD"],
                     "keywords": ["keyword1", "keyword2", ...],
@@ -382,7 +392,7 @@ class ConversationHandler:
         
         return events_and_assignments
 
-    def find_course_information(self, search_parameters: dict):
+    async def find_course_information(self, search_parameters: dict):
         """Find course information using the vector search function
            Pulls syllabus, course description, and course materials from the vector database.
            Extracts text from the syllabus and course description and returns it to the openai api.
@@ -392,6 +402,7 @@ class ConversationHandler:
             - item_types
             - specific_dates
             - keywords
+            - generality
             - query
         """
           
@@ -411,8 +422,7 @@ class ConversationHandler:
         print("Calling vector_db.search...")
 
         try:
-            #course_information = await vector_db.search(search_parameters) 
-            return
+            course_information = await vector_db.search(search_parameters) 
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
@@ -420,7 +430,7 @@ class ConversationHandler:
         
         return course_information
           
-    def create_notes(self, search_parameters: dict):
+    async def create_notes(self, search_parameters: dict):
         
         return
     
