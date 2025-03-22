@@ -10,7 +10,10 @@ ensuring proper formatting of input texts for specific models like E5 (which req
 
 import logging
 import numpy as np
-import requests
+import aiohttp
+import requests  # Keep for backward compatibility
+import asyncio
+from typing import List, Optional, Union
 
 # Configure logging
 logger = logging.getLogger("canvas_vector_db.embedding")
@@ -56,6 +59,9 @@ class HFEmbeddingFunction:
         Returns:
             Numpy array of embeddings
         """
+        # For ChromaDB compatibility, provide a synchronous interface
+        # but using requests instead of aiohttp
+        
         # Handle empty input case
         if not input:
             return np.array([])
@@ -125,6 +131,32 @@ class HFEmbeddingFunction:
             return np.zeros((len(input), self.embedding_dims), dtype=np.float32)
         
         return final_embeddings
+    
+    # For backward compatibility: synchronous method that calls the async one
+    def generate_embeddings_sync(self, input: List[str]) -> np.ndarray:
+        """
+        Synchronously generate embeddings for the input texts.
+        
+        Args:
+            input: List of text strings to embed
+            
+        Returns:
+            Numpy array of embeddings
+        """
+        return asyncio.run(self.generate_embeddings(input))
+
+async def create_async_hf_embedding_function(api_token, model_id="intfloat/multilingual-e5-large-instruct"):
+    """
+    Create and return an async Hugging Face embedding function.
+    
+    Args:
+        api_token: Hugging Face API token
+        model_id: Model ID to use for embeddings
+        
+    Returns:
+        HFEmbeddingFunction instance
+    """
+    return HFEmbeddingFunction(api_token, model_id)
 
 def create_hf_embedding_function(api_token, model_id="intfloat/multilingual-e5-large-instruct"):
     """
