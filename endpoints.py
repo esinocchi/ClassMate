@@ -212,7 +212,7 @@ async def pushCourses(user_id, domain, courses: List[ClassesDict]):
 
 
 # call this endpoint to force a user to re-authenticate whenever browser cache is empty
-@app.get('/endpoints/initate_user')
+@app.get('/endpoints/initiate_user')
 async def initate_user(domain: str):
     """
     This endpoint is used to force a user to re-authenticate and generate a new token.

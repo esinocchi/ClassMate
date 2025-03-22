@@ -144,7 +144,6 @@ async function handlePrompt() {
 
                 try {
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
-                    console.log(updated)
                     response = updated.context[0].content[0].message; // Update response for display
                     console.log(response)
                     
@@ -319,13 +318,22 @@ function rebuildPage() {
         let context = result.Context_CanvasAI || dataHolder;
         context[1].domain = getURL();
 
+        //check for existing id
+        if (context[1].id = '') {
+            context[1].id = retrieveID(context[1].domain);
+        }
+
         for (let i = context[0].content.length - 1; i >= 0; i--) {
             addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
         };
 
-        for (let i = context[1].classes.length - 1; i >= 0; i--) {
-            addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
-        };
+        if (context[1].classes.length != 0){
+            for (let i = context[1].classes.length - 1; i >= 0; i--) {
+                addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
+            };
+        } else {
+            retrieveClassList(context[1].id, context[1].domain);
+        }
     }); 
 }
 
@@ -370,8 +378,6 @@ function clearMemory() {
     [...parent.children].forEach(child => {
         child.remove();
     });
-
-    resetAllMemory()
 }
 
 //pull current URL of website
@@ -423,11 +429,24 @@ async function mainPipelineEntry(contextJSON) {
     }
 }
 
-async function retrieveClassList(studentID, ) {
+async function retrieveClassList(studentID, domain) {
     //returned in the form dictionary {"id": "classNumber", "name": "className", "selected": false}
     try {
-        const response = await fetch(`https://canvasclassmate.me/endpoints/pullClasses?`);
-        processClassList(response);
+        const response = await fetch(`https://canvasclassmate.me/endpoints/pullClasses?user_id=${studentID}&domain=${domain}`);
+        console.log(response);
+        //processClassList(response);
+    } catch (error) {
+        console.error('Error calling API:', error);
+        return false;  // Return false if there's an error
+    }
+}
+
+async function retrieveID(domain) {
+    //returned in the form {"user_id": int}
+    try {
+        const response = await fetch(`https://canvasclassmate.me/endpoints/initiate_user?domain=${domain}`);
+        console.log(response);
+        return response.user_id
     } catch (error) {
         console.error('Error calling API:', error);
         return false;  // Return false if there's an error
