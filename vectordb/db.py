@@ -37,10 +37,12 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 import chromadb
-from chromadb.utils import embedding_functions
 import requests
 from datetime import datetime, timedelta, timezone
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+import asyncio
+import aiohttp
+import re  # Adding import for re module used in _parse_html_content
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -339,7 +341,7 @@ class VectorDatabase:
     
     
         
-    def process_data(self, force_reload: bool = False) -> bool:
+    async def process_data(self, force_reload: bool = False) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
@@ -512,7 +514,7 @@ class VectorDatabase:
         
         return True
     
-    def _load_document_metadata(self):
+    async def _load_document_metadata(self):
         """
         Load document metadata from JSON file without reprocessing embeddings.
         """
@@ -667,7 +669,7 @@ class VectorDatabase:
         
         return related_docs
     
-    def extract_file_content(self, doc: Dict[str, Any]) -> str:
+    async def extract_file_content(self, doc: Dict[str, Any]) -> str:
         """
         Extract content from a file URL when needed.
         
@@ -693,13 +695,14 @@ class VectorDatabase:
         # Try to download the file
         try:
             logger.info(f"Downloading file: {doc.get('display_name', '')}")
-            response = requests.get(url)
-            if response.status_code != 200:
-                logger.warning(f"Failed to download file {url}: {response.status_code}")
-                return ""
-            
-            # Get the raw file content as bytes
-            file_bytes = response.content
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        logger.warning(f"Failed to download file {url}: {response.status}")
+                        return ""
+                    
+                    # Get the raw file content as bytes
+                    file_bytes = await response.read()
             
             # Use the imported extract_text_and_images function
             extracted_text = extract_text_and_images(file_bytes, file_extension)
@@ -903,7 +906,7 @@ class VectorDatabase:
         
         return query_where, normalized_query
 
-    def _execute_chromadb_query(self, query_text, query_where, top_k):
+    async def _execute_chromadb_query(self, query_text, query_where, top_k):
         """
         Execute a query against ChromaDB.
         
@@ -917,7 +920,9 @@ class VectorDatabase:
         """
         try:
             logger.info(f"Executing ChromaDB query with query_text: {query_text}")
-            results = self.collection.query(
+            # Use asyncio to prevent blocking the event loop during the ChromaDB query
+            results = await asyncio.to_thread(
+                self.collection.query,
                 query_texts=[query_text],
                 n_results=top_k,
                 where=query_where,
@@ -933,7 +938,8 @@ class VectorDatabase:
                 try:
                     logger.info("Trying query with only course_id filter...")
                     simplified_where = {"course_id": query_where["course_id"]}
-                    results = self.collection.query(
+                    results = await asyncio.to_thread(
+                        self.collection.query,
                         query_texts=[query_text],
                         n_results=top_k,
                         where=simplified_where,
@@ -946,7 +952,8 @@ class VectorDatabase:
             # Last resort: try with no filters
             try:
                 logger.info("Trying query with no filters...")
-                results = self.collection.query(
+                results = await asyncio.to_thread(
+                    self.collection.query,
                     query_texts=[query_text],
                     n_results=top_k,
                     include=["distances", "documents", "metadatas"]
@@ -1045,7 +1052,7 @@ class VectorDatabase:
                     'is_related': True
                 })
 
-    def search(self, search_parameters: Optional[dict] = None, top_k: int = 5,
+    async def search(self, search_parameters: Optional[dict] = None, top_k: int = 5,
                include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
         """
         Search for documents similar to the query.
@@ -1073,7 +1080,7 @@ class VectorDatabase:
         logger.debug(f"Search parameters: {search_parameters}")
         
         # Execute ChromaDB query
-        results = self._execute_chromadb_query(normalized_query, query_where, top_k)
+        results = await self._execute_chromadb_query(normalized_query, query_where, top_k)
         
         # Process results
         search_results = []
@@ -1098,7 +1105,7 @@ class VectorDatabase:
             # Extract content for files if needed
             if doc.get('type') == 'file' and ('content' not in doc or not doc['content']):
                 try:
-                    doc['content'] = self.extract_file_content(doc)
+                    doc['content'] = await self.extract_file_content(doc)
                     if doc['content']:
                         logger.info(f"Extracted content for file: {doc.get('display_name', '')}")
                 except Exception as e:
@@ -1120,7 +1127,7 @@ class VectorDatabase:
         
         return combined_results[:top_k]
     
-    def get_available_courses(self) -> List[Dict[str, Any]]:
+    async def get_available_courses(self) -> List[Dict[str, Any]]:
         """
         Get list of available courses.
         
@@ -1139,16 +1146,17 @@ class VectorDatabase:
             })
         return courses
     
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         """
         Clear the ChromaDB collection.
         """
         try:
-            self.client.delete_collection(self.collection_name)
+            await asyncio.to_thread(self.client.delete_collection, self.collection_name)
             logger.info(f"Deleted collection: {self.collection_name}")
             
             # Recreate the collection
-            self.collection = self.client.create_collection(
+            self.collection = await asyncio.to_thread(
+                self.client.create_collection,
                 name=self.collection_name,
                 embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
@@ -1162,8 +1170,6 @@ class VectorDatabase:
             
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
-
-
 
     def _parse_html_content(self, html_content: str) -> str:
         """
@@ -1229,7 +1235,6 @@ class VectorDatabase:
         except Exception as e:
             logger.error(f"Error parsing HTML content: {e}")
             # Fallback to a simple tag stripping approach if the parser fails
-            import re
             text = re.sub(r'<[^>]*>', ' ', html_content)
             text = re.sub(r'\s+', ' ', text)
             return text.strip()
