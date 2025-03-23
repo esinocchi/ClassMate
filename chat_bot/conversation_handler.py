@@ -238,7 +238,8 @@ class ConversationHandler:
                     "required": [
                         "context_code",
                         "title",
-                        "start_at"
+                        "start_at",
+                        "canvas_base_url"
                     ]
                 }
             },
