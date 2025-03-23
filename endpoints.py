@@ -340,11 +340,11 @@ def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if check_update_status(user_context['id'], user_context['domain']):
+    if check_update_status(user_context.user_id, user_context.domain):
         return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    if user_context['classes'] == []:
+    if user_context.classes == []:
         return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
