@@ -478,7 +478,6 @@ class ConversationHandler:
         print("=== TRANSFORM USER MESSAGE: Parsing context array ===")
         print(f"Context Array Structure:")
         context_array = context
-        print(json.dumps(context_array, indent=2))
         
         print("\n=== TRANSFORM USER MESSAGE: Processing messages ===")
 
@@ -486,7 +485,6 @@ class ConversationHandler:
             print(f"\nProcessing message pair {i + 1}:")
             chat_history.append({"role": "user", "content":context_array.context[1].content[i]})
             
-            print(f"Assistant content: {json.dumps(context_array.context[0].content[i], indent=2)}")
             if context_array.context[0].content[i].function and context_array.context[0].content[i].function != [""]:
                 print(f"Function detected: {context_array.context[0].content[i].function}")
                 chat_history.append({"role": "function","name":context_array.context[0].content[i].function[0], "content": context_array.context[0].content[i].function[1]})
@@ -494,14 +492,12 @@ class ConversationHandler:
                 chat_history.append({"role": "assistant", "content":context_array.context[0].content[i].message})
         
         print("\n=== TRANSFORM USER MESSAGE: Final chat history ===")
-        print(json.dumps(chat_history, indent=2))
         print("=== TRANSFORM USER MESSAGE: Complete ===\n")
         return chat_history
     
     async def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         print("\n=== PROCESS USER MESSAGE: Starting ===")
-        print(f"Chat history received: {json.dumps(chat_history, indent=2)}")
         
         print("=== PROCESS USER MESSAGE: Generating system context ===")
         # Generate the system context with enhanced instructions
@@ -569,7 +565,6 @@ class ConversationHandler:
                 arguments = json.loads(function_call.arguments)
                 arguments["canvas_base_url"] = self.canvas_api_url
                 arguments["access_token"] = self.canvas_api_token
-                print(f"Function arguments: {json.dumps(arguments, indent=2)}")
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
@@ -585,7 +580,6 @@ class ConversationHandler:
                     print(f"Keywords before validation: {before_keywords}")
                     print(f"Keywords after validation: {arguments['search_parameters']['keywords']}")
             
-            print(f"Final arguments: {json.dumps(arguments, indent=2)}")
 
             print("\n=== PROCESS USER MESSAGE: Executing function ===")
             if function_name in function_mapping:
@@ -596,7 +590,6 @@ class ConversationHandler:
                     result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
-                    print(f"Function result: {json.dumps(result, indent=2) if result is not None else 'None'}")
                     if result is None:
                         print("WARNING: Function returned None")
                 except Exception as e:
