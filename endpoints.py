@@ -110,7 +110,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
         conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray)
         
         print("=== STAGE 4: Transforming user message ===")
-        chat_history = conversation_handler.transform_user_message(context_data)
+        chat_history = conversation_handler.transform_user_message(contextArray)
         
         print("=== STAGE 5: Processing chat history ===")
         response = await conversation_handler.process_user_message(chat_history)
