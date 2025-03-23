@@ -35,7 +35,7 @@ class ContextEntry(BaseModel):
 class ClassesDict(BaseModel):
     id: str
     name: str
-    selected: str
+    selected: bool
 
 class ContextEntry2(BaseModel):
     role: str
