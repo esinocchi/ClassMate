@@ -89,6 +89,8 @@ async def mainPipelineEntry(contextArray: ContextObject):
         user_context = context_data[1]
         user_id = user_context.user_id
         user_domain = user_context.domain
+        print(f"JACOB GOONS: {user_domain}")
+
         
         handler = DataHandler(user_id, user_domain)
         user_data = handler.grab_user_data()
