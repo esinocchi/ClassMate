@@ -47,7 +47,6 @@ load_dotenv()
 
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
-canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 # Pydantic classes for structured output
@@ -55,13 +54,13 @@ canvas_api_token = os.getenv("CANVAS_API_KEY")
 # Define the complete function response model
 
 class ConversationHandler:
-    def __init__(self, student_name, student_id, courses, domain, chat_history):
+    def __init__(self, student_name, student_id, courses, domain, chat_history,canvas_api_token):
         self.student_name = student_name
         self.student_id = student_id
         self.courses = courses
         self.domain = domain
         self.chat_history = chat_history
-        self.canvas_api_url = canvas_api_url
+        self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
         
@@ -316,7 +315,6 @@ class ConversationHandler:
     
     def define_system_context(self):
         current_time = datetime.now(timezone.utc).isoformat()
-        print(f"JACOB GOONS 2: {self.domain}")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
