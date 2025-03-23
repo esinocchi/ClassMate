@@ -4,6 +4,7 @@ from openai import OpenAI
 import json
 import sys
 from pathlib import Path
+import tzlocal
 from datetime import datetime, timezone
 from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
@@ -47,7 +48,6 @@ load_dotenv()
 
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
-canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 # Pydantic classes for structured output
@@ -55,13 +55,13 @@ canvas_api_token = os.getenv("CANVAS_API_KEY")
 # Define the complete function response model
 
 class ConversationHandler:
-    def __init__(self, student_name, student_id, courses, domain, chat_history):
+    def __init__(self, student_name, student_id, courses, domain, chat_history,canvas_api_token):
         self.student_name = student_name
-        self.student_id = f"user_{student_id}"
+        self.student_id = student_id
         self.courses = courses
         self.domain = domain
         self.chat_history = chat_history
-        self.canvas_api_url = canvas_api_url
+        self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
         
@@ -89,7 +89,28 @@ class ConversationHandler:
                 "weight": 1.0
             }
         }
-        self.generality = "HIGH"
+        self.generality_definitions = {
+            "SPECIFIC": {
+                "description": "Used when the user is looking for a single, clearly identified number of items with specific details",
+                "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
+                "result_type": "Very targeted set of results"
+            },
+            "LOW": {
+                "description": "Used when the user is looking for a small set of focused results about a narrow topic",
+                "examples": ["Find quizzes about neural networks in CMPSC 444", "Show me this week's assignments"],
+                "result_type": "Focused set of results"
+            },
+            "MEDIUM": {
+                "description": "Default level. Used for balanced queries that need a moderate number of results",
+                "examples": ["What assignments do I have?", "Show my upcoming deadlines"],
+                "result_type": "Balanced set of results"
+            },
+            "HIGH": {
+                "description": "Used for broad, exploratory queries or when comprehensiveness is important",
+                "examples": ["Show me everything for my Biology class", "What are the assignments for this semester in Physics?"],
+                "result_type": "Comprehensive set of results"
+            }
+        }
 
 
     def define_functions(self):
@@ -161,7 +182,7 @@ class ConversationHandler:
                     "properties": {
                         "context_code": {
                             "type": "string",
-                            "description": "This should always be the students user id. This should be in the form user_idnumbe"
+                            "description": "This should always be the students user id. This should be in the form "
                         },
                         "title": {
                             "type": "string",
@@ -208,12 +229,17 @@ class ConversationHandler:
                         "duplicate_append_iterator": {
                             "type": "boolean",
                             "description": "If true, an increasing counter will be appended to the event title for each duplicate (e.g., Event 1, Event 2, etc.)."
+                        },
+                        "canvas_base_url": {
+                            "type": "string",
+                            "description": "This should the provided domain of the user"
                         }
                     },
                     "required": [
                         "context_code",
                         "title",
-                        "start_at"
+                        "start_at",
+                        "canvas_base_url"
                     ]
                 }
             },
@@ -289,13 +315,15 @@ class ConversationHandler:
         return functions
     
     def define_system_context(self):
-        current_time = datetime.now(timezone.utc).isoformat()
+        local_tz = tzlocal.get_localzone()
+        current_time = datetime.now(local_tz).isoformat()
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
 
             [STUDENT INFORMATION & RESOURCES]
             - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
+            - The user's canvas base url: {self.domain}
             - Valid Item Types: {self.valid_types}
             - Time Range Definitions: {self.time_range_definitions}
 
@@ -318,10 +346,11 @@ class ConversationHandler:
 
             2. **Keyword Extraction for Retrieval:**
             - Extract a concise list of keywords from the user’s prompt, ensuring the following elements are captured:
-                - **Item Types:** Choose from {self.valid_types}.
-                - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Course:** Include both the course name and its course ID (from {self.courses}). If a course is not mentioned, default to "all_courses".
-                - **Specific Dates:** Use the date mentioned by the user or default to today’s date.
+                - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
+                - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
+                - **Item Types:** Choose from {self.valid_types}.
+                - **Specific Dates:** Use date or date range mentioned by the user.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
                 - The keyword list must contain a maximum of 10 items.
@@ -456,30 +485,26 @@ class ConversationHandler:
         print("=== TRANSFORM USER MESSAGE: Parsing context array ===")
         print(f"Context Array Structure:")
         context_array = context
-        print(json.dumps(context_array, indent=2))
         
         print("\n=== TRANSFORM USER MESSAGE: Processing messages ===")
 
-        for i in range(len(context_array[1]["content"])-1,-1,-1):
+        for i in range(len(context_array.context[1].content)-1,-1,-1):
             print(f"\nProcessing message pair {i + 1}:")
-            chat_history.append({"role": "user", "content":context_array[1]["content"][i]})
+            chat_history.append({"role": "user", "content":context_array.context[1].content[i]})
             
-            print(f"Assistant content: {json.dumps(context_array[0]['content'][i], indent=2)}")
-            if context_array[0]["content"][i]["function"] and context_array[0]["content"][i]["function"] != [""]:
-                print(f"Function detected: {context_array['context'][0]['content'][i]['function']}")
-                chat_history.append({"role": "function","name":context_array[0]["content"][i]["function"][0], "content": context_array[0]["content"][i]["function"][1]})
+            if context_array.context[0].content[i].function and context_array.context[0].content[i].function != [""]:
+                print(f"Function detected: {context_array.context[0].content[i].function}")
+                chat_history.append({"role": "function","name":context_array.context[0].content[i].function[0], "content": context_array.context[0].content[i].function[1]})
             if i != 0:
-                chat_history.append({"role": "assistant", "content":context_array[0]["content"][i]["message"]})
+                chat_history.append({"role": "assistant", "content":context_array.context[0].content[i].message})
         
         print("\n=== TRANSFORM USER MESSAGE: Final chat history ===")
-        print(json.dumps(chat_history, indent=2))
         print("=== TRANSFORM USER MESSAGE: Complete ===\n")
         return chat_history
     
     async def process_user_message(self, chat_history: dict):
         """Process a user message and return the appropriate response"""
         print("\n=== PROCESS USER MESSAGE: Starting ===")
-        print(f"Chat history received: {json.dumps(chat_history, indent=2)}")
         
         print("=== PROCESS USER MESSAGE: Generating system context ===")
         # Generate the system context with enhanced instructions
@@ -547,7 +572,6 @@ class ConversationHandler:
                 arguments = json.loads(function_call.arguments)
                 arguments["canvas_base_url"] = self.canvas_api_url
                 arguments["access_token"] = self.canvas_api_token
-                print(f"Function arguments: {json.dumps(arguments, indent=2)}")
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
@@ -563,7 +587,6 @@ class ConversationHandler:
                     print(f"Keywords before validation: {before_keywords}")
                     print(f"Keywords after validation: {arguments['search_parameters']['keywords']}")
             
-            print(f"Final arguments: {json.dumps(arguments, indent=2)}")
 
             print("\n=== PROCESS USER MESSAGE: Executing function ===")
             if function_name in function_mapping:
@@ -574,7 +597,6 @@ class ConversationHandler:
                     result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
-                    print(f"Function result: {json.dumps(result, indent=2) if result is not None else 'None'}")
                     if result is None:
                         print("WARNING: Function returned None")
                 except Exception as e:
@@ -591,9 +613,8 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
-            print(f"Updated chat context with function result. New length: {len(chat)}")
-            print("goon")
-            print(chat)
+            
+           
             try:
                 # Context is then passed back to the api in order for it to respond to the user
                 print("About to make second OpenAI API call")
@@ -605,26 +626,27 @@ class ConversationHandler:
                 )
                 print("Second API call completed successfully")
                 
-                print("\n=== Second API Response Details ===")
+                """print("\n=== Second API Response Details ===")
                 print("Complete response object:")
                 print(f"Response message: {final_completion.choices[0].message}")
                 print(f"Response content: {final_completion.choices[0].message.content}")
                 print(f"Response message dict: {vars(final_completion.choices[0].message)}")
-                print("================================\n")
+                print("================================\n")"""
                 final_message = final_completion.choices[0].message.content
                 print(final_message)
                 return_value = {"message": final_message, "function": [function_name, json.dumps(result)]}
-                self.chat_history["context"][0]["content"][0] = return_value
+                self.chat_history.context[0].content[0] = return_value
                 
             except Exception as e:
                 print(f"ERROR during second API call: {str(e)}")
                 print(f"Error type: {type(e)}")
                 return_value = [{"message": f"Error processing function result: {str(e)}", "function": [function_name, json.dumps(result)]}]
-                self.chat_history["context"][0]["content"][0] = return_value
+                self.chat_history.context[0].content[0] = return_value
         else:
             print("=== PROCESS USER MESSAGE: No function call needed ===")
             content = {"message": response_content , "function": [""]}
-            self.chat_history["context"][0]["content"][0] = content
+            self.chat_history.context[0].content[0] = content
        
+        print(self.chat_history)    
         return self.chat_history
             

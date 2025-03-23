@@ -9,6 +9,8 @@ import aiohttp
 from dotenv import load_dotenv
 import time
 import json
+import asyncio
+
 load_dotenv()
 
 app = FastAPI()
@@ -83,38 +85,40 @@ async def mainPipelineEntry(contextArray: ContextObject):
    
     #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
-    #chat_requirements = check_chat_requirements(contextArray)
-    chat_requirements = "None"
+    chat_requirements = await check_chat_requirements(contextArray)
 
     if chat_requirements == "None":
             
 
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-        context_data = contextArray["context"]
+        context_data = contextArray.context
         user_context = context_data[1]
-        user_id = user_context['id']
-        user_domain = user_context['domain']
+        user_id = user_context.user_id
+        user_domain = user_context.domain
+        print(f"JACOB GOONS: {user_domain}")
+
         
         handler = DataHandler(user_id, user_domain)
         user_data = handler.grab_user_data()
         user_name = user_data["user_metadata"]["name"]
+        user_token = user_data["user_metadata"]["token"]
         
         print("=== STAGE 2: Processing context data ===")
         # Handle both dictionary and Pydantic model access
         
         courses = {}  # Changed to a single dictionary
 
-        for class_info in user_context['classes']:
-            if class_info['selected'] == True:
+        for class_info in user_context.classes:
+            if class_info.selected == True:
                 # Remove 'course_' prefix from ID and store as a simple key-value pair
-                course_id = class_info['id'].replace('course_', '')
-                courses[class_info['name']] = course_id
+                course_id = class_info.id.replace('course_', '')
+                courses[class_info.name] = course_id
         
         print("=== STAGE 3: Initializing ConversationHandler ===")
-        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray)
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=f"user_{user_id}", courses=courses,domain=user_domain,chat_history=contextArray,canvas_api_token=user_token)
         
         print("=== STAGE 4: Transforming user message ===")
-        chat_history = conversation_handler.transform_user_message(context_data)
+        chat_history = conversation_handler.transform_user_message(contextArray)
         
         print("=== STAGE 5: Processing chat history ===")
         response = await conversation_handler.process_user_message(chat_history)
@@ -122,7 +126,8 @@ async def mainPipelineEntry(contextArray: ContextObject):
         print("=== STAGE 6: Returning response ===\n")
         return response  # Return the modified Context
     else:
-        return[{"message": chat_requirements,"function":""}]
+        contextArray.context[0].content[0] = {"message": chat_requirements,"function":""}
+        return contextArray
 
 
 
@@ -159,7 +164,7 @@ async def pullCourses(user_id, domain):
     
     #only one course is in each course object, but we still need to iterate through the course object to get the course id and course name
     for course_id, course_name in courses_selected.items():
-            course_formatted = ClassesDict(id=course_id, name=course_name, selected="true")
+            course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
     
@@ -174,8 +179,9 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course["id"] not in courses_added:
-            course_formatted = ClassesDict(id=course["id"], name=course["name"], selected="false")
+        if course.get("id") not in courses_added and course.get("name"):
+            print(course)
+            course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
 
     #classes are returned in the format {course_id: course_name}
@@ -323,7 +329,7 @@ async def checkAndUpdateUserData(user_id, domain):
     else:
         return {"message": "User data not updated"}
 
-def check_chat_requirements(contextArray: ContextObject):
+async def check_chat_requirements(contextArray: ContextObject):
     """
     This function is used to check if the user has any chat requirements missing
 
@@ -344,11 +350,11 @@ def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if check_update_status(user_context['id'], user_context['domain']):
+    if await check_update_status(user_context.user_id, user_context.domain):
         return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    if user_context['classes'] == []:
+    if user_context.classes == []:
         return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
