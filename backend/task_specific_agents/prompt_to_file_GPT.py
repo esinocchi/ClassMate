@@ -37,6 +37,8 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
     latex_content = response.choices[0].message.content
     #latex_content is being set to the response of model
 
+    os.makedirs(f"{CanvasAI_dir}/media_output/{domain}/{user_id}", exist_ok=True)
+
     with open(latex_file_path, "w", encoding="utf-8") as f:
         f.write(latex_content)
         handler = DataHandler(user_id, f"{domain}.instructure.com")
@@ -61,16 +63,11 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
     return "PDF TO LATEX SUCESSFUL"
 
 handler = DataHandler(7210330, "psu.instructure.com")
-handler.initiate_user_data()
-print(handler.grab_user_data()["current_chat_context"])
+
+
 
 prompt_to_pdf("What is the capital of France?", "psu", 7210330)
 
-if os.path.exists(f"{CanvasAI_dir}/media_output/psu/7146525/latexoutput.pdf"):
-    print("PDF exists")
-
-handler.delete_chat_context()
-print(handler.grab_user_data()["current_chat_context"])
 
 
 
