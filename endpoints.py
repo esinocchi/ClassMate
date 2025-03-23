@@ -79,7 +79,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
    
     #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
-    chat_requirements = check_chat_requirements(contextArray)
+    chat_requirements = await check_chat_requirements(contextArray)
 
     if chat_requirements == "None":
             
@@ -319,7 +319,7 @@ async def checkAndUpdateUserData(user_id, domain):
     else:
         return {"message": "User data not updated"}
 
-def check_chat_requirements(contextArray: ContextObject):
+async def check_chat_requirements(contextArray: ContextObject):
     """
     This function is used to check if the user has any chat requirements missing
 
@@ -340,7 +340,7 @@ def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if check_update_status(user_context.user_id, user_context.domain):
+    if await check_update_status(user_context.user_id, user_context.domain):
         return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
