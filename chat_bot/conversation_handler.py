@@ -182,7 +182,7 @@ class ConversationHandler:
                     "properties": {
                         "context_code": {
                             "type": "string",
-                            "description": "This should always be the students user id. This should be in the form user_idnumbe"
+                            "description": "This should always be the students user id. This should be in the form "
                         },
                         "title": {
                             "type": "string",
@@ -612,9 +612,8 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
-            print(f"Updated chat context with function result. New length: {len(chat)}")
-            print("goon")
-            print(chat)
+            
+           
             try:
                 # Context is then passed back to the api in order for it to respond to the user
                 print("About to make second OpenAI API call")
@@ -626,12 +625,12 @@ class ConversationHandler:
                 )
                 print("Second API call completed successfully")
                 
-                print("\n=== Second API Response Details ===")
+                """print("\n=== Second API Response Details ===")
                 print("Complete response object:")
                 print(f"Response message: {final_completion.choices[0].message}")
                 print(f"Response content: {final_completion.choices[0].message.content}")
                 print(f"Response message dict: {vars(final_completion.choices[0].message)}")
-                print("================================\n")
+                print("================================\n")"""
                 final_message = final_completion.choices[0].message.content
                 print(final_message)
                 return_value = {"message": final_message, "function": [function_name, json.dumps(result)]}
