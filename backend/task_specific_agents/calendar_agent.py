@@ -115,7 +115,7 @@ async def create_event(
     if end_at is None:
         all_day = True
     print(f"GOON: {canvas_base_url}")
-    url = f"{canvas_base_url}/calendar_events"
+    url = f"https://{canvas_base_url}/calendar_events"
 
     headers = {
         "Authorization": f"Bearer {access_token}"
