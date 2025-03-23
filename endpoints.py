@@ -9,6 +9,8 @@ import aiohttp
 from dotenv import load_dotenv
 import time
 import json
+import asyncio
+
 load_dotenv()
 
 app = FastAPI()
@@ -153,7 +155,7 @@ async def pullCourses(user_id, domain):
     
     #only one course is in each course object, but we still need to iterate through the course object to get the course id and course name
     for course_id, course_name in courses_selected.items():
-            course_formatted = ClassesDict(id=course_id, name=course_name, selected="true")
+            course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
     
@@ -168,8 +170,9 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course["id"] not in courses_added:
-            course_formatted = ClassesDict(id=course["id"], name=course["name"], selected="false")
+        if course.get("id") not in courses_added and course.get("name"):
+            print(course)
+            course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
 
     #classes are returned in the format {course_id: course_name}

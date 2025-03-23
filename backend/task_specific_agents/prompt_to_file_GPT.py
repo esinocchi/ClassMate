@@ -60,18 +60,17 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
 
     return "PDF TO LATEX SUCESSFUL"
 
-
-prompt_to_pdf("What is the capital of France?", "psu", 7146525)
-
-handler = DataHandler("psu", 7146525)
+handler = DataHandler(7210330, "psu.instructure.com")
 handler.initiate_user_data()
-print(handler.grab_user_data())
+print(handler.grab_user_data()["current_chat_context"])
+
+prompt_to_pdf("What is the capital of France?", "psu", 7210330)
 
 if os.path.exists(f"{CanvasAI_dir}/media_output/psu/7146525/latexoutput.pdf"):
     print("PDF exists")
 
 handler.delete_chat_context()
-print(handler.grab_user_data())
+print(handler.grab_user_data()["current_chat_context"])
 
 
 
