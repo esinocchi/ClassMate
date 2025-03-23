@@ -86,7 +86,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
     #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     chat_requirements = await check_chat_requirements(contextArray)
-
+    print("these are the chat requirements: ", chat_requirements)
     if chat_requirements == "None":
             
 
