@@ -109,7 +109,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
                 courses[class_info.name] = course_id
         
         print("=== STAGE 3: Initializing ConversationHandler ===")
-        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray,canvas_api_token=user_token)
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=f"user_{user_id}", courses=courses,domain=user_domain,chat_history=contextArray,canvas_api_token=user_token)
         
         print("=== STAGE 4: Transforming user message ===")
         chat_history = conversation_handler.transform_user_message(contextArray)
