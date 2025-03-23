@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-
+#pydantic models for pipeline
 class ContextPair(BaseModel):
     message: str
     function: List[str]
@@ -49,6 +49,12 @@ class ContextEntry2(BaseModel):
 
 class ContextObject(BaseModel):
     context: List[Union[ContextEntry, ContextEntry2]]
+
+#pydantic models for class updates
+class PushClassesObject(BaseModel):
+    user_id: str
+    domain: str
+    classes: List[ClassesDict]
 
 
 # Root directory for testing connection
@@ -80,7 +86,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
     #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     chat_requirements = await check_chat_requirements(contextArray)
-
+    print("these are the chat requirements: ", chat_requirements)
     if chat_requirements == "None":
             
 
@@ -182,7 +188,7 @@ async def pullCourses(user_id, domain):
     return {'courses': all_courses}
 
 @app.post('/endpoints/pushCourses')
-async def pushCourses(user_id, domain, courses: List[ClassesDict]):
+async def pushCourses(classesData: PushClassesObject):
     """
     This endpoint is used to push courses to the database.
 
@@ -204,12 +210,12 @@ async def pushCourses(user_id, domain, courses: List[ClassesDict]):
     #courses are returned in the format {course_id: course_name}
     courses_selected = {}
     #for each ClassesDict object, if selected is true, add to courses_selected dictionary
-    for course in courses:
+    for course in classesData.classes:
         
-        if course.selected == "true":
+        if course.selected == True:
             courses_selected[course.id] = course.name
     
-    handler = DataHandler(user_id, domain)
+    handler = DataHandler(classesData.user_id, classesData.domain)
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
     handler.update_user_data()
@@ -344,12 +350,18 @@ async def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if await check_update_status(user_context.user_id, user_context.domain):
-        return "User data update currently in progress, please try again in a few minutes"
+    #if await check_update_status(user_context.user_id, user_context.domain):
+    #    return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    if user_context.classes == []:
-        return "Please select at least one course in the settings page to continue"
+    print("active")
+
+    for i in range(len(user_context.classes)):
+        print(user_context.classes[i].selected)
+        if user_context.classes[i].selected == True:
+            return "None"
+        else:
+            return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
 
