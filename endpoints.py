@@ -202,7 +202,7 @@ async def pushCourses(user_id, domain, courses: List[ClassesDict]):
     #for each ClassesDict object, if selected is true, add to courses_selected dictionary
     for course in courses:
         
-        if course.selected == "true":
+        if course.selected == True:
             courses_selected[course.id] = course.name
     
     handler = DataHandler(user_id, domain)
@@ -344,8 +344,9 @@ async def check_chat_requirements(contextArray: ContextObject):
         return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    if user_context.classes == []:
-        return "Please select at least one course in the settings page to continue"
+    for i in range(len(user_context.classes)):
+        if user_context.classes[i].selected == False:
+            return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
 
