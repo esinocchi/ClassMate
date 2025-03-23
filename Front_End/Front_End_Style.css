@@ -204,6 +204,10 @@
     transform: scaleX(1) scaleY(1);
 }
 
+#SettingsWindow .header {
+    margin-bottom: 15px;
+}
+
 #settingsContainer, #classesHolder {
     flex-direction: column;
 }

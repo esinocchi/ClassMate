@@ -381,6 +381,5 @@ async def oauthTokenGenerator():
     #we will use oauth2 to generate a token
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
-    print(token)
     return token
 
