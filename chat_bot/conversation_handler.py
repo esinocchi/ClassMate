@@ -230,7 +230,7 @@ class ConversationHandler:
                             "type": "boolean",
                             "description": "If true, an increasing counter will be appended to the event title for each duplicate (e.g., Event 1, Event 2, etc.)."
                         },
-                        "domain": {
+                        "canvas_base_url": {
                             "type": "string",
                             "description": "This should the provided domain of the user"
                         }

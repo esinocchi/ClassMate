@@ -117,7 +117,8 @@ async def mainPipelineEntry(contextArray: ContextObject):
         print("=== STAGE 6: Returning response ===\n")
         return response  # Return the modified Context
     else:
-        return[{"message": chat_requirements,"function":""}]
+        contextArray.context[0].content[0] = {"message": chat_requirements,"function":""}
+        return contextArray
 
 
 
