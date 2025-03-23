@@ -1,8 +1,6 @@
 import io
 from docx import Document
-import requests
 import os
-import time
 import json
 import fitz  # PyMuPDF
 import pytesseract
@@ -11,8 +9,8 @@ from bs4 import BeautifulSoup
 from PIL import Image
 import sys
 import aiohttp
-import asyncio
-
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 # Import calendar_agent directly from task_specific_agents (sibling directory)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
@@ -182,13 +180,69 @@ def extract_text_and_images(file_bytes: bytes, file_type: str):
         elif file_type == "docx":
             # Handle DOCX files
             try:
-                # Open DOCX file from memory and extract text from paragraphs
+                # Open DOCX file from memory
                 doc = Document(io.BytesIO(file_bytes))
+
+                # Extract text from paragraphs
                 for paragraph in doc.paragraphs:
                     if paragraph.text:
                         total_text += paragraph.text + "\n"
+
+                # Extract text from images in the DOCX file
+                for rel in doc.part.rels.values():
+                    if "image" in rel.target_ref:
+                        try:
+                            # Get the image data
+                            image_bytes = rel.target_part.blob
+                            image = Image.open(io.BytesIO(image_bytes))
+
+                            # Perform OCR on the image
+                            ocr_text = pytesseract.image_to_string(image)
+                            if ocr_text.strip():
+                                total_text += f"Text from image in DOCX:\n{ocr_text}\n"
+                        except Exception as img_error:
+                            print(f"Error processing image in DOCX: {img_error}")
+                            continue
+
             except Exception as docx_error:
                 return f"Error processing DOCX: {docx_error}"
+
+                
+        elif file_type == "pptx":
+            # Handle PPTX files
+            try:
+                # Open PPTX file from memory
+                pptx_stream = io.BytesIO(file_bytes)
+                presentation = Presentation(pptx_stream)
+
+                # Iterate through slides and extract text
+                for slide_num, slide in enumerate(presentation.slides):
+                    slide_text = f"Slide {slide_num + 1}:\n"
+                    for shape in slide.shapes:
+                        # Extract text from shapes with text
+                        if hasattr(shape, "text") and shape.text.strip():
+                            slide_text += shape.text + "\n"
+
+                        # Extract text from images using OCR
+                        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                            try:
+                                # Get the image data
+                                image_bytes = io.BytesIO(shape.image.blob)
+                                image = Image.open(image_bytes)
+
+                                # Perform OCR on the image
+                                ocr_text = pytesseract.image_to_string(image)
+                                if ocr_text.strip():
+                                    slide_text += f"Text from image in slide {slide_num + 1}:\n{ocr_text}\n"
+                            except Exception as img_error:
+                                print(f"Error processing image in slide {slide_num + 1}: {img_error}")
+                                continue
+
+                    total_text += slide_text
+
+                pptx_stream.close()
+            except Exception as pptx_error:
+                return f"Error processing PPTX: {pptx_error}"
 
         elif file_type == "txt":
             # Handle TXT files

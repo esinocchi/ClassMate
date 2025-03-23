@@ -216,6 +216,7 @@ async def pushCourses(classesData: PushClassesObject):
             courses_selected[course.id] = course.name
     
     handler = DataHandler(classesData.user_id, classesData.domain)
+    
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
     handler.update_user_data()

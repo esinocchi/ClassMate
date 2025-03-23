@@ -1,29 +1,76 @@
-
-import shutil
-from dotenv import load_dotenv
-import openai
-from pdflatex import PDFLaTeX
 import os
 import sys
-
-#Update on your own to before the actual CanvasAI directory e.g. mine is f"{BASE_DIR}CanvasAI/" to access anything
-
-load_dotenv()
+import requests
+import shutil
+import openai
+from pdflatex import PDFLaTeX
+import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 CanvasAI_dir = os.path.dirname(backend_dir)
 sys.path.append(backend_dir)
 
-from data_retrieval.data_handler import DataHandler
+from data_retrieval.data_handler import DataHandler, clear_directory
+from data_retrieval.get_all_user_data import extract_text_and_images, get_file_type
 
-def prompt_to_pdf(prompt: str, domain: str, user_id):
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
+    handler = DataHandler(user_id, domain)
+    API_TOKEN = handler.grab_user_data()["user_metadata"]["token"]
+    
+    print(API_TOKEN)
+    
+    # Make the request to download the file
+    response = requests.get(file_url, headers={"Authorization": f"Bearer {API_TOKEN}"}, stream=True)
+    
+    # Check if the request was successful
+    if response.status_code != 200:
+        return f"Error: Failed to download file. Status code: {response.status_code}"
+    
+    # Get the raw file content (binary data)
+    file_bytes = response.content
+    
+    # Try to extract text and images from the file
+    try:
+        file_text = extract_text_and_images(file_bytes, get_file_type(file_name))
+    except Exception as e:
+        return f"Error: File text could not be extracted. Details: {str(e)}"
+    
+    print(file_text)
+    
+    # Try to process the text into a detailed PDF of notes
+    try:
+        prompt_to_pdf_status = "ERROR: pdf couldn't be created"
+        i = 0
+        while i < 5:
+            print(f"trying to make pdf {i}")
+            prompt_to_pdf_status = prompt_to_pdf(file_text, user_id, handler.domain)
+            if prompt_to_pdf_status == "PDF TO LATEX SUCESSFUL":
+                break
+            i += 1
+        if i == 5:
+            return "ERROR: pdf couldn't be created"
+    except Exception as e:
+        return f"ERROR: PDF input not accepted. Details: {str(e)}"
+    
+    return "Lecture file to notes pdf successful"
+
+
+
+def prompt_to_pdf(prompt: str, user_id, domain: str):
     client = openai.OpenAI(api_key=os.getenv("API_KEY"))
     
+
+    print("herehereherherherherhe")
 
     latex_file_path = f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.tex"
      #this will depend on the directory structure of CanvasAI
 
+    clear_directory(f"{CanvasAI_dir}/media_output/{domain}/{user_id}")
+    
     response = client.chat.completions.create(
         model="ft:gpt-4o-mini-2024-07-18:personal:input-to-latex:AjGUuIsy",
         messages=[
@@ -33,9 +80,12 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
     )
     #this will depend on the directory structure of CanvasAI
 
+    
 
     latex_content = response.choices[0].message.content
     #latex_content is being set to the response of model
+
+    print('latex made')
 
     os.makedirs(f"{CanvasAI_dir}/media_output/{domain}/{user_id}", exist_ok=True)
 
@@ -49,6 +99,7 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
     try:
         pdfl = PDFLaTeX.from_texfile(latex_file_path)
         pdfl.create_pdf(keep_pdf_file=True, keep_log_file=False)
+        print("trying to make pdf")
 
         if os.path.exists("latexoutput.pdf"):
             shutil.move("latexoutput.pdf", f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.pdf")
@@ -61,13 +112,5 @@ def prompt_to_pdf(prompt: str, domain: str, user_id):
     #delete the LaTeX, file
 
     return "PDF TO LATEX SUCESSFUL"
-
-handler = DataHandler(7210330, "psu.instructure.com")
-
-
-
-prompt_to_pdf("What is the capital of France?", "psu", 7210330)
-
-
 
 
