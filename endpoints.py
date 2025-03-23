@@ -39,7 +39,7 @@ class ClassesDict(BaseModel):
 
 class ContextEntry2(BaseModel):
     role: str
-    id: str
+    user_id: str
     domain: str
     recentDocs: List[str]
     content: List[str]
