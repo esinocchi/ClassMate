@@ -4,6 +4,7 @@ from openai import OpenAI
 import json
 import sys
 from pathlib import Path
+import tzlocal
 from datetime import datetime, timezone
 from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
@@ -314,7 +315,8 @@ class ConversationHandler:
         return functions
     
     def define_system_context(self):
-        current_time = datetime.now(timezone.utc).isoformat()
+        local_tz = tzlocal.get_localzone()
+        current_time = datetime.now(local_tz).isoformat()
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
