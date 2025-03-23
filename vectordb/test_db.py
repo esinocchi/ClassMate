@@ -39,19 +39,22 @@ def get_canvas_data():
 
     # Load environment variables
     load_dotenv()
-    user_id = "7210330"
-    domain = os.getenv("CANVAS_DOMAIN")
+    user_id = "7214035"
     token = os.getenv("CANVAS_API_TOKEN")
     courses_selected = {
-    2372294: "PHYS 211",
-    2381676: "STAT ",
-    2361723: "APOCCOLYPTIC GEO"
-}
+            "2361957": "CMPSC 465",
+            "2379517": "CMPSC 311",
+            "2361815": "EARTH 103N",
+            "2361972": "CMPEN331",
+            "2364485": "ACCT 211"
+        }
 
-    handler = DataHandler(user_id, domain, token, courses_selected=courses_selected)
+    handler = DataHandler(user_id, domain="psu.instructure.com", token=token, courses_selected=courses_selected)
 
     handler.initiate_user_data()
+
     handler.update_user_data()
+    
 
     time.sleep(180)
 
@@ -64,14 +67,14 @@ async def search_db():
     await db.process_data(force_reload=True)
     
     output = await db.search({
-        "course_id": "2361815",
-        "time_range": "ALL_TIME",
-        "item_types": ["syllabus"],
+        "course_id": "all_courses",
+        "time_range": "FUTURE",
+        "item_types": ["assignment", "announcement"],
         "specific_dates": [],
-        "keywords": ["office hours"],
-        "generality": "LOW",
-        "query": "What are the office hours for Earth 103N?"
-    }, top_k=5)
+        "keywords": ["next"],
+        "generality": "MEDIUM",
+        "query": "What is my next assignment?"
+    })
     
     return output
 
@@ -79,3 +82,4 @@ async def search_db():
 if __name__ == "__main__":
     result = asyncio.run(search_db())
     print(result)
+    
