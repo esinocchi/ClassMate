@@ -360,10 +360,9 @@ async def check_chat_requirements(contextArray: ContextObject):
         print(user_context.classes[i].selected)
         if user_context.classes[i].selected == True:
             return "None"
-        else:
-            return "Please select at least one course in the settings page to continue"
-    #if user has all requirements, return "None" as in no chat requirements
-    return "None"
+    
+    return "Please select at least one course in the settings page to continue"
+    
 
 @app.get('/endpoints/check_update_status')
 async def check_update_status(user_id, domain):
