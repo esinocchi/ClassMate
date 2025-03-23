@@ -88,6 +88,8 @@ saveClassesButton.addEventListener("click", () => {
         chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
         console.log(Context);
     }); 
+
+
 });
 
 //Give settings button functionality
@@ -141,8 +143,6 @@ async function handlePrompt() {
             chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
                 let promptPairs = result.Context_CanvasAI || dataHolder;
 
-                console.log(promptPairs);
-
                 //check if the id is already stored
                 if (promptPairs[1].user_id == "holder") {
                     promptPairs[1].user_id = retrieveID(promptPairs[1].domain);
@@ -166,6 +166,7 @@ async function handlePrompt() {
                 console.log(promptPairs[1].content)
 
                 try {
+                    console.log(promptPairs);
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
 
                     response = updated.context[0].content[0].message; // Update response for display
@@ -222,12 +223,6 @@ function toggleChat() {
 
 //add class checkbox and title to settings page
 function addClassSetting(classID, checked) {
-    //convert string to boolean
-    if (checked == "false") {
-        checked = false;
-    } else if (checked == "true") {
-        checked = true;
-    }   
 
     //create parent div
     const ClassBox = document.createElement("div");
@@ -316,6 +311,7 @@ function addMemoryBox(prompt, response) {
 
 //rebuild class selections and past chats
 async function rebuildPage() {
+    resetAllMemory();
     try {
         await new Promise((resolve, reject) => {
             try{
@@ -323,15 +319,10 @@ async function rebuildPage() {
                     //update domain each reload
                     let context = result.Context_CanvasAI || dataHolder;
 
-                    
-
-                    console.log(context);
-
                     context[1].domain = getURL();
 
                     //check for existing id
                     if (context[1].user_id == 'holder') {
-                        console.log("pulling id");
                         context[1].user_id = await retrieveID(context[1].domain);
                     }
 
@@ -342,9 +333,7 @@ async function rebuildPage() {
                     if (context[1].classes[0].id == ""){
                          context[1].classes = await retrieveClassList(context[1].user_id, context[1].domain);
                     }
-                    console.log("context", context);
                     for (let i = context[1].classes.length - 1; i >= 0; i--) {
-                        console.log(context[1].classes[i].selected);
                         addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
                     };
                     // Save updated list back to local storage
@@ -435,7 +424,7 @@ async function mainPipelineEntry(contextJSON) {
 }
 
 async function retrieveClassList(studentID, domain) {
-    console.log("\npulling Classes\n")
+    console.log("\retrieving Classes\n")
     //returned in the form dictionary {"id": "classNumber", "name": "className", "selected": false}
     try {
         const url = new URL("https://canvasclassmate.me/endpoints/pullCourses");
@@ -456,9 +445,6 @@ async function retrieveClassList(studentID, domain) {
     
             // Modify the classes portion of the structure
             context[1].classes = classes;
-        
-            console.log(classes);
-            console.log(context);
     
             // Save the updated structure
             chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
@@ -472,15 +458,20 @@ async function retrieveClassList(studentID, domain) {
 }
 
 async function retrieveID(domain) {
+    console.log("\nretrieving ID\n");
     //returned in the form {"user_id": int}
     try {
         const response = await fetch(`https://canvasclassmate.me/endpoints/initiate_user?domain=${domain}`);
         const id_return = await response.json(); // Add await here
         console.log(`\nfetched ID: `); // Access as object property
-        console.log(id_return);
-        return id_return.user_id; // Correct property access
+        console.log(id_return.user_id.toString());
+        return id_return.user_id.toString(); // Correct property access
     } catch (error) {
         console.error('Error calling API:', error);
         return false;
     }
+}
+
+async function pushClasses(){
+
 }
