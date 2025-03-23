@@ -4,7 +4,7 @@ import requests
 import fitz  # PyMuPDF
 from PIL import Image
 import pytesseract
-from prompt_to_file_GPT import prompt_to_pdf
+from Projects.CanvasAI.backend.task_specific_agents.prompt_to_file_GPT import prompt_to_pdf
 from dotenv import load_dotenv
 
 BASE_DIR = "Penn State/Projects/CanvasAI/"
@@ -207,31 +207,4 @@ def find_module_item(course_id: str, input_file_name: str):
 
     return potential_module_items
 
-def text_formatter_for_simplicity(input: str):
-    """
-    (input to simplify)
-    
-    """
-    formatted_str = input.replace(" ", "").replace("-", "").lower()
-    #removes spaces, underscores, and lowercases every letter
-    
-    return formatted_str
 
-def find_file_from_course(course_id: str, potential_file_name: str):
-    """
-    (7 digit # course id, potential file name)
-
-    """
-    try:
-        file_list = requests.get(f"{API_URL}/courses/{course_id}/files/", headers={"Authorization": f"Bearer {API_TOKEN}"}).json()
-        potential_files = {}
-        for i in range(len(file_list)):
-            print(f"files: {potential_file_name}")
-            print(f"{file_list[i].get('filename')}")
-            if text_formatter_for_simplicity(potential_file_name) in text_formatter_for_simplicity(file_list[i].get("filename")):
-                potential_files[file_list[i].get("filename")] = [file_list[i].get("url"), "File"]
-        return potential_files
-    except:
-        return "ERROR: cannot access files from course"
-    #try to access files section in a course. If working, list files that are close to input
-    #if files cannot be accessed, return Error

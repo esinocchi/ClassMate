@@ -9,6 +9,8 @@ import aiohttp
 from dotenv import load_dotenv
 import time
 import json
+import asyncio
+
 load_dotenv()
 
 app = FastAPI()
@@ -39,7 +41,7 @@ class ClassesDict(BaseModel):
 
 class ContextEntry2(BaseModel):
     role: str
-    id: str
+    user_id: str
     domain: str
     recentDocs: List[str]
     content: List[str]
@@ -153,13 +155,13 @@ async def pullCourses(user_id, domain):
     
     #only one course is in each course object, but we still need to iterate through the course object to get the course id and course name
     for course_id, course_name in courses_selected.items():
-            course_formatted = ClassesDict(id=course_id, name=course_name, selected="true")
+            course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
     
     #pull all classes from canvas api
     async with aiohttp.ClientSession() as session:
-       async with session.get(f"https://{domain}/api/v1/courses/{course_id}/assignments", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+       async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
         if response.status == 200:
             courses = await response.json()
         else:
@@ -168,8 +170,9 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course["id"] not in courses_added:
-            course_formatted = ClassesDict(id=course["id"], name=course["name"], selected="false")
+        if course.get("id") not in courses_added and course.get("name"):
+            print(course)
+            course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
 
     #classes are returned in the format {course_id: course_name}
@@ -363,7 +366,7 @@ async def check_update_status(user_id, domain):
 
     ===============================================
 
-    call this endpoint whenever a user tries to update courses_selected, 
+    call this endpoint whenever a user tries to update courses_selected by hitting the save button, 
     main pipline entry handles the case of when user tries to chat while update is in progress.
     """
     handler = DataHandler(user_id, domain)
@@ -382,4 +385,3 @@ async def oauthTokenGenerator():
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
     return token
-

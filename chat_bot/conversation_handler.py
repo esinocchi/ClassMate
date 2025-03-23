@@ -89,7 +89,28 @@ class ConversationHandler:
                 "weight": 1.0
             }
         }
-        self.generality = "HIGH"
+        self.generality_definitions = {
+            "SPECIFIC": {
+                "description": "Used when the user is looking for a single, clearly identified number of items with specific details",
+                "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
+                "result_type": "Very targeted set of results"
+            },
+            "LOW": {
+                "description": "Used when the user is looking for a small set of focused results about a narrow topic",
+                "examples": ["Find quizzes about neural networks in CMPSC 444", "Show me this week's assignments"],
+                "result_type": "Focused set of results"
+            },
+            "MEDIUM": {
+                "description": "Default level. Used for balanced queries that need a moderate number of results",
+                "examples": ["What assignments do I have?", "Show my upcoming deadlines"],
+                "result_type": "Balanced set of results"
+            },
+            "HIGH": {
+                "description": "Used for broad, exploratory queries or when comprehensiveness is important",
+                "examples": ["Show me everything for my Biology class", "What are the assignments for this semester in Physics?"],
+                "result_type": "Comprehensive set of results"
+            }
+        }
 
 
     def define_functions(self):
@@ -318,10 +339,11 @@ class ConversationHandler:
 
             2. **Keyword Extraction for Retrieval:**
             - Extract a concise list of keywords from the user’s prompt, ensuring the following elements are captured:
-                - **Item Types:** Choose from {self.valid_types}.
-                - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Course:** Include both the course name and its course ID (from {self.courses}). If a course is not mentioned, default to "all_courses".
-                - **Specific Dates:** Use the date mentioned by the user or default to today’s date.
+                - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
+                - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
+                - **Item Types:** Choose from {self.valid_types}.
+                - **Specific Dates:** Use date or date range mentioned by the user.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
                 - The keyword list must contain a maximum of 10 items.

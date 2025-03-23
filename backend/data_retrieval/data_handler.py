@@ -4,7 +4,6 @@ import os
 import time
 import json
 from .get_all_user_data import get_all_user_data
-from urllib.parse import urlparse
 import asyncio
 import threading
 from dotenv import load_dotenv
@@ -324,6 +323,14 @@ class DataHandler:
         Deletes the chat_context in the user_data dictionary
         """
         user_data = self.grab_user_data()
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        backend_dir = os.path.dirname(current_dir)
+        CanvasAI_dir = os.path.dirname(backend_dir)
+
+        pdf_file_path = f"{CanvasAI_dir}/media_output/{self.domain}/{self.id}/latexoutput.pdf"
+        if os.path.exists(pdf_file_path):
+            os.remove(pdf_file_path)
             
         user_data["current_chat_context"] = ""
         return self.save_user_data(user_data)
