@@ -57,7 +57,7 @@ canvas_api_token = os.getenv("CANVAS_API_KEY")
 class ConversationHandler:
     def __init__(self, student_name, student_id, courses, domain, chat_history):
         self.student_name = student_name
-        self.student_id = f"user_{student_id}"
+        self.student_id = student_id
         self.courses = courses
         self.domain = domain
         self.chat_history = chat_history
@@ -460,16 +460,16 @@ class ConversationHandler:
         
         print("\n=== TRANSFORM USER MESSAGE: Processing messages ===")
 
-        for i in range(len(context_array[1]["content"])-1,-1,-1):
+        for i in range(len(context_array.context[1].content)-1,-1,-1):
             print(f"\nProcessing message pair {i + 1}:")
-            chat_history.append({"role": "user", "content":context_array[1]["content"][i]})
+            chat_history.append({"role": "user", "content":context_array.context[1].content[i]})
             
-            print(f"Assistant content: {json.dumps(context_array[0]['content'][i], indent=2)}")
-            if context_array[0]["content"][i]["function"] and context_array[0]["content"][i]["function"] != [""]:
-                print(f"Function detected: {context_array['context'][0]['content'][i]['function']}")
-                chat_history.append({"role": "function","name":context_array[0]["content"][i]["function"][0], "content": context_array[0]["content"][i]["function"][1]})
+            print(f"Assistant content: {json.dumps(context_array.context[0].content[i], indent=2)}")
+            if context_array.context[0].content[i].function and context_array.context[0].content[i].function != [""]:
+                print(f"Function detected: {context_array.context[0].content[i].function}")
+                chat_history.append({"role": "function","name":context_array.context[0].content[i].function[0], "content": context_array.context[0].content[i].function[1]})
             if i != 0:
-                chat_history.append({"role": "assistant", "content":context_array[0]["content"][i]["message"]})
+                chat_history.append({"role": "assistant", "content":context_array.context[0].content[i].message})
         
         print("\n=== TRANSFORM USER MESSAGE: Final chat history ===")
         print(json.dumps(chat_history, indent=2))
@@ -614,17 +614,18 @@ class ConversationHandler:
                 final_message = final_completion.choices[0].message.content
                 print(final_message)
                 return_value = {"message": final_message, "function": [function_name, json.dumps(result)]}
-                self.chat_history["context"][0]["content"][0] = return_value
+                self.chat_history.context[0].content[0] = return_value
                 
             except Exception as e:
                 print(f"ERROR during second API call: {str(e)}")
                 print(f"Error type: {type(e)}")
                 return_value = [{"message": f"Error processing function result: {str(e)}", "function": [function_name, json.dumps(result)]}]
-                self.chat_history["context"][0]["content"][0] = return_value
+                self.chat_history.context[0].content[0] = return_value
         else:
             print("=== PROCESS USER MESSAGE: No function call needed ===")
             content = {"message": response_content , "function": [""]}
-            self.chat_history["context"][0]["content"][0] = content
+            self.chat_history.context[0].content[0] = content
        
+        print(self.chat_history)    
         return self.chat_history
             

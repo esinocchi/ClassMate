@@ -84,10 +84,10 @@ async def mainPipelineEntry(contextArray: ContextObject):
             
 
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-        context_data = contextArray["context"]
+        context_data = contextArray.context
         user_context = context_data[1]
-        user_id = user_context['id']
-        user_domain = user_context['domain']
+        user_id = user_context.id
+        user_domain = user_context.domain
         
         handler = DataHandler(user_id, user_domain)
         user_data = handler.grab_user_data()
@@ -98,11 +98,11 @@ async def mainPipelineEntry(contextArray: ContextObject):
         
         courses = {}  # Changed to a single dictionary
 
-        for class_info in user_context['classes']:
-            if class_info['selected'] == True:
+        for class_info in user_context.classes:
+            if class_info.selected == True:
                 # Remove 'course_' prefix from ID and store as a simple key-value pair
-                course_id = class_info['id'].replace('course_', '')
-                courses[class_info['name']] = course_id
+                course_id = class_info.id.replace('course_', '')
+                courses[class_info.name] = course_id
         
         print("=== STAGE 3: Initializing ConversationHandler ===")
         conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray)
