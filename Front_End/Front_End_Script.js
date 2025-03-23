@@ -1,4 +1,4 @@
-dataHolder = [{"role": "assistant", "content": [{"message": "", "function": [""]}]},{"role": "user", "user_id": "holder", "domain": getURL(), "recentDocs": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": ""}]}];
+dataHolder = [{"role": "assistant", "content": [{"message": "", "function": [""]}]},{"role": "user", "user_id": "holder", "domain": getURL(), "recentDocs": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": false}]}];
 
 // Create a container div for the box
 let closed = true;
@@ -26,6 +26,7 @@ const imageUrl3 = chrome.runtime.getURL('images/settings.png');
 chat.innerHTML = `
 <div class="header">
     <img src="${imageUrl3}" alt="NotFound" id="settingsIcon" height="20px" width="20px">
+    <button id="clearPromptButton" class="settingsChildButton">New Chat</button>
     <span id="titleText">What can we help you with?</span>
 </div>
 <div id="dynamicBoxesContainer"></div>
@@ -51,7 +52,6 @@ settings.innerHTML = `
 <div id="settingsContainer">
     <div class="settingsChild">
         <span id="clearPromptLabel" class="settingsChildLabel">Clear Prompt History:</span>
-        <button id="clearPromptButton" class="settingsChildButton">Clear History</button>
     </div>
     <div id="classesBox">
         <div class="header">
@@ -78,7 +78,7 @@ saveClassesButton.addEventListener("click", () => {
         states[classID] = checkbox.checked; // Store checkbox state as boolean
     });
 
-    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+    chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
         let Context = result.Context_CanvasAI || dataHolder;
 
         for (let i = Context[1].classes.length - 1; i >= 0; i--) {
@@ -87,6 +87,8 @@ saveClassesButton.addEventListener("click", () => {
         }
         chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
         console.log(Context);
+
+        await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes);
     }); 
 
 
@@ -424,7 +426,7 @@ async function mainPipelineEntry(contextJSON) {
 }
 
 async function retrieveClassList(studentID, domain) {
-    console.log("\retrieving Classes\n")
+    console.log("\nretrieving Classes\n")
     //returned in the form dictionary {"id": "classNumber", "name": "className", "selected": false}
     try {
         const url = new URL("https://canvasclassmate.me/endpoints/pullCourses");
@@ -472,6 +474,40 @@ async function retrieveID(domain) {
     }
 }
 
-async function pushClasses(){
+async function pushClasses(id, domain, classes){
+    if (isUpdating(id, domain) == false) {
+        try {
+            //add new pydantic model for pass
+            const requestBody = {
+                user_id: id,
+                domain: domain,
+                classes: classes
+            };
+            const response = await fetch(`https://canvasclassmate.me/endpoints/pushCourses`,{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', 
+                },
+                body: JSON.stringify(requestBody),
+            });
 
+            return response
+        } catch (error) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+}
+
+async function isUpdating(user_id, domain){
+    try {
+            const response = await fetch(`https://canvasclassmate.me/endpoints/check_update_status?user_id=${user_id}&domain=${domain}`);
+            const updating = await response.json(); // Add await here
+            console.log(updating);
+            return updating
+    } catch (error) {
+        return false;
+    }
 }

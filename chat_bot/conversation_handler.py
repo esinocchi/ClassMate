@@ -4,6 +4,7 @@ from openai import OpenAI
 import json
 import sys
 from pathlib import Path
+import tzlocal
 from datetime import datetime, timezone
 from typing import List, Optional, Literal, Union
 from pydantic import BaseModel, Field
@@ -47,7 +48,6 @@ load_dotenv()
 
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
-canvas_api_url = os.getenv("CANVAS_API_URL")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
 # Pydantic classes for structured output
@@ -55,13 +55,13 @@ canvas_api_token = os.getenv("CANVAS_API_KEY")
 # Define the complete function response model
 
 class ConversationHandler:
-    def __init__(self, student_name, student_id, courses, domain, chat_history):
+    def __init__(self, student_name, student_id, courses, domain, chat_history,canvas_api_token):
         self.student_name = student_name
         self.student_id = student_id
         self.courses = courses
         self.domain = domain
         self.chat_history = chat_history
-        self.canvas_api_url = canvas_api_url
+        self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
         
@@ -182,7 +182,7 @@ class ConversationHandler:
                     "properties": {
                         "context_code": {
                             "type": "string",
-                            "description": "This should always be the students user id. This should be in the form user_idnumbe"
+                            "description": "This should always be the students user id. This should be in the form "
                         },
                         "title": {
                             "type": "string",
@@ -230,7 +230,7 @@ class ConversationHandler:
                             "type": "boolean",
                             "description": "If true, an increasing counter will be appended to the event title for each duplicate (e.g., Event 1, Event 2, etc.)."
                         },
-                        "domain": {
+                        "canvas_base_url": {
                             "type": "string",
                             "description": "This should the provided domain of the user"
                         }
@@ -238,7 +238,8 @@ class ConversationHandler:
                     "required": [
                         "context_code",
                         "title",
-                        "start_at"
+                        "start_at",
+                        "canvas_base_url"
                     ]
                 }
             },
@@ -314,14 +315,15 @@ class ConversationHandler:
         return functions
     
     def define_system_context(self):
-        current_time = datetime.now(timezone.utc).isoformat()
+        local_tz = tzlocal.get_localzone()
+        current_time = datetime.now(local_tz).isoformat()
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
 
             [STUDENT INFORMATION & RESOURCES]
             - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
-            - Domain: {self.domain}
+            - The user's canvas base url: {self.domain}
             - Valid Item Types: {self.valid_types}
             - Time Range Definitions: {self.time_range_definitions}
 
@@ -611,9 +613,8 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
-            print(f"Updated chat context with function result. New length: {len(chat)}")
-            print("goon")
-            print(chat)
+            
+           
             try:
                 # Context is then passed back to the api in order for it to respond to the user
                 print("About to make second OpenAI API call")
@@ -625,12 +626,12 @@ class ConversationHandler:
                 )
                 print("Second API call completed successfully")
                 
-                print("\n=== Second API Response Details ===")
+                """print("\n=== Second API Response Details ===")
                 print("Complete response object:")
                 print(f"Response message: {final_completion.choices[0].message}")
                 print(f"Response content: {final_completion.choices[0].message.content}")
                 print(f"Response message dict: {vars(final_completion.choices[0].message)}")
-                print("================================\n")
+                print("================================\n")"""
                 final_message = final_completion.choices[0].message.content
                 print(final_message)
                 return_value = {"message": final_message, "function": [function_name, json.dumps(result)]}

@@ -81,6 +81,10 @@
     font-weight: bold;
 }
 
+#ChatWindow .header {
+    justify-content: left;
+}
+
 #ChatWindow .footer {
     height: auto;
     width: 100%;
