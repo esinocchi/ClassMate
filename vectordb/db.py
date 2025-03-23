@@ -37,15 +37,19 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 from dotenv import load_dotenv
 import chromadb
-from chromadb.utils import embedding_functions
 import requests
 from datetime import datetime, timedelta, timezone
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+import asyncio
+import aiohttp
+import re  # Adding import for re module used in _parse_html_content
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
 from backend.data_retrieval.get_all_user_data import extract_text_and_images
+from vectordb.embedding_model import create_hf_embedding_function
 
 
 # Load environment variables
@@ -63,7 +67,7 @@ DEFAULT_CACHE_DIR = "chroma_data/"
 DEFAULT_COLLECTION_NAME = "canvas_embeddings"
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = None):
+    def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
@@ -71,6 +75,7 @@ class VectorDatabase:
             json_file_path: Path to the JSON file containing the documents.
             cache_dir: Directory to store ChromaDB data.
             collection_name: Name of the ChromaDB collection. If None, will use user_id from the json file.
+            hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
         self.cache_dir = cache_dir
@@ -91,14 +96,18 @@ class VectorDatabase:
         # Initialize ChromaDB client to store files in disk in cache_dir
         self.client = chromadb.PersistentClient(path=cache_dir)
         
-        # Initialize embedding function (using the same model as before: all-MiniLM-L6-v2)
-        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        # Use Hugging Face API for embeddings with multilingual-e5-large-instruct model
+        self.hf_api_token = hf_api_token
+        if not self.hf_api_token:
+            raise ValueError("Hugging Face API token is required. Provide it as a parameter or set HUGGINGFACE_API_TOKEN environment variable.")
+        
+        # Custom embedding function using Hugging Face API
+        self.embedding_function = create_hf_embedding_function(self.hf_api_token)
         
         self.documents = [] # stores documents
         self.document_map = {} # Allows O(1) lookup of documents by ID
         self.course_map = {} # information about courses
+        self.syllabus_map = {} # information about syllabi
         
         try: # Attempts to retrieve existing collection
             self.collection = self.client.get_collection(
@@ -123,7 +132,7 @@ class VectorDatabase:
             hnsw:search_ef: determines the size of the dynamic list (default: 100)
             hnsw:m: determines the number of neighbors (edges) each node in the graph can have (default: 16)
             '''
-    
+
     def _preprocess_text_for_embedding(self, doc: Dict[str, Any]) -> str:
         """
         Preprocess document text for embedding.
@@ -329,8 +338,10 @@ class VectorDatabase:
         normalized = normalized.replace('\u2013', '-').replace('\u2014', '-')
         
         return normalized
+    
+    
         
-    def process_data(self, force_reload: bool = False) -> bool:
+    async def process_data(self, force_reload: bool = False) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
@@ -356,16 +367,60 @@ class VectorDatabase:
         user_metadata = data.get('user_metadata', {})
         logger.info(f"Processing data for user ID: {user_metadata.get('id')}")
         
-        # Extract courses and build course map
+        # Extract courses and build course and syllabus maps
         courses = data.get('courses', [])
         for course in courses:
             course_id = str(course.get('id'))
+            syllabus = str(course.get('syllabus_body'))
             if course_id:
                 self.course_map[course_id] = course
-        
+            if syllabus:
+                self.syllabus_map[course_id] = syllabus
+
         ids = [] # list of document IDs
         texts = [] # list of preprocessed text for each document
         metadatas = [] # list of metadata for each document
+        
+        # Add syllabi as documents
+        for course_id, syllabus in self.syllabus_map.items():
+            if not syllabus or syllabus == "None":
+                continue
+            
+            # Parse the HTML content to extract plain text
+            parsed_syllabus = self._parse_html_content(syllabus)
+            if not parsed_syllabus:
+                logger.warning(f"No content extracted from syllabus for course {course_id}")
+                continue
+            
+            # Generate a unique ID for the syllabus
+            syllabus_id = f"syllabus_{course_id}"
+            
+            # Create a syllabus document
+            syllabus_doc = {
+                'id': syllabus_id,
+                'type': 'syllabus',
+                'course_id': course_id,
+                'title': f"Syllabus for {self.course_map[course_id].get('name', f'Course {course_id}')}",
+                'content': parsed_syllabus  # Use the parsed content
+            }
+            
+            # Store document in memory
+            self.documents.append(syllabus_doc)
+            self.document_map[syllabus_id] = syllabus_doc
+            
+            # Prepare for ChromaDB
+            ids.append(syllabus_id)
+            texts.append(self._preprocess_text_for_embedding(syllabus_doc))
+            
+            # Create metadata
+            metadata = {
+                'id': syllabus_id,
+                'type': 'syllabus',
+                'course_id': course_id
+            }
+            
+            metadatas.append(metadata)
+            logger.info(f"Added syllabus for course {course_id}")
         
         # Process all document types
         document_types = {
@@ -409,45 +464,57 @@ class VectorDatabase:
                 if item.get('module_id'):
                     metadata['module_id'] = str(item['module_id'])
                 
-                # Add type-specific metadata fields
+                # Handle event course_id from context_code
+                if doc_type == 'event' and 'context_code' in item and item['context_code'].startswith('course_'):
+                    course_id = item['context_code'].replace('course_', '')
+                    item['course_id'] = course_id
+                    metadata['course_id'] = str(course_id)
+                
+                # Add date fields to metadata based on document type
+                date_field_mapping = {
+                    'assignment': ('due_at', 'due_timestamp'),
+                    'announcement': ('posted_at', 'posted_timestamp'),
+                    'quiz': ('due_at', 'due_timestamp'),
+                    'event': ('start_at', 'start_timestamp'),
+                    'file': ('updated_at', 'updated_timestamp')
+                }
+                
+                if doc_type in date_field_mapping:
+                    source_field, target_field = date_field_mapping[doc_type]
+                    if item.get(source_field):
+                        try:
+                            date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
+                            metadata[target_field] = int(date_obj.timestamp())
+                        except (ValueError, AttributeError):
+                            pass
+                
+                # Add file-specific metadata
                 if doc_type == 'file':
-                        metadata['folder_id'] = str(item.get('folder_id', ''))
-                    
-                elif doc_type in ['announcement', 'assignment', 'quiz']:
-                    if item.get('module_id'):
-                        metadata['module_id'] = str(item.get('module_id', ''))
-                    
-                elif doc_type == 'event':
-                    # Parse course_id from context_code if available
-                    if 'context_code' in item and item['context_code'].startswith('course_'):
-                        course_id = item['context_code'].replace('course_', '')
-                        item['course_id'] = course_id
-                        metadata['course_id'] = str(course_id)
+                    metadata['folder_id'] = str(item.get('folder_id', ''))
                 
                 metadatas.append(metadata)
         
         # Build document relations
         self._build_document_relations(self.documents)
         
-        # Add documents to ChromaDB
-        if ids:
-            try:
-                self.collection.add(
-                    ids=ids,
-                    documents=texts,
-                    metadatas=metadatas
-                )
-                logger.info(f"Added {len(ids)} documents to ChromaDB")
-            except Exception as e:
-                logger.error(f"Error adding documents to ChromaDB: {e}")
-                return False
+        # Generate embeddings first
+        embeddings = self.embedding_function(texts)
+        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
+
+        # Then add to collection with explicit embeddings
+        self.collection.add(
+            ids=ids,
+            embeddings=embeddings,  # Pass pre-computed embeddings
+            documents=texts,
+            metadatas=metadatas
+        )
         
         # Save to cache
         self._save_to_cache()
         
         return True
     
-    def _load_document_metadata(self):
+    async def _load_document_metadata(self):
         """
         Load document metadata from JSON file without reprocessing embeddings.
         """
@@ -602,7 +669,7 @@ class VectorDatabase:
         
         return related_docs
     
-    def extract_file_content(self, doc: Dict[str, Any]) -> str:
+    async def extract_file_content(self, doc: Dict[str, Any]) -> str:
         """
         Extract content from a file URL when needed.
         
@@ -628,13 +695,14 @@ class VectorDatabase:
         # Try to download the file
         try:
             logger.info(f"Downloading file: {doc.get('display_name', '')}")
-            response = requests.get(url)
-            if response.status_code != 200:
-                logger.warning(f"Failed to download file {url}: {response.status_code}")
-                return ""
-            
-            # Get the raw file content as bytes
-            file_bytes = response.content
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        logger.warning(f"Failed to download file {url}: {response.status}")
+                        return ""
+                    
+                    # Get the raw file content as bytes
+                    file_bytes = await response.read()
             
             # Use the imported extract_text_and_images function
             extracted_text = extract_text_and_images(file_bytes, file_extension)
@@ -644,158 +712,161 @@ class VectorDatabase:
             logger.error(f"Error downloading or processing file {url}: {e}")
             return "" 
     
-    def _filter_by_time(self, doc, search_parameters):
+    
+
+    def _build_time_range_filter(self, search_parameters):
         """
-        Filter a document based on time range from search parameters.
+        Build time range filter conditions for ChromaDB query.
         
         Args:
-            doc: Document dictionary to filter
             search_parameters: Dictionary containing search parameters
             
         Returns:
-            True if document passes the filter, False if it should be skipped
+            List of time range filter conditions to be added to the main where clause
         """
-        if not search_parameters or "time_range" not in search_parameters:
-            return True  # No time filter specified, so document passes
+        if not search_parameters or "time_range" not in search_parameters or not search_parameters["time_range"]:
+            return []
         
         time_range = search_parameters["time_range"]
-        if not time_range:
-            return True  # No time range specified, so document passes
-        
-        # Get the relevant date field based on document type
-        date_field_str = None
-        if doc.get('type') == 'assignment':
-            date_field_str = doc.get('due_at')
-        elif doc.get('type') == 'announcement':
-            date_field_str = doc.get('posted_at')
-        elif doc.get('type') == 'quiz':
-            date_field_str = doc.get('due_at')
-        elif doc.get('type') == 'event':
-            date_field_str = doc.get('start_at')
-        elif doc.get('type') == 'file':
-            date_field_str = doc.get('updated_at')
-        
-        # Skip if no date field available
-        if not date_field_str:
-            return True
-        
-        # Convert the date string to datetime object if available
-        try:
-            # Convert ISO format to datetime (handling the 'Z' UTC indicator)
-            date_field = datetime.fromisoformat(date_field_str.replace('Z', '+00:00'))
-        except (ValueError, AttributeError) as e:
-            logger.warning(f"Error parsing date {date_field_str} for doc {doc.get('id')}: {e}")
-            return False
-        
-        # Ensure date has UTC timezone information for proper comparison
-        if date_field.tzinfo is None:
-            date_field = date_field.replace(tzinfo=timezone.utc)
-        
-        # Current time as reference
         current_time = datetime.now(timezone.utc)
+        current_timestamp = int(current_time.timestamp())
         
-        # Apply filter based on time_range
+        # List of all possible timestamp fields across different document types
+        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        
+        range_conditions = []
+        
         if time_range == "FUTURE":
-            if date_field <= current_time:
-                logger.info(f"Skipping doc {doc.get('id')} (name: {doc.get('name', '')}) because date {date_field} is not in the future")
-                return False
+            for field in timestamp_fields:
+                range_conditions.append({field: {"$gte": current_timestamp}}) # $gte: >=
+                # filter: item >= current_timestamp
+            
         elif time_range == "RECENT_PAST":
-            seven_days_ago = current_time - timedelta(days=7)
-            if date_field > current_time or date_field < seven_days_ago:
-                logger.info(f"Skipping doc {doc.get('id')} (name: {doc.get('name', '')}) because date {date_field} is not in the recent past")
-                return False
-        elif time_range == "EXTENDED_PAST":
-            thirty_days_ago = current_time - timedelta(days=30)
-            if date_field > current_time or date_field < thirty_days_ago:
-                logger.info(f"Skipping doc {doc.get('id')} (name: {doc.get('name', '')}) because date {date_field} is not in the extended past")
-                return False
-        
-        return True
+            fourteen_days_ago = current_time - timedelta(days=14)
+            fourteen_days_ago_timestamp = int(fourteen_days_ago.timestamp())
+            
+            for field in timestamp_fields:
+                range_conditions.append({
+                    "$and": [
+                        {field: {"$lte": current_timestamp}}, # $lte: <=
+                        {field: {"$gte": fourteen_days_ago_timestamp}} # $gte: >=
+                    ]
+                })
+                # filter: item <= current_timestamp AND item >= fourteen_days_ago_timestamp
 
-    def _filter_by_specific_dates(self, doc, search_parameters):
+        elif time_range == "EXTENDED_PAST":
+            # Any time before current date (no lower bound)
+            for field in timestamp_fields:
+                range_conditions.append({field: {"$lte": current_timestamp}}) # $lte: <=
+                # filter: item <= current_timestamp
+        
+        # Return time range condition or empty list if no valid range
+        return [{"$or": range_conditions}] if range_conditions else []
+
+    def _build_specific_dates_filter(self, search_parameters):
         """
-        Filter a document based on specific dates from search parameters.
+        Build specific dates filter conditions for ChromaDB query.
         
         Args:
-            doc: Document dictionary to filter
             search_parameters: Dictionary containing search parameters
             
         Returns:
-            True if document passes the filter, False if it should be skipped
+            List of specific dates filter conditions to be added to the main where clause
         """
         if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
-            return True  # No specific dates filter specified, so document passes
+            return []
         
-        # Get the relevant date field based on document type
-        date_field_str = None
-        if doc.get('type') == 'assignment':
-            date_field_str = doc.get('due_at')
-        elif doc.get('type') == 'announcement':
-            date_field_str = doc.get('posted_at') 
-        elif doc.get('type') == 'quiz':
-            date_field_str = doc.get('due_at')
-        elif doc.get('type') == 'event':
-            date_field_str = doc.get('start_at')
-        elif doc.get('type') == 'file':
-            date_field_str = doc.get('updated_at')
-        
-        # Skip if no date field available
-        if not date_field_str:
-            return True
-        
-        # Convert the date string to datetime object if available
-        try:
-            # Convert ISO format to datetime
-            date_field = datetime.fromisoformat(date_field_str.replace('Z', '+00:00'))
-        except (ValueError, AttributeError) as e:
-            logger.warning(f"Error parsing date {date_field_str} for specific date check: {e}")
-            return False
-        
-        # Parse specific dates
         specific_dates = []
         for date_str in search_parameters["specific_dates"]:
             try:
-                # Convert specific dates to datetime objects (assuming YYYY-MM-DD format)
                 specific_date = datetime.strptime(date_str, "%Y-%m-%d")
                 specific_dates.append(specific_date)
             except ValueError:
                 logger.warning(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
         
         if not specific_dates:
-            return True  # No valid specific dates to filter on
+            return []  # No valid specific dates to filter on
+        
+        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        date_conditions = []
         
         if len(specific_dates) == 1:
-            # Single date = exact match
+            # Single date = exact match (within day)
             specific_date = specific_dates[0]
-            date_matches = (date_field.year == specific_date.year and 
-                            date_field.month == specific_date.month and 
-                            date_field.day == specific_date.day)
+            start_timestamp = int(specific_date.replace(hour=0, minute=0, second=0).timestamp())
+            end_timestamp = int(specific_date.replace(hour=23, minute=59, second=59).timestamp())
             
-            if not date_matches:
-                logger.info(f"Skipping doc {doc.get('id')} (name: {doc.get('name', '')}) because date {date_field} does not match the specific date {specific_date}")
-                return False
-        
+            for field in timestamp_fields:
+                date_conditions.append({
+                    "$and": [
+                        {field: {"$gte": start_timestamp}}, # $gte: >=
+                        {field: {"$lte": end_timestamp}} # $lte: <=
+                    ]
+                })
+                # filter: item >= start_timestamp AND item <= end_timestamp
+                # item must be on EXACT specific_date when filtering by a single date
+
         elif len(specific_dates) >= 2:
-            # Multiple dates = range (assume first is start, last is end)
+            # Date range
             start_date = min(specific_dates)
             end_date = max(specific_dates)
             
-            # Add timezone to match date_field
-            if date_field.tzinfo is not None:
-                start_date = start_date.replace(tzinfo=date_field.tzinfo)
-                end_date = end_date.replace(tzinfo=date_field.tzinfo)
+            start_timestamp = int(start_date.replace(hour=0, minute=0, second=0).timestamp())
+            end_timestamp = int(end_date.replace(hour=23, minute=59, second=59).timestamp())
             
-            # Set end_date to end of the day (23:59:59)
-            end_date = end_date.replace(hour=23, minute=59, second=59)
-            
-            # Check if date_field is within range
-            if date_field < start_date or date_field > end_date:
-                logger.info(f"Skipping doc {doc.get('id')} (name: {doc.get('name', '')}) because date {date_field} is not within range {start_date} to {end_date}")
-                return False
-            else:
-                logger.info(f"Doc {doc.get('id')} (name: {doc.get('name', '')}) passed date range filter with date {date_field}")
+            for field in timestamp_fields:
+                date_conditions.append({
+                    "$and": [
+                        {field: {"$gte": start_timestamp}}, # $gte: >=
+                        {field: {"$lte": end_timestamp}} # $lte: <=
+                    ]
+                })
+                # filter: item >= start_timestamp AND item <= end_timestamp
+                # item must be between start_date and end_date when filtering by a date range
         
-        return True
+        # Return date condition or empty list if no valid conditions
+        return [{"$or": date_conditions}] if date_conditions else []
+
+    def _build_course_and_type_filter(self, search_parameters):
+        """
+        Build course and document type filter conditions for ChromaDB query.
+        
+        Args:
+            search_parameters: Dictionary containing search parameters
+            
+        Returns:
+            List of course and type filter conditions to be added to the main where clause
+        """
+        conditions = []
+        
+        # Add course filter
+        if "course_id" in search_parameters:
+            course_id = search_parameters["course_id"]
+            if course_id and course_id != "all_courses":
+                conditions.append({"course_id": {"$eq": str(course_id)}}) # $eq: ==
+                # filter: item.course_id == course_id
+                
+        # Add document type filter
+        if "item_types" in search_parameters:
+            item_types = search_parameters["item_types"]
+            if item_types and isinstance(item_types, list) and len(item_types) > 0:
+                # Map item types to our internal types
+                type_mapping = {
+                    "assignment": "assignment",
+                    "file": "file",
+                    "quiz": "quiz",
+                    "announcement": "announcement",
+                    "event": "event",
+                    "syllabus": "syllabus"
+                }
+                
+                normalized_types = [type_mapping[item_type] for item_type in item_types 
+                                    if item_type in type_mapping]
+                if normalized_types:
+                    conditions.append({"type": {"$in": normalized_types}}) # $in: in
+                    # filter: item.type in item_types
+
+        return conditions
 
     def _build_chromadb_query(self, search_parameters):
         """
@@ -813,29 +884,18 @@ class VectorDatabase:
         
         # Build ChromaDB where clause with proper operator
         conditions = []
-        if "course_id" in search_parameters:
-            course_id = search_parameters["course_id"]
-            if course_id and course_id != "all_courses":
-                conditions.append({"course_id": {"$eq": str(course_id)}})
         
-        # Handle document type filtering
-        if "item_types" in search_parameters:
-            item_types = search_parameters["item_types"]
-            if item_types and isinstance(item_types, list) and len(item_types) > 0:
-                # Map item types to our internal types
-                type_mapping = {
-                    "assignment": "assignment",
-                    "file": "file",
-                    "quiz": "quiz",
-                    "announcement": "announcement",
-                    "event": "event"
-                }
-                
-                normalized_types = [type_mapping[item_type] for item_type in item_types 
-                                    if item_type in type_mapping]
-                
-                if normalized_types:
-                    conditions.append({"type": {"$in": normalized_types}})
+        # Add course and document type filters
+        course_type_conditions = self._build_course_and_type_filter(search_parameters)
+        conditions.extend(course_type_conditions)
+        
+        # Add time range filter
+        time_range_conditions = self._build_time_range_filter(search_parameters)
+        conditions.extend(time_range_conditions)
+        
+        # Add specific dates filter
+        specific_dates_conditions = self._build_specific_dates_filter(search_parameters)
+        conditions.extend(specific_dates_conditions)
         
         # Apply the where clause if there are conditions
         query_where = None
@@ -846,7 +906,7 @@ class VectorDatabase:
         
         return query_where, normalized_query
 
-    def _execute_chromadb_query(self, query_text, query_where, top_k):
+    async def _execute_chromadb_query(self, query_text, query_where, top_k):
         """
         Execute a query against ChromaDB.
         
@@ -859,9 +919,12 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            results = self.collection.query(
+            logger.info(f"Executing ChromaDB query with query_text: {query_text}")
+            # Use asyncio to prevent blocking the event loop during the ChromaDB query
+            results = await asyncio.to_thread(
+                self.collection.query,
                 query_texts=[query_text],
-                n_results=top_k * 3,  # Get more results for post-processing
+                n_results=top_k,
                 where=query_where,
                 include=["distances", "documents", "metadatas"]
             )
@@ -875,9 +938,10 @@ class VectorDatabase:
                 try:
                     logger.info("Trying query with only course_id filter...")
                     simplified_where = {"course_id": query_where["course_id"]}
-                    results = self.collection.query(
+                    results = await asyncio.to_thread(
+                        self.collection.query,
                         query_texts=[query_text],
-                        n_results=top_k * 3,
+                        n_results=top_k,
                         where=simplified_where,
                         include=["distances", "documents", "metadatas"]
                     )
@@ -888,9 +952,10 @@ class VectorDatabase:
             # Last resort: try with no filters
             try:
                 logger.info("Trying query with no filters...")
-                results = self.collection.query(
+                results = await asyncio.to_thread(
+                    self.collection.query,
                     query_texts=[query_text],
-                    n_results=top_k * 3,
+                    n_results=top_k,
                     include=["distances", "documents", "metadatas"]
                 )
                 return results
@@ -987,7 +1052,7 @@ class VectorDatabase:
                     'is_related': True
                 })
 
-    def search(self, search_parameters: Optional[dict] = None, top_k: int = 5,
+    async def search(self, search_parameters: Optional[dict] = None, top_k: int = 5,
                include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
         """
         Search for documents similar to the query.
@@ -1007,7 +1072,7 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        # Build query for ChromaDB
+        # Build query for ChromaDB including time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
         
         # Log the search parameters for debugging
@@ -1015,7 +1080,7 @@ class VectorDatabase:
         logger.debug(f"Search parameters: {search_parameters}")
         
         # Execute ChromaDB query
-        results = self._execute_chromadb_query(normalized_query, query_where, top_k)
+        results = await self._execute_chromadb_query(normalized_query, query_where, top_k)
         
         # Process results
         search_results = []
@@ -1029,33 +1094,25 @@ class VectorDatabase:
             if not doc:
                 continue
             
-            # Apply time-based filtering
-            if not self._filter_by_time(doc, search_parameters):
-                continue
-            
-            # Apply specific date filtering
-            if not self._filter_by_specific_dates(doc, search_parameters):
-                continue
-            
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
             
             # Skip results below minimum score
             if similarity < minimum_score:
-                logger.info(f"Skipping doc {doc_id} (name: {doc.get('name', '')}) because similarity {similarity} is below threshold {minimum_score}")
+                logger.info(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
                 continue
             
             # Extract content for files if needed
             if doc.get('type') == 'file' and ('content' not in doc or not doc['content']):
                 try:
-                    doc['content'] = self.extract_file_content(doc)
+                    doc['content'] = await self.extract_file_content(doc)
                     if doc['content']:
                         logger.info(f"Extracted content for file: {doc.get('display_name', '')}")
                 except Exception as e:
                     logger.error(f"Failed to extract content: {e}")
             
             # Add to results
-            logger.info(f"Adding doc {doc_id} (name: {doc.get('name', '')}) to results with similarity {similarity}")
+            logger.info(f"Adding doc {doc_id} to results with similarity {similarity}")
             search_results.append({
                 'document': doc,
                 'similarity': similarity
@@ -1070,7 +1127,7 @@ class VectorDatabase:
         
         return combined_results[:top_k]
     
-    def get_available_courses(self) -> List[Dict[str, Any]]:
+    async def get_available_courses(self) -> List[Dict[str, Any]]:
         """
         Get list of available courses.
         
@@ -1089,16 +1146,17 @@ class VectorDatabase:
             })
         return courses
     
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         """
         Clear the ChromaDB collection.
         """
         try:
-            self.client.delete_collection(self.collection_name)
+            await asyncio.to_thread(self.client.delete_collection, self.collection_name)
             logger.info(f"Deleted collection: {self.collection_name}")
             
             # Recreate the collection
-            self.collection = self.client.create_collection(
+            self.collection = await asyncio.to_thread(
+                self.client.create_collection,
                 name=self.collection_name,
                 embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
@@ -1112,3 +1170,71 @@ class VectorDatabase:
             
         except Exception as e:
             logger.error(f"Error clearing cache: {e}")
+
+    def _parse_html_content(self, html_content: str) -> str:
+        """
+        Parse HTML content to extract plain text.
+        
+        Args:
+            html_content: HTML content string to parse
+            
+        Returns:
+            Plain text extracted from HTML content
+        """
+        if not html_content or html_content == "None":
+            return ""
+        
+        try:
+            from html.parser import HTMLParser
+            
+            class HTMLTextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.text_parts = []
+                    self.in_script = False
+                    self.in_style = False
+                    
+                def handle_starttag(self, tag, attrs):
+                    if tag.lower() == "script":
+                        self.in_script = True
+                    elif tag.lower() == "style":
+                        self.in_style = True
+                    elif tag.lower() == "br" or tag.lower() == "p":
+                        self.text_parts.append("\n")
+                    elif tag.lower() == "li":
+                        self.text_parts.append("\n• ")
+                
+                def handle_endtag(self, tag):
+                    if tag.lower() == "script":
+                        self.in_script = False
+                    elif tag.lower() == "style":
+                        self.in_style = False
+                    elif tag.lower() in ["div", "h1", "h2", "h3", "h4", "h5", "h6", "tr"]:
+                        self.text_parts.append("\n")
+                
+                def handle_data(self, data):
+                    if not self.in_script and not self.in_style:
+                        # Only append non-empty strings after stripping whitespace
+                        text = data.strip()
+                        if text:
+                            self.text_parts.append(text)
+            
+                def get_text(self):
+                    # Join all text parts and normalize whitespace
+                    text = " ".join(self.text_parts)
+                    # Replace multiple whitespace with a single space
+                    text = re.sub(r'\s+', ' ', text)
+                    # Replace multiple newlines with a single newline
+                    text = re.sub(r'\n+', '\n', text)
+                    return text.strip()
+            
+            extractor = HTMLTextExtractor()
+            extractor.feed(html_content)
+            return extractor.get_text()
+            
+        except Exception as e:
+            logger.error(f"Error parsing HTML content: {e}")
+            # Fallback to a simple tag stripping approach if the parser fails
+            text = re.sub(r'<[^>]*>', ' ', html_content)
+            text = re.sub(r'\s+', ' ', text)
+            return text.strip()

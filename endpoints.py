@@ -7,8 +7,8 @@ from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
 import aiohttp
 from dotenv import load_dotenv
-import os
 import time
+import json
 load_dotenv()
 
 app = FastAPI()
@@ -35,7 +35,7 @@ class ContextEntry(BaseModel):
 class ClassesDict(BaseModel):
     id: str
     name: str
-    selected: str
+    selected: bool
 
 class ContextEntry2(BaseModel):
     role: str
@@ -75,18 +75,17 @@ async def mainPipelineEntry(contextArray: ContextObject):
     This endpoint is called when the user sends a message to the chatbot.
     """
    
-    #[{"role": "assistant", "content": [{"message":"", "function": ""}]},
+    #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     #chat_requirements = check_chat_requirements(contextArray)
-    chat_requirements = check_chat_requirements(contextArray)
-    
+    chat_requirements = "None"
 
     if chat_requirements == "None":
             
 
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-        context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
-        user_context = context_data['context'][1]
+        context_data = contextArray["context"]
+        user_context = context_data[1]
         user_id = user_context['id']
         user_domain = user_context['domain']
         
@@ -100,13 +99,13 @@ async def mainPipelineEntry(contextArray: ContextObject):
         courses = {}  # Changed to a single dictionary
 
         for class_info in user_context['classes']:
-            if class_info['selected'] == 'true':
+            if class_info['selected'] == True:
                 # Remove 'course_' prefix from ID and store as a simple key-value pair
                 course_id = class_info['id'].replace('course_', '')
                 courses[class_info['name']] = course_id
         
         print("=== STAGE 3: Initializing ConversationHandler ===")
-        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain)
+        conversation_handler = ConversationHandler(student_name=user_name, student_id=user_id, courses=courses,domain=user_domain,chat_history=contextArray)
         
         print("=== STAGE 4: Transforming user message ===")
         chat_history = conversation_handler.transform_user_message(context_data)
@@ -213,7 +212,7 @@ async def pushCourses(user_id, domain, courses: List[ClassesDict]):
 
 
 # call this endpoint to force a user to re-authenticate whenever browser cache is empty
-@app.get('/endpoints/initate_user')
+@app.get('/endpoints/initiate_user')
 async def initate_user(domain: str):
     """
     This endpoint is used to force a user to re-authenticate and generate a new token.
@@ -239,6 +238,8 @@ async def initate_user(domain: str):
     #get user id from canvas api
     async with aiohttp.ClientSession() as session:
     
+        print(token)
+
         async with session.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"}) as response:
             if response.status == 200:
                 user_info = await response.json()
