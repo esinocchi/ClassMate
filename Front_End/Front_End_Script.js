@@ -1,4 +1,4 @@
-dataHolder = [{"role": "assistant", "content": [{"message": "", "function": [""]}]},{"role": "user", "id": "", "domain": getURL(), "recentDocs": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": ""}]}];
+dataHolder = [{"role": "assistant", "content": [{"message": "", "function": [""]}]},{"role": "user", "user_id": "holder", "domain": getURL(), "recentDocs": [""], "content": [""], "classes": [{"id": "", "name": "", "selected": ""}]}];
 
 // Create a container div for the box
 let closed = true;
@@ -59,11 +59,36 @@ settings.innerHTML = `
         </div>
         <div id="classesHolder">
         </div>
+        <div class="footer">
+            <button id="saveClassesButton" class="settingsChildButton">Save Class Selections</button>
+        </div>
     </div>
 </div>
 `
 
 document.body.appendChild(settings)
+
+saveClassesButton.addEventListener("click", () => {
+    const checkboxes = document.querySelectorAll("#classesHolder input[type='checkbox']");
+    const states = [];
+
+    checkboxes.forEach((checkbox) => {
+        // Extract classID by removing the prefix
+        const classID = checkbox.id.replace("active-checkBox-", "");
+        states[classID] = checkbox.checked; // Store checkbox state as boolean
+    });
+
+    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+        let Context = result.Context_CanvasAI || dataHolder;
+
+        for (let i = Context[1].classes.length - 1; i >= 0; i--) {
+            //update selected value for store checkboxes (store as string for json purposes)
+            Context[1].classes[i].selected = states[`${Context[1].classes[i].name}`]
+        }
+        chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
+        console.log(Context);
+    }); 
+});
 
 //Give settings button functionality
 settingsIcon.addEventListener("click", () => {
@@ -116,12 +141,12 @@ async function handlePrompt() {
             chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
                 let promptPairs = result.Context_CanvasAI || dataHolder;
 
-                //check if the id is already stored
-                if (promptPairs[1].id == "") {
-                    //add code to call api
-                }
+                console.log(promptPairs);
 
-                console.log(promptPairs[1].content)
+                //check if the id is already stored
+                if (promptPairs[1].user_id == "holder") {
+                    promptPairs[1].user_id = retrieveID(promptPairs[1].domain);
+                }
 
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
                 if (promptPairs[0].content.length > 19) {
@@ -131,8 +156,6 @@ async function handlePrompt() {
                 
                 if(promptPairs[1].content[0] === ""){
                     promptPairs[1].content[0] = prompt;
-                    console.log("after change")
-                    console.log(promptPairs)
                 } else {
                     console.log("appending to old data")
                     promptPairs[0].content.unshift({"message": "", 
@@ -144,6 +167,7 @@ async function handlePrompt() {
 
                 try {
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
+
                     response = updated.context[0].content[0].message; // Update response for display
                     console.log(response)
                     
@@ -201,7 +225,7 @@ function addClassSetting(classID, checked) {
     //convert string to boolean
     if (checked == "false") {
         checked = false;
-    } else {
+    } else if (checked == "true") {
         checked = true;
     }   
 
@@ -237,27 +261,6 @@ function addClassSetting(classID, checked) {
 
     //event listener to update class selection memory based on changes
     current = document.getElementById(currID);
-    current.addEventListener("change",  (event) => {
-        const checkboxName = event.target.id;
-        const isChecked = event.target.checked;
-
-        //pull local storage data based on ID of event triggerer
-        chrome.storage.local.get(["Context_CanvasAI"], function(result) {
-            let Context = result.Context_CanvasAI || dataHolder;
-            for (let i = Context[1].classes.length - 1; i >= 0; i--) {
-                //update selected value for store checkboxes (store as string for json purposes)
-                if(Context[1].classes[i].name == checkboxName.replace("active-checkBox-", "")){
-                    if(isChecked) {
-                        Context[1].classes[i].selected = "true";
-                    } else {
-                        Context[1].classes[i].selected = "false";
-                    }
-                    chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
-                    break;
-                }
-            }
-            }); 
-        });
 }
 
 //create memory box for previous chats
@@ -312,50 +315,50 @@ function addMemoryBox(prompt, response) {
     }
 
 //rebuild class selections and past chats
-function rebuildPage() {
-    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
-        //update domain each reload
-        let context = result.Context_CanvasAI || dataHolder;
-        context[1].domain = getURL();
+async function rebuildPage() {
+    try {
+        await new Promise((resolve, reject) => {
+            try{
+                chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
+                    //update domain each reload
+                    let context = result.Context_CanvasAI || dataHolder;
 
-        //check for existing id
-        if (context[1].id = '') {
-            context[1].id = retrieveID(context[1].domain);
-        }
+                    
 
-        for (let i = context[0].content.length - 1; i >= 0; i--) {
-            addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
-        };
+                    console.log(context);
 
-        if (context[1].classes.length != 0){
-            for (let i = context[1].classes.length - 1; i >= 0; i--) {
-                addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
-            };
-        } else {
-            retrieveClassList(context[1].id, context[1].domain);
-        }
-    }); 
-}
+                    context[1].domain = getURL();
 
-//process new list of classes and update memory
-function processClassList(classes) {
-    //process list in form {[class, checked]} into chrome memory
-    chrome.storage.local.get(["Context_CanvasAI"], function(result) {
-        // Default to an empty structure if "Context_CanvasAI" doesn't exist
-        let context = result.Context_CanvasAI || dataHolder;
-        
-        let classList = [];
-        
-        Object.keys(classes).forEach(key => {
-            classList.push({"id": key, "name": classes.key, "selected": "false"});
+                    //check for existing id
+                    if (context[1].user_id == 'holder') {
+                        console.log("pulling id");
+                        context[1].user_id = await retrieveID(context[1].domain);
+                    }
+
+                    for (let i = context[0].content.length - 1; i >= 0; i--) {
+                        addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
+                    };
+
+                    if (context[1].classes[0].id == ""){
+                         context[1].classes = await retrieveClassList(context[1].user_id, context[1].domain);
+                    }
+                    console.log("context", context);
+                    for (let i = context[1].classes.length - 1; i >= 0; i--) {
+                        console.log(context[1].classes[i].selected);
+                        addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
+                    };
+                    // Save updated list back to local storage
+                    chrome.storage.local.set({ Context_CanvasAI: context}, function() {
+                        resolve(context); // Resolve the promise with updated data
+                    });
+                }); 
+            } catch (error) {
+                reject(error);
+            }
         });
-
-        // Modify the classes portion of the structure
-        context[1].classes = classList;
-    
-        // Save the updated structure
-        chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
-    });
+    } catch (error) {
+        console.error("Error during id fetching:", error);
+    }
 }
 
 //clear chat memory
@@ -389,11 +392,12 @@ function getURL() {
 }
 
 function resetAllMemory() {
-    chrome.storage.local.set({ "Context_CanvasAI": dataHolder }, function() {
+    chrome.storage.local.set({ Context_CanvasAI: dataHolder }, function() {
         console.log("memory reset to base model")
     });
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
-        console.log(result.Context_CanvasAI)
+        console.log(result.Context_CanvasAI);
+        console.log(result.Context_CanvasAI[1].user_id);
     });
 }
 
@@ -406,6 +410,7 @@ function resetAllMemory() {
 
 
 async function mainPipelineEntry(contextJSON) {
+    console.log("\nentering Pipeline\n")
     try {
         const response = await fetch(`https://canvasclassmate.me/endpoints/mainPipelineEntry`,{
             method: 'POST',
@@ -430,11 +435,36 @@ async function mainPipelineEntry(contextJSON) {
 }
 
 async function retrieveClassList(studentID, domain) {
+    console.log("\npulling Classes\n")
     //returned in the form dictionary {"id": "classNumber", "name": "className", "selected": false}
     try {
-        const response = await fetch(`https://canvasclassmate.me/endpoints/pullClasses?user_id=${studentID}&domain=${domain}`);
-        console.log(response);
-        //processClassList(response);
+        const url = new URL("https://canvasclassmate.me/endpoints/pullCourses");
+        url.searchParams.append("user_id", studentID);
+        url.searchParams.append("domain", domain);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error(`API request failed with status: ${response.status}`);
+        }
+
+        const data = await response.json(); // Correctly parse the JSON response
+        console.log("courseData",data.courses);
+        //update stored data
+        chrome.storage.local.get(["Context_CanvasAI"], function(result) {
+            // Default to an empty structure if "Context_CanvasAI" doesn't exist
+            let context = result.Context_CanvasAI || dataHolder;
+    
+            // Modify the classes portion of the structure
+            context[1].classes = classes;
+        
+            console.log(classes);
+            console.log(context);
+    
+            // Save the updated structure
+            chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
+        });
+
+        return data.courses;
     } catch (error) {
         console.error('Error calling API:', error);
         return false;  // Return false if there's an error
@@ -445,10 +475,12 @@ async function retrieveID(domain) {
     //returned in the form {"user_id": int}
     try {
         const response = await fetch(`https://canvasclassmate.me/endpoints/initiate_user?domain=${domain}`);
-        console.log(response);
-        return response.user_id
+        const id_return = await response.json(); // Add await here
+        console.log(`\nfetched ID: `); // Access as object property
+        console.log(id_return);
+        return id_return.user_id; // Correct property access
     } catch (error) {
         console.error('Error calling API:', error);
-        return false;  // Return false if there's an error
+        return false;
     }
 }

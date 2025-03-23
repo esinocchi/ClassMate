@@ -204,6 +204,10 @@
     transform: scaleX(1) scaleY(1);
 }
 
+#SettingsWindow .header {
+    margin-bottom: 15px;
+}
+
 #settingsContainer, #classesHolder {
     flex-direction: column;
 }
@@ -265,6 +269,15 @@
 
 .settingsChildButton:active {
     opacity: 0.5;
+}
+
+#SettingsWindow .footer {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    display: flex;          /* Add this line */
+    align-items: center;    /* Vertical centering */
+    justify-content: center; /* Horizontal centering */
+    width: 100%;
 }
 
   .checkbox-wrapper-49 input[type="checkbox"] {
