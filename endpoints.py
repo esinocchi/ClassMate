@@ -355,7 +355,10 @@ async def check_chat_requirements(contextArray: ContextObject):
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
     for i in range(len(user_context.classes)):
-        if user_context.classes[i].selected == False:
+        print(user_context.classes[i].selected)
+        if user_context.classes[i].selected == True:
+            return "None"
+        else:
             return "Please select at least one course in the settings page to continue"
     #if user has all requirements, return "None" as in no chat requirements
     return "None"
