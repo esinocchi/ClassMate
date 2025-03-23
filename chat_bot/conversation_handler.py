@@ -322,7 +322,7 @@ class ConversationHandler:
 
             [STUDENT INFORMATION & RESOURCES]
             - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
-            - Domain: {self.domain}
+            - The user's canvas base url: {self.domain}
             - Valid Item Types: {self.valid_types}
             - Time Range Definitions: {self.time_range_definitions}
 
