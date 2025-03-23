@@ -316,6 +316,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         current_time = datetime.now(timezone.utc).isoformat()
+        print(f"JACOB GOONS 2: {self.domain}")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
