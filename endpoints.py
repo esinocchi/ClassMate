@@ -88,7 +88,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
         context_data = contextArray.context
         user_context = context_data[1]
-        user_id = user_context.id
+        user_id = user_context.user_id
         user_domain = user_context.domain
         
         handler = DataHandler(user_id, user_domain)
