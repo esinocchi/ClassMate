@@ -84,7 +84,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
             
 
         print("\n=== STAGE 1: Starting mainPipelineEntry ===")
-        context_data = contextArray.dict() if hasattr(contextArray, 'dict') else contextArray
+        context_data = contextArray["context"]
         user_context = context_data[1]
         user_id = user_context['id']
         user_domain = user_context['domain']
@@ -159,7 +159,7 @@ async def pullCourses(user_id, domain):
     
     #pull all classes from canvas api
     async with aiohttp.ClientSession() as session:
-       async with session.get(f"https://{domain}/api/v1/courses/{course_id}/assignments", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+       async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
         if response.status == 200:
             courses = await response.json()
         else:
@@ -363,7 +363,7 @@ async def check_update_status(user_id, domain):
 
     ===============================================
 
-    call this endpoint whenever a user tries to update courses_selected, 
+    call this endpoint whenever a user tries to update courses_selected by hitting the save button, 
     main pipline entry handles the case of when user tries to chat while update is in progress.
     """
     handler = DataHandler(user_id, domain)
@@ -382,4 +382,3 @@ async def oauthTokenGenerator():
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
     return token
-
