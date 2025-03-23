@@ -229,6 +229,10 @@ class ConversationHandler:
                         "duplicate_append_iterator": {
                             "type": "boolean",
                             "description": "If true, an increasing counter will be appended to the event title for each duplicate (e.g., Event 1, Event 2, etc.)."
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "This should the provided domain of the user"
                         }
                     },
                     "required": [
@@ -317,6 +321,7 @@ class ConversationHandler:
 
             [STUDENT INFORMATION & RESOURCES]
             - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
+            - Domain: {self.domain}
             - Valid Item Types: {self.valid_types}
             - Time Range Definitions: {self.time_range_definitions}
 
