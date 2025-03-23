@@ -350,10 +350,12 @@ async def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if await check_update_status(user_context.user_id, user_context.domain):
-        return "User data update currently in progress, please try again in a few minutes"
+    #if await check_update_status(user_context.user_id, user_context.domain):
+    #    return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
+    print("active")
+
     for i in range(len(user_context.classes)):
         print(user_context.classes[i].selected)
         if user_context.classes[i].selected == True:
