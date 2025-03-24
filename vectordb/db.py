@@ -500,7 +500,7 @@ class VectorDatabase:
         
         # Generate embeddings first
         embeddings = self.embedding_function(texts)
-
+        print(embeddings)
         # Then add to collection with explicit embeddings
         self.collection.add(
             ids=ids,
@@ -1239,6 +1239,7 @@ class VectorDatabase:
 
         # Augment results with additional information
         combined_results = self._augment_results(combined_results)
+        print(combined_results)
         
         return combined_results[:top_k]
     
