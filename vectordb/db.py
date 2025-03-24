@@ -56,14 +56,14 @@ from vectordb.embedding_model import create_hf_embedding_function
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("canvas_vector_db")
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[
+#         logging.StreamHandler()
+#     ]
+# )
+# logger = logging.getLogger("canvas_vector_db")
 
 
 
@@ -89,7 +89,7 @@ class VectorDatabase:
                 user_id = data.get('user_metadata', {}).get('id', 'default')
                 self.collection_name = f"canvas_embeddings_{user_id}"
             except Exception as e:
-                logger.error(f"Error loading JSON file to get user_id: {e}")
+                print(f"Error loading JSON file to get user_id: {e}")
                 self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
@@ -115,10 +115,10 @@ class VectorDatabase:
                 name=self.collection_name,
                 embedding_function=self.embedding_function
             )
-            logger.info(f"Using existing collection: {self.collection_name}")
+            print(f"Using existing collection: {self.collection_name}")
         
         except Exception: # If no existing collection, collection is created
-            logger.info(f"Creating new collection: {self.collection_name}")
+            print(f"Creating new collection: {self.collection_name}")
             self.collection = self.client.create_collection(
                 name=self.collection_name,
                 embedding_function=self.embedding_function,
@@ -361,12 +361,12 @@ class VectorDatabase:
             with open(self.json_file_path, 'r') as f:
                 data = json.load(f)
         except Exception as e:
-            logger.error(f"Error loading JSON file: {e}")
+            print(f"Error loading JSON file: {e}")
             return False
         
         # Extract user metadata
         user_metadata = data.get('user_metadata', {})
-        logger.info(f"Processing data for user ID: {user_metadata.get('id')}")
+        print(f"Processing data for user ID: {user_metadata.get('id')}")
         
         # Extract courses and build course and syllabus maps
         courses = data.get('courses', [])
@@ -390,7 +390,7 @@ class VectorDatabase:
             # Parse the HTML content to extract plain text
             parsed_syllabus = self._parse_html_content(syllabus)
             if not parsed_syllabus:
-                logger.warning(f"No content extracted from syllabus for course {course_id}")
+                print(f"No content extracted from syllabus for course {course_id}")
                 continue
             
             # Generate a unique ID for the syllabus
@@ -421,7 +421,7 @@ class VectorDatabase:
             }
             
             metadatas.append(metadata)
-            logger.info(f"Added syllabus for course {course_id}")
+            print(f"Added syllabus for course {course_id}")
         
         # Process all document types
         document_types = {
@@ -500,7 +500,7 @@ class VectorDatabase:
         
         # Generate embeddings first
         embeddings = self.embedding_function(texts)
-        print(embeddings)
+        print(f"Generated embeddings with shape: {embeddings.shape}")
         # Then add to collection with explicit embeddings
         self.collection.add(
             ids=ids,
@@ -525,7 +525,7 @@ class VectorDatabase:
             
             # Extract user metadata
             user_metadata = data.get('user_metadata', {})
-            logger.info(f"Loading metadata for user ID: {user_metadata.get('id')}")
+            print(f"Loading metadata for user ID: {user_metadata.get('id')}")
             
             # Extract courses and build course map
             courses = data.get('courses', [])
@@ -561,10 +561,10 @@ class VectorDatabase:
             # Build document relations
             self._build_document_relations(self.documents)
             
-            logger.info(f"Successfully loaded metadata for {len(self.documents)} items")
+            print(f"Successfully loaded metadata for {len(self.documents)} items")
             
         except Exception as e:
-            logger.error(f"Error loading document metadata: {e}")
+            print(f"Error loading document metadata: {e}")
     
     def _build_document_relations(self, documents: List[Dict[str, Any]]) -> None:
         """
@@ -629,10 +629,10 @@ class VectorDatabase:
             if count > 0:
                 # Load document metadata
                 self._load_document_metadata()
-                logger.info(f"Loaded {count} documents from ChromaDB cache")
+                print(f"Loaded {count} documents from ChromaDB cache")
                 return True
         except Exception as e:
-            logger.error(f"Error checking ChromaDB cache: {e}")
+            print(f"Error checking ChromaDB cache: {e}")
         
         return False
     
@@ -682,7 +682,7 @@ class VectorDatabase:
         # Skip if no URL
         url = doc.get('url')
         if not url:
-            logger.warning(f"No URL found for document: {doc.get('display_name', '')}")
+            print(f"No URL found for document: {doc.get('display_name', '')}")
             return ""
         
         # Get file extension
@@ -694,11 +694,11 @@ class VectorDatabase:
         
         # Try to download the file
         try:
-            logger.info(f"Downloading file: {doc.get('display_name', '')}")
+            print(f"Downloading file: {doc.get('display_name', '')}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status != 200:
-                        logger.warning(f"Failed to download file {url}: {response.status}")
+                        print(f"Failed to download file {url}: {response.status}")
                         return ""
                     
                     # Get the raw file content as bytes
@@ -709,7 +709,7 @@ class VectorDatabase:
             return extracted_text
                 
         except Exception as e:
-            logger.error(f"Error downloading or processing file {url}: {e}")
+            print(f"Error downloading or processing file {url}: {e}")
             return "" 
     
     
@@ -792,7 +792,7 @@ class VectorDatabase:
                 specific_date = datetime.strptime(date_str, "%Y-%m-%d")
                 specific_dates.append(specific_date)
             except ValueError:
-                logger.warning(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
+                print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
         
         if not specific_dates:
             return []  # No valid specific dates to filter on
@@ -929,7 +929,7 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            logger.info(f"Executing ChromaDB query with query_text: {query_text}")
+            print(f"Executing ChromaDB query with query_text: {query_text}")
             # Use asyncio to prevent blocking the event loop during the ChromaDB query
             results = await asyncio.to_thread(
                 self.collection.query,
@@ -940,13 +940,13 @@ class VectorDatabase:
             )
             return results
         except Exception as e:
-            logger.error(f"ChromaDB query error with filters: {e}")
-            logger.error(f"Failed query where clause: {query_where}")
+            print(f"ChromaDB query error with filters: {e}")
+            print(f"Failed query where clause: {query_where}")
             
             # If the complex query fails, try with just the course_id filter
             if isinstance(query_where, dict) and "type" in query_where and "course_id" in query_where:
                 try:
-                    logger.info("Trying query with only course_id filter...")
+                    print("Trying query with only course_id filter...")
                     simplified_where = {"course_id": query_where["course_id"]}
                     results = await asyncio.to_thread(
                         self.collection.query,
@@ -957,11 +957,11 @@ class VectorDatabase:
                     )
                     return results
                 except Exception as e2:
-                    logger.error(f"Course-only filter failed: {e2}")
+                    print(f"Course-only filter failed: {e2}")
             
             # Last resort: try with no filters
             try:
-                logger.info("Trying query with no filters...")
+                print("Trying query with no filters...")
                 results = await asyncio.to_thread(
                     self.collection.query,
                     query_texts=[query_text],
@@ -970,7 +970,7 @@ class VectorDatabase:
                 )
                 return results
             except Exception as e3:
-                logger.error(f"No-filter query also failed: {e3}")
+                print(f"No-filter query also failed: {e3}")
                 return {}
 
     def _post_process_results(self, search_results, normalized_query):
@@ -1184,8 +1184,8 @@ class VectorDatabase:
         top_k = self._determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
-        logger.debug(f"Search query: '{normalized_query}'")
-        logger.debug(f"Search parameters: {search_parameters}")
+        print(f"Search query: '{normalized_query}'")
+        print(f"Search parameters: {search_parameters}")
 
         task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
         formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
@@ -1204,14 +1204,14 @@ class VectorDatabase:
             if not doc:
                 continue
 
-            logger.info(f"Processing document: {doc.get('name', '')}")
+            print(f"Processing document: {doc.get('name', '')}")
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
             
             # Skip results below minimum score
             if similarity < minimum_score:
-                logger.info(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
+                print(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
                 continue
             
             # Extract content for files if needed
@@ -1219,12 +1219,12 @@ class VectorDatabase:
                 try:
                     doc['content'] = await self.extract_file_content(doc)
                     if doc['content']:
-                        logger.info(f"Extracted content for file: {doc.get('display_name', '')}")
+                        print(f"Extracted content for file: {doc.get('display_name', '')}")
                 except Exception as e:
-                    logger.error(f"Failed to extract content: {e}")
+                    print(f"Failed to extract content: {e}")
             
             # Add to results
-            logger.info(f"Adding doc {doc_id} to results with similarity {similarity}")
+            print(f"Adding doc {doc_id} to results with similarity {similarity}")
             search_results.append({
                 'document': doc,
                 'similarity': similarity
@@ -1268,7 +1268,7 @@ class VectorDatabase:
         """
         try:
             await asyncio.to_thread(self.client.delete_collection, self.collection_name)
-            logger.info(f"Deleted collection: {self.collection_name}")
+            print(f"Deleted collection: {self.collection_name}")
             
             # Recreate the collection
             self.collection = await asyncio.to_thread(
@@ -1277,7 +1277,7 @@ class VectorDatabase:
                 embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
             )
-            logger.info(f"Created new collection: {self.collection_name}")
+            print(f"Created new collection: {self.collection_name}")
             
             # Reset in-memory data
             self.documents = []
@@ -1285,7 +1285,7 @@ class VectorDatabase:
             self.course_map = {}
             
         except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
+            print(f"Error clearing cache: {e}")
 
     def _parse_html_content(self, html_content: str) -> str:
         """
@@ -1349,7 +1349,7 @@ class VectorDatabase:
             return extractor.get_text()
             
         except Exception as e:
-            logger.error(f"Error parsing HTML content: {e}")
+            print(f"Error parsing HTML content: {e}")
             # Fallback to a simple tag stripping approach if the parser fails
             text = re.sub(r'<[^>]*>', ' ', html_content)
             text = re.sub(r'\s+', ' ', text)
