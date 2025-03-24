@@ -55,7 +55,7 @@ async def calculate_grade(
     assignment_id = assignment[0]["document"]["id"]
 
     headers = {"Authorization": f"Bearer {access_token}"}
-
+    print(f"CANVAS BASE URL: {canvas_base_url}")
     # URL to retrieve current overall course score for the student.
     current_score_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/enrollments"
     current_score_params = {"user_id": "self", "include[]": "total_scores"}
