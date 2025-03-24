@@ -393,7 +393,7 @@ class ConversationHandler:
                                         "type": "string",
                                         "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
                                     },
-                                    "description": "This should always be ['file']"
+                                    "description": "This should always be ['assignment']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -408,7 +408,7 @@ class ConversationHandler:
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should always be ['lecture','notes','slides']"
+                                    "description": "This should be based on the query"
                                 },
                                 "query": {
                                     "type": "string",
