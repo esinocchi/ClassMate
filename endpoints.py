@@ -167,6 +167,8 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
+
+    print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
     
     #pull all classes from canvas api
     async with aiohttp.ClientSession() as session:
@@ -183,6 +185,9 @@ async def pullCourses(user_id, domain):
             print(course)
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
+            courses_added += [str(course.get("id"))]
+
+    print(f"\n\n\n these are the courses added: {courses_added} after pulling all classes\n\n\n")
 
     #classes are returned in the format {course_id: course_name}
     return {'courses': all_courses}
