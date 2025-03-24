@@ -37,10 +37,6 @@ chat.innerHTML = `
 </div>
 <div id="toolbar" class="footer">
     <button id="clearPromptButton" class="toolbarChildButton">New Chat</button>
-    <div class="dropdown" id="dropdown">
-        <button class="toolbarChildButton" onclick="toggleDropdown()">Select Recent Doc</button>
-        <div class="dropdown-menu" id="dropdownMenu">
-    </div>
   </div>
 </div>
 `;
@@ -135,21 +131,7 @@ document.addEventListener("keydown", function(event) {
 window.addEventListener("load", () => {
     rebuildPage();
 });
-  
-  // Close dropdown if user clicks outside
-  document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown.contains(event.target)) {
-      document.getElementById('dropdownMenu').classList.remove('show');
-    }
-  });
-
-// Function to toggle the dropdown menu
-function toggleDropdown() {
-    const menu = document.getElementById('dropdownMenu');
-    menu.classList.toggle('show'); // Toggles visibility
-  }
-
+ 
 //main functionality for prompt handling
 async function handlePrompt() {
     // Get and remove value from the prompt entry box
