@@ -474,6 +474,7 @@ class ConversationHandler:
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
+        await vector_db.process_data(force_reload=False)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
@@ -510,6 +511,7 @@ class ConversationHandler:
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
+        await vector_db.process_data(force_reload=False)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")

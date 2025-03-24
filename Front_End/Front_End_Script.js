@@ -82,10 +82,14 @@ saveClassesButton.addEventListener("click", () => {
     chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
         let Context = result.Context_CanvasAI || dataHolder;
 
+        //check for existing id
+        if (Context[1].user_id == "holder") {
+            Context[1].user_id = await retrieveID(Context[1].domain);
+        }
+
         console.log(Context)
 
         if(await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes)){
-
         for (let i = Context[1].classes.length - 1; i >= 0; i--) {
             //update selected value for store checkboxes (store as string for json purposes)
             Context[1].classes[i].selected = states[`${Context[1].classes[i].name}`]
@@ -189,7 +193,13 @@ async function handlePrompt() {
                     console.log(promptPairs);
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
 
-                    response = updated.context[0].content[0].message; // Update response for display
+                    //check for pdf notes output
+                    if(updated.context[0].content[0].function[0] == "create_notes") {
+                        response = [updated.context[0].content[0].message, true]
+                    } else {
+                        response = updated.context[0].content[0].message; // Update response for display
+                    }
+
                     console.log(response)
                     
                     // Save updated list back to local storage
@@ -202,7 +212,11 @@ async function handlePrompt() {
             });
         });
 
-        addMemoryBox(prompt, response); //add memory box for display
+        if (Array.isArray(response)){
+            addMemoryBox(prompt, response, true); //add memory box for display
+        } else {
+            addMemoryBox(prompt, response, false); //add memory box for display
+        }
 
     } catch (error) {
         console.error("Error during prompt handling:", error);
@@ -279,7 +293,7 @@ function addClassSetting(classID, checked) {
 }
 
 //create memory box for previous chats
-function addMemoryBox(prompt, response) {
+function addMemoryBox(prompt, response, downloadlink) {
     if (prompt == '') {
         return -1;
     }
@@ -299,6 +313,16 @@ function addMemoryBox(prompt, response) {
     // Append prompt and response boxes to memoryBox
     memoryBox.appendChild(promptBox);
     memoryBox.appendChild(responseBox);
+
+    if(downloadlink = true) {
+        const downloadButton = document.createElement("button");
+        downloadButton.classList.add("toolbarChildButton")
+        memoryBox.appendChild(downloadButton);
+
+        downloadButton.addEventListener("click", function(event) {
+            pullPDF();
+        });
+    }
 
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
 
@@ -342,7 +366,7 @@ async function rebuildPage() {
                     context[1].domain = getURL();
 
                     //check for existing id
-                    if (context[1].user_id == 'holder') {
+                    if (context[1].user_id == "holder") {
                         context[1].user_id = await retrieveID(context[1].domain);
                     }
 
@@ -358,12 +382,17 @@ async function rebuildPage() {
                     for (let i = context[1].classes.length - 1; i >= 0; i--) {
                         addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
                     };
+
+                    console.log('final: ', context)
+
                     // Save updated list back to local storage
                     chrome.storage.local.set({ Context_CanvasAI: context}, function() {
+                        console.log("context set");
                         resolve(context); // Resolve the promise with updated data
                     });
                 }); 
             } catch (error) {
+                console.log("error rebuilding")
                 reject(error);
             }
         });
@@ -495,7 +524,7 @@ async function retrieveID(domain) {
 }
 
 async function pushClasses(id, domain, classes){
-    let boolean1 = await isUpdating(id, domain)
+    let boolean1 = await isUpdating(id, domain);
     console.log(boolean1);
     if (boolean1 == false) {
         console.log("going");
@@ -535,6 +564,26 @@ async function isUpdating(user_id, domain){
             return updating
     } catch (error) {
         console.log("error1")
+        return false;
+    }
+}
+
+async function pullPDF(user_id, domain) {
+    try {
+        const response = await fetch(`https://canvasclassmate.me/endpoints/pullNotes?user_id=${user_id}&domain=${domain}`);
+
+        if (!response.ok) {
+            console.error('Failed to download document');
+            return;
+        }
+    
+        const blob = await response.blob();  // Convert the response to a Blob object
+        const url = URL.createObjectURL(blob);
+    
+        // Open the PDF in a new tab
+        window.open(url, '_blank');
+    } catch (error) {
+        console.log("error pulling pdf")
         return false;
     }
 }

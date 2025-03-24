@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Union
 from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
-from vectordb.db import VectorDatabase
+from fastapi.responses import FileResponse
 import aiohttp
 from dotenv import load_dotenv
 import time
@@ -168,14 +168,30 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
+
+    print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
+    
+    courses = []
     
     #pull all classes from canvas api
+
+    page_number = 1
     async with aiohttp.ClientSession() as session:
-       async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
-        if response.status == 200:
-            courses = await response.json()
-        else:
-            return {"message": "Error pulling courses from canvas api"}
+        headers = {"Authorization": f"Bearer {handler.grab_user_data()['user_metadata']['token']}"}
+        while True:
+            async with session.get(
+                f"{handler.API_URL}/courses/",
+                params={"enrollment_state": "active", "include[]": ["all_courses", "syllabus_body"], "page": page_number},
+                headers=headers
+            ) as response:
+                if response.status == 200:
+                    courses_data = await response.json()
+                    if not courses_data:  # Break if no more courses are returned
+                        break
+                    courses += courses_data
+                else:
+                    return {"message": "Error pulling courses from Canvas API"}
+            page_number += 1
     
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
@@ -185,8 +201,10 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
             courses_added += [str(course.get("id"))]
-    #classes are returned in the format {course_id: course_name}
 
+    print(f"\n\n\n these are the courses added: {courses_added} after pulling all classes\n\n\n")
+
+    #classes are returned in the format {course_id: course_name}
     return {'courses': all_courses}
 
 @app.post('/endpoints/pushCourses')
@@ -221,9 +239,7 @@ async def pushCourses(classesData: PushClassesObject):
     
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
-    print("Updating user data...")
     handler.update_user_data()
-    print("User data updated")
 
     return {'message': "Courses pushed to database"}
 
@@ -275,7 +291,7 @@ async def initate_user(domain: str):
     else:
         handler = DataHandler(user_id, domain, token)
         handler.initiate_user_data()
-        
+
     return {'user_id': user_id}
 
 @app.put('/endpoints/deleteUserDataContext')
@@ -356,8 +372,8 @@ async def check_chat_requirements(contextArray: ContextObject):
     print(f"\n\n\n{user_context}\n\n\n")
 
     #if user data update is currently in progress, return error message
-    if await check_update_status(user_context.user_id, user_context.domain):
-        return "User data update currently in progress, please try again in a few minutes"
+    #if await check_update_status(user_context.user_id, user_context.domain):
+    #    return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
     print("active")
@@ -405,3 +421,13 @@ async def oauthTokenGenerator():
     #for now, we will use a hardcoded token
     token = os.getenv("CANVAS_API_TOKEN")
     return token
+
+#returns the stored pdf
+@app.get("endpoints/pullNotes")
+async def pullPDF(domain, user_id):
+    pdf_path = f"media_output/{domain}/{user_id}"
+    return FileResponse(pdf_path, media_type='application/pdf', filename="your_file.pdf")
+
+
+
+
