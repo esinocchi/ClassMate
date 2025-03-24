@@ -31,7 +31,7 @@ Note: Ensure that the JSON data file is structured correctly, containing user me
 import os
 import json
 import sys
-import logging
+import tzlocal
 import numpy as np
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -50,7 +50,7 @@ sys.path.append(str(root_dir))
 
 from backend.data_retrieval.get_all_user_data import extract_text_and_images
 from vectordb.embedding_model import create_hf_embedding_function
-
+from vectordb.content_extraction import parse_file_content
 
 # Load environment variables
 load_dotenv()
@@ -169,7 +169,7 @@ class VectorDatabase:
             display_name = doc.get('display_name', '')
             if display_name:
                 # Normalize the display name to improve matching
-                normalized_name = self._normalize_text(display_name)
+                normalized_name = self.normalize_text(display_name)
                 # Add the name at the beginning for emphasis
                 text_parts.insert(0, f"Filename: {normalized_name}")
                 # Also add it as a title for better matching
@@ -180,7 +180,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None: # error prevention
                     # Normalize any text fields to handle special characters
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -190,7 +190,7 @@ class VectorDatabase:
             name = doc.get('name', '')
             if name:
                 # Normalize the name to improve matching
-                normalized_name = self._normalize_text(name)
+                normalized_name = self.normalize_text(name)
                 # Add the name at the beginning for emphasis
                 text_parts.insert(0, f"Assignment: {normalized_name}")
                 text_parts.insert(0, f"Title: {normalized_name}")
@@ -204,7 +204,7 @@ class VectorDatabase:
                     else:
                         # Normalize any text fields
                         if isinstance(doc[field], str):
-                            value = self._normalize_text(doc[field])
+                            value = self.normalize_text(doc[field])
                         else:
                             value = doc[field]
                         # e.g. HW2 (name) -> Name: HW2
@@ -223,7 +223,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Announcement: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -232,7 +232,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None: # error prevention
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -242,7 +242,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Quiz: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -255,7 +255,7 @@ class VectorDatabase:
                 elif field in doc and doc[field] is not None:
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -265,7 +265,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Event: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -276,7 +276,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None:
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -290,7 +290,7 @@ class VectorDatabase:
         if module_name:
             # Normalize module name
             if isinstance(module_name, str):
-                module_name = self._normalize_text(module_name)
+                module_name = self.normalize_text(module_name)
             text_parts.append(f"Module Name: {module_name}")
         
         # Join all parts with newlines for better separation
@@ -318,7 +318,8 @@ class VectorDatabase:
         # ]
         return "\n".join(text_parts)
     
-    def _normalize_text(self, text: str) -> str:
+    @staticmethod
+    def normalize_text(text: str) -> str:
         """
         Normalize text by handling special characters and standardizing formats.
         
@@ -741,51 +742,7 @@ class VectorDatabase:
                     seen_ids.add(related_id)
         
         return related_docs
-    
-    async def extract_file_content(self, doc: Dict[str, Any]) -> str:
-        """
-        Extract content from a file URL when needed.
-        
-        Args:
-            doc: Document dictionary containing file metadata
-            
-        Returns:
-            Extracted text content as a string
-        """
-        # Skip if no URL
-        url = doc.get('url')
-        if not url:
-            print(f"No URL found for document: {doc.get('display_name', '')}")
-            return ""
-        
-        # Get file extension
-        file_extension = doc.get('file_extension', '')
-        if not file_extension:
-            display_name = doc.get('display_name', '')
-            if display_name and '.' in display_name:
-                file_extension = display_name.split('.')[-1].lower()
-        
-        # Try to download the file
-        try:
-            print(f"Downloading file: {doc.get('display_name', '')}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        print(f"Failed to download file {url}: {response.status}")
-                        return ""
-                    
-                    # Get the raw file content as bytes
-                    file_bytes = await response.read()
-            
-            # Use the imported extract_text_and_images function
-            extracted_text = extract_text_and_images(file_bytes, file_extension)
-            return extracted_text
-                
-        except Exception as e:
-            print(f"Error downloading or processing file {url}: {e}")
-            return "" 
-    
-    
+
 
     def _build_time_range_filter(self, search_parameters):
         """
@@ -802,7 +759,9 @@ class VectorDatabase:
         
         time_range = search_parameters["time_range"]
 
-        current_time = datetime.now(timezone.utc)
+        # Get current time in local timezone, then convert to UTC for timestamp comparison
+        local_timezone = tzlocal.get_localzone()
+        current_time = datetime.now(local_timezone)
         current_timestamp = int(current_time.timestamp())
         
         # List of all possible timestamp fields across different document types
@@ -862,10 +821,18 @@ class VectorDatabase:
         if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
             return []
         
+        local_timezone = tzlocal.get_localzone()
         specific_dates = []
+        
         for date_str in search_parameters["specific_dates"]:
             try:
-                specific_date = datetime.strptime(date_str, "%Y-%m-%d")
+                # Parse naive date (without timezone)
+                naive_date = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                # Make it timezone-aware by replacing the tzinfo
+                # This is the modern way that works with both pytz and zoneinfo
+                specific_date = naive_date.replace(tzinfo=local_timezone)
+                
                 specific_dates.append(specific_date)
             except ValueError:
                 print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
@@ -889,8 +856,6 @@ class VectorDatabase:
                         {field: {"$lte": end_timestamp}} # $lte: <=
                     ]
                 })
-                # filter: item >= start_timestamp AND item <= end_timestamp
-                # item must be on EXACT specific_date when filtering by a single date
 
         elif len(specific_dates) >= 2:
             # Date range
@@ -907,8 +872,6 @@ class VectorDatabase:
                         {field: {"$lte": end_timestamp}} # $lte: <=
                     ]
                 })
-                # filter: item >= start_timestamp AND item <= end_timestamp
-                # item must be between start_date and end_date when filtering by a date range
         
         # Return date condition or empty list if no valid conditions
         return [{"$or": date_conditions}] if date_conditions else []
@@ -966,7 +929,7 @@ class VectorDatabase:
         """
         # Normalize the query
         query = search_parameters["query"]
-        normalized_query = self._normalize_text(query)
+        normalized_query = self.normalize_text(text=query)
         
         # Build ChromaDB where clause with proper operator
         conditions = []
@@ -1187,6 +1150,8 @@ class VectorDatabase:
         Args:
             search_results: List of search result dictionaries
         """
+        local_timezone = tzlocal.get_localzone()
+        
         for result in search_results:
             doc = result['document']
             doc_type = doc.get('type', '')
@@ -1205,11 +1170,18 @@ class VectorDatabase:
             for date_field in ['due_at', 'posted_at', 'start_at', 'updated_at']:
                 if date_field in doc and doc[date_field]:
                     try:
+                        # Parse date from UTC and convert to local timezone
                         date_obj = datetime.fromisoformat(doc[date_field].replace('Z', '+00:00'))
-                        now = datetime.now(timezone.utc)
+                        local_date = date_obj.astimezone(local_timezone)
+                        
+                        # Add localized time string
+                        doc[f'local_{date_field}'] = local_date.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Now calculate relative time using local time
+                        now = datetime.now(local_timezone)
                         
                         # Add relative time
-                        delta = date_obj - now
+                        delta = local_date - now
                         days = delta.days
                         
                         if days > 0:
@@ -1229,13 +1201,12 @@ class VectorDatabase:
                                 doc['relative_time'] = f"{days} days ago"
                         
                         break  # Only process the first date field found
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"Error converting time: {e}")
         
         return search_results
 
-    async def search(self, search_parameters: Optional[dict] = None,
-               include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
+    async def search(self, search_parameters, include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
@@ -1247,7 +1218,6 @@ class VectorDatabase:
                 - item_types: List of document types to include
                 - specific_dates: Optional list of specific dates to filter by
                 - keywords: Optional list of additional keywords
-            top_k: Number of top results to return.
             include_related: Whether to include related documents.
             minimum_score: Minimum similarity score to include in results.
             
@@ -1284,7 +1254,6 @@ class VectorDatabase:
                 continue
 
             print(f"Processing document: {doc.get('name', '')}")
-            print(doc)
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
@@ -1293,16 +1262,13 @@ class VectorDatabase:
             if similarity < minimum_score:
                 print(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
                 continue
-            
-            # Extract content for files if needed
-            if doc.get('type') == 'assignment':
-                print("\n\nworks\n\n")
+
+            if doc.get('type') == 'file':
                 try:
-                    doc['description'] = await self.extract_file_content(doc)
-                    if doc['description']:
-                        print(f"Extracted content for file: {doc.get('display_name', '')}")
+                    doc['content'] = await parse_file_content(doc.get('url'))
                 except Exception as e:
-                    print(f"Failed to extract content: {e}")
+                    print(f"Failed to extract content for file {doc.get('display_name', '')}: {e}")
+
             
             # Add to results
             print(f"Adding doc {doc.get('name', '')} to results with similarity {similarity}")
@@ -1323,7 +1289,9 @@ class VectorDatabase:
 
         for result in combined_results:
             result.pop('similarity', None)  # Remove similarity score from each result
+            result.pop('related_docs', None) # Remove related docs from each result for now, not currently being used
         
+        print(combined_results)
         return combined_results[:top_k]
     
     async def get_available_courses(self) -> List[Dict[str, Any]]:

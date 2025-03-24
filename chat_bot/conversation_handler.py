@@ -5,18 +5,16 @@ import json
 import sys
 from pathlib import Path
 import tzlocal
-from datetime import datetime, timezone
-from typing import List, Optional, Literal, Union
-from pydantic import BaseModel, Field
-
+from datetime import datetime
+from typing import List, Union
+from pydantic import BaseModel
+from backend.task_specific_agents.lecture_to_notes_agent import lecture_file_to_notes_pdf
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
 from backend.task_specific_agents.calendar_agent import create_event
-import chat_bot.context_retrieval
-from vectordb.db import VectorDatabase
 
 # Define the context models locally
 class ContextPair(BaseModel):
@@ -49,9 +47,7 @@ load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 canvas_api_token = os.getenv("CANVAS_API_KEY")
 
-# Pydantic classes for structured output
 
-# Define the complete function response model
 
 class ConversationHandler:
     def __init__(self, student_name, student_id, courses, domain, chat_history,canvas_api_token):
@@ -89,11 +85,7 @@ class ConversationHandler:
             }
         }
         self.generality_definitions = {
-            #"SPECIFIC": {
-            #    "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
-            #    "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
-            #    "result_type": "Very targeted set of results"
-            #},
+            
             "LOW": {
                 "description": "Used when the user is looking for a small set of focused results about a narrow topic",
                 "examples": ["Find quizzes about neural networks in CMPSC 444", "Show me this week's assignments"],
@@ -135,20 +127,16 @@ class ConversationHandler:
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH",],
+                                    "enum": ["LOW", "MEDIUM", "HIGH"],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                #"specific_amount": {
-                                #    "type": "integer",
-                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
                                         "type": "string",
-                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                        "enum": ["assignment","quiz","event", "syllabus"]
                                     },
-                                    "description": "This should always be ['syllabus']"
+                                    "description": "This should always be ['assignments','events']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -156,14 +144,14 @@ class ConversationHandler:
                                         "type": "string",
                                         "format": "date"
                                     },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
                                 },
                                 "keywords": {
                                     "type": "array",
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should always be ['course information','course materials'] l"
+                                    "description": "keywords from the user's query to help with semantic search"
                                 },
                                 "query": {
                                     "type": "string",
@@ -256,7 +244,7 @@ class ConversationHandler:
                             "properties": {
                                 "course_id": {
                                     "type": "string",
-                                    "description": "Specific Course ID(s) (e.g. 2372294) when mentioned by the user. 'all_courses': if the user asks for information about all courses or they don't mention a specific course"
+                                    "description": "Specific Course ID(s) (e.g. 2372294) when mentioned by the user. 'all_courses': if the user asks for information about all courses"
                                 },
                                 "time_range": {
                                     "type": "string", 
@@ -268,10 +256,6 @@ class ConversationHandler:
                                     "enum": ["LOW", "MEDIUM", "HIGH"],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                #"specific_amount": {
-                                #    "type": "integer",
-                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -280,14 +264,14 @@ class ConversationHandler:
                                     },
                                     "description": "This should always be ['syllabus']"
                                 },
-                               #"specific_dates": {
-                                #    "type": "array",
-                                #    "items": {
-                                #        "type": "string",
-                                #        "format": "date"
-                                #    },
-                                #    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
-                                #},
+                               "specific_dates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                                },
                                 "keywords": {
                                     "type": "array",
                                     "items": {
@@ -308,7 +292,7 @@ class ConversationHandler:
             },
             {
                 "name": "create_notes",
-                "description": "Create a note using the vector search function",
+                "description": "Create notes for a file found in the vector search function",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -325,7 +309,7 @@ class ConversationHandler:
                             "properties": {
                                 "course_id": {
                                     "type": "string",
-                                    "description": "Specific Course ID(s) (e.g. 2372294) when mentioned by the user. 'all_courses': if the user asks for information about all courses or they don't mention a specific course"
+                                    "description": "Specific Course ID"
                                 },
                                 "time_range": {
                                     "type": "string", 
@@ -334,12 +318,8 @@ class ConversationHandler:
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH",],
                                     "description": "Context for how many items to retrieve"
-                                },
-                                "specific_amount": {
-                                    "type": "integer",
-                                    "description": "The number of items to retrieve if generality is SPECIFIC"
                                 },
                                 "item_types": {
                                     "type": "array",
@@ -347,7 +327,7 @@ class ConversationHandler:
                                         "type": "string",
                                         "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
                                     },
-                                    "description": "This should always be ['syllabus']"
+                                    "description": "This should always be ['file']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -355,21 +335,21 @@ class ConversationHandler:
                                         "type": "string",
                                         "format": "date"
                                     },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
                                 },
                                 "keywords": {
                                     "type": "array",
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should always be ['course information','course materials'] l"
+                                    "description": "This should always be ['lecture','notes','slides']"
                                 },
                                 "query": {
                                     "type": "string",
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
                         }
                     },
                     "required": ["user_id", "domain", "search_parameters"]
@@ -400,9 +380,9 @@ class ConversationHandler:
             - Creating events when requested
 
             [DATE & TIME]
-            - Current UTC Time: {current_time}
+            - Current Time: {current_time}
             - All dates and times must be in ISO8601 format.
-            - Use the current UTC time as your reference for "now."
+            - Use the current time as your reference for "now."
 
             [INSTRUCTIONS FOR FUNCTION CALLS]
             1. **When to Call a Function:**
@@ -410,18 +390,18 @@ class ConversationHandler:
 
             2. **Keyword Extraction for Retrieval:**
             - Extract a concise list of keywords from the user's prompt, ensuring the following elements are captured:
-                - **Course:** Include both the course name and its course ID (from {self.courses}). If a course is not mentioned, default to "all_courses".
+                - **Course:** The course ID (from {self.courses}). If a course is not mentioned or if somebody mentions all courses, default to "all_courses".
                 - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
                 - **Item Types:** Choose from {self.valid_types}.
-                - **Specific Dates:** Use date or date range mentioned by the user.
+                - **Specific Dates:** Use date mentioned by the user. Only ever include dates if the user mentions a specific date. Do no try and infer dates.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
                 - The keyword list must contain a maximum of 10 items.
                 - Do not duplicate the compulsory elements; include only additional relevant keywords.
 
             3. **JSON Response Structure for Function Calls:**
-            - For Canvas search queries, respond with a valid JSON object in the following exact format:
+            - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
                 ```
                 {{
                 "parameters": {{
@@ -444,6 +424,7 @@ class ConversationHandler:
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
+
             - **Tone & Style:**
             - Maintain professionalism and clarity.
             - Use plain, accessible language suitable for academic settings.
@@ -452,8 +433,11 @@ class ConversationHandler:
             [FAIL-SAFE MEASURES]
             - **Time Range Fail-Safe:** If unsure, default to "ALL_TIME".
             - **Course Fail-Safe:** If the course mentioned does not match exactly, select the closest course based on string similarity.
-            
-            Remember, your final response to the user must always be clear, confirming the action taken (e.g., "I have created the event") if a function call was executed, or directly addressing the query if not.
+            - **Generality Fail-Safe:** If the user does not specify a generality, default to "MEDIUM".
+
+            [RESPONSE GUIDELINES]
+            - **If No Function Call Is Needed:**  
+            Respond directly to the user in plain language with a clear, concise message.   
             """
         
         return system_context
@@ -477,7 +461,6 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-                For example, if the user asks for the next 3 upcoming assignments, you will check which 3 assignments are next relative to the current date.
             - For note creation requests, respond with the note pdf file that was created.
             -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
         """
@@ -489,18 +472,14 @@ class ConversationHandler:
         print(f"Search parameters received: {json.dumps(search_parameters, indent=2)}")
         
         from vectordb.db import VectorDatabase
-        print("Imported VectorDatabase")
         
         user_id_number = self.student_id.split("_")[1]
-        print(f"User ID number: {user_id_number}")
         
         vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
-        print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         await vector_db.process_data(force_reload=False)
-        print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
         try:
@@ -526,34 +505,58 @@ class ConversationHandler:
             - query
         """
         from vectordb.db import VectorDatabase
-        print("Imported VectorDatabase")
         
         user_id_number = self.student_id.split("_")[1]
-        print(f"User ID number: {user_id_number}")
         
         vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
-        print(f"Vector DB path: {vector_db_path}")
         
-        print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         await vector_db.process_data(force_reload=False)
-        print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
 
         try:
             course_information = await vector_db.search(search_parameters) 
-            print(f"Course information: {course_information}")
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             course_information = []
         
         return course_information
-          
-    async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
+
+    async def find_file(self, search_parameters: dict):
+        """Find a file using the vector search function"""
+        print("\n=== FIND_FILE: Starting ===")
+        print(f"Search parameters received: {json.dumps(search_parameters, indent=2)}")
+        from vectordb.db import VectorDatabase
         
-        return
+        user_id_number = self.student_id.split("_")[1]
+        
+        vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
+        
+        print("Initializing VectorDatabase...")
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
+        await vector_db.process_data(force_reload=False)
+        
+        try:
+            file = await vector_db.search(search_parameters) 
+        except Exception as e:
+            print(f"ERROR in vector_db.search: {str(e)}")
+            print(f"Error type: {type(e)}")
+            file = []
+        
+        file_description = [file[0]["document"]["filename"], file[0]["document"]["url"]]
+        return file_description
+
+    async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
+        """Create notes for a file using the vector search function"""
+        search_parameters["specific_dates"] = [""]
+        file_description = await self.find_file(search_parameters)
+        file_name = file_description[0]
+        file_url = file_description[1]
+
+        return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return return_value
     
     def validate_search_parameters(self, search_parameters):
         """Validates search parameters and enables fail-safes"""
@@ -561,8 +564,6 @@ class ConversationHandler:
         if search_parameters["course_id"] not in self.courses.values() and search_parameters["course_id"] != "all_courses":
             search_parameters["course_id"] = "all_courses"
         
-        # Time range update
-        valid_ranges = ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"]
         return search_parameters
     
 
@@ -690,6 +691,12 @@ class ConversationHandler:
                 result = {"error": f"Function '{function_name}' not implemented."}
 
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
+
+            if function_name == "create_notes":
+                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
+                self.chat_history.context[0].content[0] = return_value
+                return self.chat_history
+            
             chat.append({
                 'role': "function",
                 "name": function_name,
