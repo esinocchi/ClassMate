@@ -168,12 +168,18 @@ async def pullCourses(user_id, domain):
             all_courses += [course_formatted]
             courses_added += [course_id]
     
+    courses = []
+    
     #pull all classes from canvas api
     while True:
+       page = 1
+       
        async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+        async with session.get(f"https://{domain}/api/v1/courses?page={page}", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
             if response.status == 200:
-                courses = await response.json()
+                if response.json() == []:
+                    break
+                courses += await response.json()
             else:
                 return {"message": "Error pulling courses from canvas api"}
     
