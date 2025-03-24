@@ -499,7 +499,7 @@ class ConversationHandler:
             - generality
             - query
         """
-          
+        search_parameters["specific_dates"] = []
         from vectordb.db import VectorDatabase
         print("Imported VectorDatabase")
         
