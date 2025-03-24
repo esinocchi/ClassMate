@@ -62,17 +62,13 @@ async def search_db():
     hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
     db = VectorDatabase('user_data/psu/7214035/user_data.json', hf_api_token=hf_api_token)
     
-    # Now properly await the async methods
-    await db.clear_cache()
-    await db.process_data(force_reload=True)
-    
     output = await db.search({
         "course_id": "all_courses",
-        "time_range": "FUTURE",
+        "time_range": "NEAR_FUTURE",
         "item_types": ["assignment", "announcement"],
         "specific_dates": [],
         "keywords": ["next"],
-        "generality": "MEDIUM",
+        "generality": "LOW",
         "query": "What is my next assignment?"
     })
     
@@ -80,6 +76,7 @@ async def search_db():
 
 # Run the async function using asyncio
 if __name__ == "__main__":
+    get_canvas_data()
     result = asyncio.run(search_db())
     print(result)
     

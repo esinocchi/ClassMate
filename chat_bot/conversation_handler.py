@@ -64,37 +64,37 @@ class ConversationHandler:
         self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
-        
+        self.hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
         # Define valid types and time range definitions
         self.valid_types = ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
         self.time_range_definitions = {
+            "NEAR_FUTURE": {
+                "description": "Items within the next 10 days, including upcoming assignments.",
+                "logic": "now <= item <= now + 10d"
+            },
             "FUTURE": {
-                "description": "Upcoming items",
-                "logic": "item > now",
-                "weight": 1.2
+                "description": "Items to occur after the next 10 days.",
+                "logic": "now + 10d <= item"
             },
             "RECENT_PAST": {
-                "description": "Past 7 days",
-                "logic": "now - 7d <= item <= now",
-                "weight": 1.1
+                "description": "Items occurred within the past 10 days.",
+                "logic": "now - 10d <= item <= now"
             },
-            "EXTENDED_PAST": {
-                "description": "Past 30 days",
-                "logic": "now - 30d <= item <= now", 
-                "weight": 0.95
+            "PAST": {
+                "description": "Items occurred before the past 10 days.",
+                "logic": "item <= now - 10d"
             },
             "ALL_TIME": {
-                "description": "Any time",
-                "logic": "item exists",
-                "weight": 1.0
+                "description": "Items that exist at any point in time, regardless of when.",
+                "logic": "item exists"
             }
         }
         self.generality_definitions = {
-            "SPECIFIC": {
-                "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
-                "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
-                "result_type": "Very targeted set of results"
-            },
+            #"SPECIFIC": {
+            #    "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
+            #    "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
+            #    "result_type": "Very targeted set of results"
+            #},
             "LOW": {
                 "description": "Used when the user is looking for a small set of focused results about a narrow topic",
                 "examples": ["Find quizzes about neural networks in CMPSC 444", "Show me this week's assignments"],
@@ -136,13 +136,13 @@ class ConversationHandler:
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH",],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                "specific_amount": {
-                                    "type": "integer",
-                                    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                },
+                                #"specific_amount": {
+                                #    "type": "integer",
+                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
+                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -269,10 +269,10 @@ class ConversationHandler:
                                     "enum": ["LOW", "MEDIUM", "HIGH"],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                "specific_amount": {
-                                    "type": "integer",
-                                    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                },
+                                #"specific_amount": {
+                                #    "type": "integer",
+                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
+                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -473,7 +473,7 @@ class ConversationHandler:
         print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
-        vector_db = VectorDatabase(vector_db_path)
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
@@ -528,19 +528,15 @@ class ConversationHandler:
         
         return
     
-    def validate_keywords(self, keywords):
-        """Validates keywords and enables fail-safes"""
+    def validate_search_parameters(self, search_parameters):
+        """Validates search parameters and enables fail-safes"""
         # Course ID check
-        if keywords[0] not in self.courses.values() and keywords[0] != "all_courses":
-            keywords[0] = "all_courses"
+        if search_parameters["course_id"] not in self.courses.values() and search_parameters["course_id"] != "all_courses":
+            search_parameters["course_id"] = "all_courses"
         
         # Time range update
         valid_ranges = ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"]
-        if len(keywords) > 1 and keywords[1] not in valid_ranges:
-            keywords[1] = "ALL_TIME"
-        if len(keywords) > 2 and keywords[2] not in self.valid_types:
-            keywords[2] = "all_types"
-        return keywords[:10]
+        return search_parameters
     
 
     def transform_user_message(self, context: ContextObject):
