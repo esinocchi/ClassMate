@@ -694,7 +694,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": result, "function": [function_name, arguments]}
+                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
             
