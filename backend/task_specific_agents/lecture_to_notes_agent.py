@@ -25,7 +25,7 @@ async def async_file_download(file_url, api_token):
                 raise Exception(f"Failed to download file. Status code: {response.status}")
             return await response.read()
 
-def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
+async def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     """
     inputs:
     file_url: the url of the file to be downloaded
@@ -49,7 +49,7 @@ def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     print(API_TOKEN)
     
 
-    file_bytes = asyncio.run(async_file_download(file_url, API_TOKEN))
+    file_bytes = await async_file_download(file_url, API_TOKEN))
     # Make the request to download the file
     
     # Try to extract text and images from the file
