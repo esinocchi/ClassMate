@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from typing import List, Union
 from chat_bot.conversation_handler import ConversationHandler
 from backend.data_retrieval.data_handler import DataHandler
-from vectordb.db import VectorDatabase
 import aiohttp
 from dotenv import load_dotenv
 import time
@@ -221,9 +220,7 @@ async def pushCourses(classesData: PushClassesObject):
     
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
-    print("Updating user data...")
     handler.update_user_data()
-    print("User data updated")
 
     return {'message': "Courses pushed to database"}
 
@@ -275,7 +272,7 @@ async def initate_user(domain: str):
     else:
         handler = DataHandler(user_id, domain, token)
         handler.initiate_user_data()
-        
+
     return {'user_id': user_id}
 
 @app.put('/endpoints/deleteUserDataContext')
@@ -390,6 +387,7 @@ async def check_update_status(user_id, domain):
     """
     handler = DataHandler(user_id, domain)
     user_data = handler.grab_user_data()
+    print(f"\n\n\n this is the user data: {user_data} \n\n\n")
     return user_data["user_metadata"]["is_updating"]
 
 async def oauthTokenGenerator():
