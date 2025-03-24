@@ -102,7 +102,7 @@ def prompt_to_pdf(prompt: str, user_id, domain: str):
         print("trying to make pdf")
 
         if os.path.exists("latexoutput.pdf"):
-            shutil.move("latexoutput.pdf", f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.pdf")
+            shutil.move("latexoutput.pdf", f"{CanvasAI_dir}/media_output/{domain}/{user_id}/output.pdf")
     except:
         return "ERROR: pdf couldn't be created"
     #if the LaTeX file to pdf conversion doesn't work, return an Error
@@ -112,5 +112,7 @@ def prompt_to_pdf(prompt: str, user_id, domain: str):
     #delete the LaTeX, file
 
     return "PDF TO LATEX SUCESSFUL"
+
+prompt_to_pdf("what is the capital of the moon?", "7210330", "psu.instructure.com")
 
 
