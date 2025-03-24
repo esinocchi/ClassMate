@@ -281,14 +281,14 @@ class ConversationHandler:
                                     },
                                     "description": "This should always be ['syllabus']"
                                 },
-                                "specific_dates": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "format": "date"
-                                    },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
-                                },
+                               #"specific_dates": {
+                                #    "type": "array",
+                                #    "items": {
+                                #        "type": "string",
+                                #        "format": "date"
+                                #    },
+                                #    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                                #},
                                 "keywords": {
                                     "type": "array",
                                     "items": {
@@ -301,7 +301,7 @@ class ConversationHandler:
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types", ,"generality","keywords", "query"]
                         }
                     },
                     "required": ["search_parameters"]
@@ -499,7 +499,6 @@ class ConversationHandler:
             - generality
             - query
         """
-        search_parameters["specific_dates"] = []
         from vectordb.db import VectorDatabase
         print("Imported VectorDatabase")
         
