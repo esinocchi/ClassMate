@@ -96,7 +96,6 @@ async def mainPipelineEntry(contextArray: ContextObject):
         user_context = context_data[1]
         user_id = user_context.user_id
         user_domain = user_context.domain
-        print(f"JACOB GOONS: {user_domain}")
 
         
         handler = DataHandler(user_id, user_domain)
@@ -168,8 +167,6 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
-
-    print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
     
     courses = []
     
@@ -197,12 +194,9 @@ async def pullCourses(user_id, domain):
     for course in courses:
 
         if str(course.get("id")) not in courses_added and course.get("name"):
-            print(course)
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
             courses_added += [str(course.get("id"))]
-
-    print(f"\n\n\n these are the courses added: {courses_added} after pulling all classes\n\n\n")
 
     #classes are returned in the format {course_id: course_name}
     return {'courses': all_courses}
@@ -270,8 +264,6 @@ async def initate_user(domain: str):
 
     #get user id from canvas api
     async with aiohttp.ClientSession() as session:
-    
-        print(token)
 
         async with session.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"}) as response:
             if response.status == 200:
@@ -369,17 +361,14 @@ async def check_chat_requirements(contextArray: ContextObject):
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
-    print(f"\n\n\n{user_context}\n\n\n")
 
     #if user data update is currently in progress, return error message
     #if await check_update_status(user_context.user_id, user_context.domain):
     #    return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    print("active")
 
     for i in range(len(user_context.classes)):
-        print(user_context.classes[i].selected)
         if user_context.classes[i].selected == True:
             return "None"
     
