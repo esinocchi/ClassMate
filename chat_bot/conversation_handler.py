@@ -68,25 +68,25 @@ class ConversationHandler:
         # Define valid types and time range definitions
         self.valid_types = ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
         self.time_range_definitions = {
+            "NEAR_FUTURE": {
+                "description": "Items within the next 10 days, including upcoming assignments.",
+                "logic": "now <= item <= now + 10d"
+            },
             "FUTURE": {
-                "description": "Upcoming items",
-                "logic": "item > now",
-                "weight": 1.2
+                "description": "Items to occur after the next 10 days.",
+                "logic": "now + 10d <= item"
             },
             "RECENT_PAST": {
-                "description": "Past 7 days",
-                "logic": "now - 7d <= item <= now",
-                "weight": 1.1
+                "description": "Items occurred within the past 10 days.",
+                "logic": "now - 10d <= item <= now"
             },
-            "EXTENDED_PAST": {
-                "description": "Past 30 days",
-                "logic": "now - 30d <= item <= now", 
-                "weight": 0.95
+            "PAST": {
+                "description": "Items occurred before the past 10 days.",
+                "logic": "item <= now - 10d"
             },
             "ALL_TIME": {
-                "description": "Any time",
-                "logic": "item exists",
-                "weight": 1.0
+                "description": "Items that exist at any point in time, regardless of when.",
+                "logic": "item exists"
             }
         }
         self.generality_definitions = {
@@ -528,19 +528,15 @@ class ConversationHandler:
         
         return
     
-    def validate_keywords(self, keywords):
-        """Validates keywords and enables fail-safes"""
+    def validate_search_parameters(self, search_parameters):
+        """Validates search parameters and enables fail-safes"""
         # Course ID check
-        if keywords[0] not in self.courses.values() and keywords[0] != "all_courses":
-            keywords[0] = "all_courses"
+        if search_parameters["course_id"] not in self.courses.values() and search_parameters["course_id"] != "all_courses":
+            search_parameters["course_id"] = "all_courses"
         
         # Time range update
         valid_ranges = ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"]
-        if len(keywords) > 1 and keywords[1] not in valid_ranges:
-            keywords[1] = "ALL_TIME"
-        if len(keywords) > 2 and keywords[2] not in self.valid_types:
-            keywords[2] = "all_types"
-        return keywords[:10]
+        return search_parameters
     
 
     def transform_user_message(self, context: ContextObject):
