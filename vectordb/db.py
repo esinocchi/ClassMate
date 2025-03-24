@@ -309,7 +309,7 @@ class VectorDatabase:
         #     "Module Name: Module 1",
         #     "Content Link(s):
         #       https://www.example.com
-        #       https://www.example.com
+        #       https://www.example.co 
         #       https://www.example.com
         #       https://www.example.com
         #       https://www.example.com
@@ -728,6 +728,7 @@ class VectorDatabase:
             return []
         
         time_range = search_parameters["time_range"]
+
         current_time = datetime.now(timezone.utc)
         current_timestamp = int(current_time.timestamp())
         
@@ -735,30 +736,39 @@ class VectorDatabase:
         timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
         
         range_conditions = []
+
+        ten_days_from_now = current_time + timedelta(days=10)
+        ten_days_from_now_timestamp = int(ten_days_from_now.timestamp())
         
-        if time_range == "FUTURE":
-            for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": current_timestamp}}) # $gte: >=
-                # filter: item >= current_timestamp
-            
-        elif time_range == "RECENT_PAST":
-            fourteen_days_ago = current_time - timedelta(days=14)
-            fourteen_days_ago_timestamp = int(fourteen_days_ago.timestamp())
-            
+        if time_range == "NEAR_FUTURE":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$lte": current_timestamp}}, # $lte: <=
-                        {field: {"$gte": fourteen_days_ago_timestamp}} # $gte: >=
+                        {field: {"$gte": current_timestamp}},  # Now
+                        {field: {"$lte": ten_days_from_now_timestamp}}  # Now + 10 days
                     ]
                 })
-                # filter: item <= current_timestamp AND item >= fourteen_days_ago_timestamp
-
-        elif time_range == "EXTENDED_PAST":
-            # Any time before current date (no lower bound)
+        
+        elif time_range == "FUTURE":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": current_timestamp}}) # $lte: <=
-                # filter: item <= current_timestamp
+                range_conditions.append({field: {"$gte": ten_days_from_now_timestamp}})  # Future items only
+        
+        elif time_range == "RECENT_PAST":
+            for field in timestamp_fields:
+                range_conditions.append({
+                    "$and": [
+                        {field: {"$gte": ten_days_from_now_timestamp}},  # Now - 10 days
+                        {field: {"$lte": current_timestamp}}  # Now
+                    ]
+                })
+        
+        elif time_range == "PAST":
+            for field in timestamp_fields:
+                range_conditions.append({field: {"$lte": ten_days_from_now_timestamp}})  # Past items only
+        
+        elif time_range == "ALL_TIME":
+            # No filtering needed, return empty list
+            return []
         
         # Return time range condition or empty list if no valid range
         return [{"$or": range_conditions}] if range_conditions else []
@@ -1052,26 +1062,102 @@ class VectorDatabase:
                     'is_related': True
                 })
 
-    def determine_top_k(self, search_parameters):
+    def _determine_top_k(self, search_parameters):
         """
-        Determine the number of top results to return based on the search parameters.
+        Determine the number of top results to return based on generality
+        and other search parameters for optimized retrieval.
+        
+        Args:
+            search_parameters: Dictionary containing filter parameters
+            
+        Returns:
+            Integer representing the top_k value to use for search
         """
-        generality_mapping = {
-            "LOW": 5,
-            "MEDIUM": 10,
-            "HIGH": 20
+        # Default mapping of generality levels to top_k values
+        generality_mapping = { 
+            "LOW": 5,         # Focused search
+            "MEDIUM": 10,     # Balanced approach (default)
+            "HIGH": 20        # Comprehensive search
         }
-
-        generality = search_parameters.get("generality")
-
-        try:
-            top_k = int(generality) # if generality is a specific number, return that number
-        except ValueError:
+        # Extract generality from parameters, default to MEDIUM
+        generality = search_parameters.get("generality", "MEDIUM")
+        
+        # Check if generality is a numeric value
+        if search_parameters.get("specific_amount"):
+            top_k = search_parameters.get("specific_amount")
+        else:
+            # Handle string generality values
             if generality in generality_mapping:
-                return generality_mapping[generality] # if generality is a valid generality, return the corresponding number
+                top_k = generality_mapping[generality]
             else:
-                return generality_mapping["MEDIUM"]
-        return top_k
+                top_k = generality_mapping["MEDIUM"]
+
+        course_id = search_parameters.get("course_id", "all_courses")
+        if course_id == "all_courses" and not isinstance(top_k, int):
+            top_k = int(top_k * 1.5)
+        
+        # Adjust for time range - use fewer results for shorter time ranges
+        time_range = search_parameters.get("time_range", "ALL_TIME")
+        if time_range in ["NEAR_FUTURE", "RECENT_PAST"]:
+            top_k = max(3, int(top_k * 0.8))
+        
+        # Ensure reasonable limits
+        return max(1, min(top_k, 30))
+    
+    def _augment_results(self, search_results):
+        """
+        Augment search results with additional information.
+        
+        Args:
+            search_results: List of search result dictionaries
+        """
+        for result in search_results:
+            doc = result['document']
+            doc_type = doc.get('type', '')
+            
+            # Add course name
+            course_id = doc.get('course_id')
+            if course_id and course_id in self.course_map:
+                # Get course name and code
+                course = self.course_map[course_id]
+                course_name, course_code = course.get('name', ''), course.get('course_code', '')
+
+                doc['course_name'] = course_name
+                doc['course_code'] = course_code
+
+            # Add time context
+            for date_field in ['due_at', 'posted_at', 'start_at', 'updated_at']:
+                if date_field in doc and doc[date_field]:
+                    try:
+                        date_obj = datetime.fromisoformat(doc[date_field].replace('Z', '+00:00'))
+                        now = datetime.now(timezone.utc)
+                        
+                        # Add relative time
+                        delta = date_obj - now
+                        days = delta.days
+                        
+                        if days > 0:
+                            if days == 0:
+                                doc['relative_time'] = "Today"
+                            elif days == 1:
+                                doc['relative_time'] = "Tomorrow"
+                            elif days < 7:
+                                doc['relative_time'] = f"In {days} days"
+                        else:
+                            days = abs(days)
+                            if days == 0:
+                                doc['relative_time'] = "Today"
+                            elif days == 1:
+                                doc['relative_time'] = "Yesterday"
+                            elif days < 7:
+                                doc['relative_time'] = f"{days} days ago"
+                        
+                        break  # Only process the first date field found
+                    except:
+                        pass
+        
+        return search_results
+
 
     async def search(self, search_parameters: Optional[dict] = None,
                include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
@@ -1150,6 +1236,9 @@ class VectorDatabase:
         
         # Post-process to prioritize exact and partial matches
         combined_results = self._post_process_results(search_results, normalized_query)
+
+        # Augment results with additional information
+        combined_results = self._augment_results(combined_results)
         
         return combined_results[:top_k]
     

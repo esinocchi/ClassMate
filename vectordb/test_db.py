@@ -68,11 +68,11 @@ async def search_db():
     
     output = await db.search({
         "course_id": "all_courses",
-        "time_range": "FUTURE",
+        "time_range": "NEAR_FUTURE",
         "item_types": ["assignment", "announcement"],
         "specific_dates": [],
         "keywords": ["next"],
-        "generality": "MEDIUM",
+        "generality": "LOW",
         "query": "What is my next assignment?"
     })
     
