@@ -510,7 +510,7 @@ class ConversationHandler:
         print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
-        vector_db = VectorDatabase(vector_db_path)
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")

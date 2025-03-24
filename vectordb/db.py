@@ -57,8 +57,11 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger("canvas_vector_db")
 
@@ -339,7 +342,7 @@ class VectorDatabase:
     
     
         
-    async def process_data(self, force_reload: bool = False) -> bool:
+    async def process_data(self, force_reload: bool = True) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
@@ -497,7 +500,6 @@ class VectorDatabase:
         
         # Generate embeddings first
         embeddings = self.embedding_function(texts)
-        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
 
         # Then add to collection with explicit embeddings
         self.collection.add(
