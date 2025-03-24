@@ -62,12 +62,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("canvas_vector_db")
 
-# Constants
-DEFAULT_CACHE_DIR = "chroma_data/"
-DEFAULT_COLLECTION_NAME = "canvas_embeddings"
+
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir: str = DEFAULT_CACHE_DIR, collection_name: str = None, hf_api_token: str = None):
+    def __init__(self, json_file_path: str, cache_dir = "chroma_data/", collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
@@ -89,7 +87,7 @@ class VectorDatabase:
                 self.collection_name = f"canvas_embeddings_{user_id}"
             except Exception as e:
                 logger.error(f"Error loading JSON file to get user_id: {e}")
-                self.collection_name = DEFAULT_COLLECTION_NAME
+                self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
         

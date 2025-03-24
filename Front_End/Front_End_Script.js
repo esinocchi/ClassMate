@@ -82,14 +82,17 @@ saveClassesButton.addEventListener("click", () => {
     chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
         let Context = result.Context_CanvasAI || dataHolder;
 
+        console.log(Context)
+
+        if(await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes)){
+
         for (let i = Context[1].classes.length - 1; i >= 0; i--) {
             //update selected value for store checkboxes (store as string for json purposes)
             Context[1].classes[i].selected = states[`${Context[1].classes[i].name}`]
         }
         chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
         console.log(Context);
-
-        await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes);
+    }
     }); 
 
 
@@ -162,7 +165,7 @@ async function handlePrompt() {
 
                 //check if the id is already stored
                 if (promptPairs[1].user_id == "holder") {
-                    promptPairs[1].user_id = retrieveID(promptPairs[1].domain);
+                    promptPairs[1].user_id = await retrieveID(promptPairs[1].domain);
                 }
 
                 // If the list is longer than 20, pop the last index and add the new prompt-response pair
@@ -343,6 +346,8 @@ async function rebuildPage() {
                         context[1].user_id = await retrieveID(context[1].domain);
                     }
 
+                    console.log(context)
+
                     for (let i = context[0].content.length - 1; i >= 0; i--) {
                         addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
                     };
@@ -510,7 +515,7 @@ async function pushClasses(id, domain, classes){
                 body: JSON.stringify(requestBody),
             });
             console.log("good")
-            return response
+            return true
         } catch (error) {
             console.log("error")
             return false;

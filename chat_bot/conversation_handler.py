@@ -64,7 +64,7 @@ class ConversationHandler:
         self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
-        
+        self.hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
         # Define valid types and time range definitions
         self.valid_types = ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
         self.time_range_definitions = {
@@ -473,7 +473,7 @@ class ConversationHandler:
         print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
-        vector_db = VectorDatabase(vector_db_path)
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")

@@ -211,12 +211,16 @@ class DataHandler:
         Grabs the user_data from the user's data file
         """
         file_path = self._get_user_data_path()
+        print(f"FILE PATH: {file_path}")
         if not os.path.exists(file_path):
+            print("\n\n\nNOOOOOOOOOOOOOT FOUUUUUUUUUUUUUUND \n\n\n")
             return "User data file not found"
             
         try:
             with open(file_path, "r") as f:
                 user_data = json.load(f)
+
+            print("\n\n\n\nGoon\n\n\n\n")
             
             # Update instance variables from loaded data
             metadata = user_data["user_metadata"]
@@ -226,6 +230,7 @@ class DataHandler:
             self.is_updating = metadata["is_updating"]
             return user_data
         except Exception as e:
+            print(f"Error grabbing user data: {str(e)}")
             return f"Error grabbing user data: {str(e)}"
 
     def update_user_data(self):
@@ -273,7 +278,7 @@ class DataHandler:
                     
                     # Save the updated data
                     self.save_user_data(updated_user_data)
-                    db = VectorDatabase(self._get_user_data_path(), self.hf_api_token)
+                    db = VectorDatabase(self._get_user_data_path(), hf_api_token=self.hf_api_token, cache_dir="chroma_data/")
                     await db.process_data(force_reload=True)
                     self.set_is_updating(False)
                     
