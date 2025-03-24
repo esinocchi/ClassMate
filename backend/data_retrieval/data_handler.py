@@ -7,7 +7,7 @@ import asyncio
 import threading
 from dotenv import load_dotenv
 import shutil
-
+from vectordb.db import VectorDatabase
 load_dotenv()
 
 
@@ -117,6 +117,7 @@ class DataHandler:
         self.id = id
         self.name = short_name
         self.API_TOKEN = token
+        self.hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
         self.domain = domain.split('.')[0]  # Just get 'psu' from 'psu.instructure.com'
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.API_URL = f"https://{domain}/api/v1"
@@ -272,6 +273,8 @@ class DataHandler:
                     
                     # Save the updated data
                     self.save_user_data(updated_user_data)
+                    db = VectorDatabase(self._get_user_data_path(), self.hf_api_token)
+                    await db.process_data(force_reload=True)
                     self.set_is_updating(False)
                     
                     end_time = time.time()
