@@ -1284,6 +1284,7 @@ class VectorDatabase:
                 continue
 
             print(f"Processing document: {doc.get('name', '')}")
+            print(doc)
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
@@ -1294,16 +1295,17 @@ class VectorDatabase:
                 continue
             
             # Extract content for files if needed
-            if doc.get('type') == 'file' and ('content' not in doc or not doc['content']):
+            if doc.get('type') == 'assignment':
+                print("\n\nworks\n\n")
                 try:
-                    doc['content'] = await self.extract_file_content(doc)
-                    if doc['content']:
+                    doc['description'] = await self.extract_file_content(doc)
+                    if doc['description']:
                         print(f"Extracted content for file: {doc.get('display_name', '')}")
                 except Exception as e:
                     print(f"Failed to extract content: {e}")
             
             # Add to results
-            print(f"Adding doc {doc_id} to results with similarity {similarity}")
+            print(f"Adding doc {doc.get('name', '')} to results with similarity {similarity}")
             search_results.append({
                 'document': doc,
                 'similarity': similarity
@@ -1318,6 +1320,9 @@ class VectorDatabase:
 
         # Augment results with additional information
         combined_results = self._augment_results(combined_results)
+
+        for result in combined_results:
+            result.pop('similarity', None)  # Remove similarity score from each result
         
         return combined_results[:top_k]
     
