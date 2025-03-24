@@ -316,7 +316,7 @@ function addMemoryBox(prompt, response, downloadlink) {
     memoryBox.appendChild(promptBox);
     memoryBox.appendChild(responseBox);
 
-    if(downloadlink = true) {
+    if (downloadlink == true) {
         const downloadButton = document.createElement("button");
         downloadButton.classList.add("toolbarChildButton")
         memoryBox.appendChild(downloadButton);
