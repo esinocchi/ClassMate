@@ -31,7 +31,7 @@ Note: Ensure that the JSON data file is structured correctly, containing user me
 import os
 import json
 import sys
-import logging
+import tzlocal
 import numpy as np
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -759,7 +759,9 @@ class VectorDatabase:
         
         time_range = search_parameters["time_range"]
 
-        current_time = datetime.now(timezone.utc)
+        # Get current time in local timezone, then convert to UTC for timestamp comparison
+        local_timezone = tzlocal.get_localzone()
+        current_time = datetime.now(local_timezone)
         current_timestamp = int(current_time.timestamp())
         
         # List of all possible timestamp fields across different document types
@@ -819,10 +821,18 @@ class VectorDatabase:
         if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
             return []
         
+        local_timezone = tzlocal.get_localzone()
         specific_dates = []
+        
         for date_str in search_parameters["specific_dates"]:
             try:
-                specific_date = datetime.strptime(date_str, "%Y-%m-%d")
+                # Parse naive date (without timezone)
+                naive_date = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                # Make it timezone-aware by replacing the tzinfo
+                # This is the modern way that works with both pytz and zoneinfo
+                specific_date = naive_date.replace(tzinfo=local_timezone)
+                
                 specific_dates.append(specific_date)
             except ValueError:
                 print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
@@ -846,8 +856,6 @@ class VectorDatabase:
                         {field: {"$lte": end_timestamp}} # $lte: <=
                     ]
                 })
-                # filter: item >= start_timestamp AND item <= end_timestamp
-                # item must be on EXACT specific_date when filtering by a single date
 
         elif len(specific_dates) >= 2:
             # Date range
@@ -864,8 +872,6 @@ class VectorDatabase:
                         {field: {"$lte": end_timestamp}} # $lte: <=
                     ]
                 })
-                # filter: item >= start_timestamp AND item <= end_timestamp
-                # item must be between start_date and end_date when filtering by a date range
         
         # Return date condition or empty list if no valid conditions
         return [{"$or": date_conditions}] if date_conditions else []
@@ -1144,6 +1150,8 @@ class VectorDatabase:
         Args:
             search_results: List of search result dictionaries
         """
+        local_timezone = tzlocal.get_localzone()
+        
         for result in search_results:
             doc = result['document']
             doc_type = doc.get('type', '')
@@ -1162,11 +1170,18 @@ class VectorDatabase:
             for date_field in ['due_at', 'posted_at', 'start_at', 'updated_at']:
                 if date_field in doc and doc[date_field]:
                     try:
+                        # Parse date from UTC and convert to local timezone
                         date_obj = datetime.fromisoformat(doc[date_field].replace('Z', '+00:00'))
-                        now = datetime.now(timezone.utc)
+                        local_date = date_obj.astimezone(local_timezone)
+                        
+                        # Add localized time string
+                        doc[f'local_{date_field}'] = local_date.strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Now calculate relative time using local time
+                        now = datetime.now(local_timezone)
                         
                         # Add relative time
-                        delta = date_obj - now
+                        delta = local_date - now
                         days = delta.days
                         
                         if days > 0:
@@ -1186,8 +1201,8 @@ class VectorDatabase:
                                 doc['relative_time'] = f"{days} days ago"
                         
                         break  # Only process the first date field found
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"Error converting time: {e}")
         
         return search_results
 
@@ -1274,6 +1289,7 @@ class VectorDatabase:
 
         for result in combined_results:
             result.pop('similarity', None)  # Remove similarity score from each result
+            result.pop('related_docs', None) # Remove related docs from each result for now, not currently being used
         
         print(combined_results)
         return combined_results[:top_k]

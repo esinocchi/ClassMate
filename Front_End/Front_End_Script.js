@@ -83,15 +83,12 @@ saveClassesButton.addEventListener("click", () => {
             Context[1].user_id = await retrieveID(Context[1].domain);
         }
 
-        console.log(Context)
-
         if(await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes)){
         for (let i = Context[1].classes.length - 1; i >= 0; i--) {
             //update selected value for store checkboxes (store as string for json purposes)
             Context[1].classes[i].selected = states[`${Context[1].classes[i].name}`]
         }
         chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
-        console.log(Context);
     }
     }); 
 
@@ -182,14 +179,15 @@ async function handlePrompt() {
                     promptPairs[1].content.unshift(prompt);
                 }
 
-                console.log(promptPairs[1].content)
-
                 try {
                     console.log(promptPairs);
+
                     const updated = await mainPipelineEntry({"context": promptPairs}); // Update memory of response based on pipeline return
 
+                    console.log("notes info", updated.context[0].content[0].function[0])
+                    console.log(updated.context[0].content[0].message)
                     //check for pdf notes output
-                    if(updated.context[0].content[0].function[0] == "create_notes") {
+                    if(updated.context[0].content[0].function[0] == "create_notes" && updated.context[0].content[0].message != "") {
                         response = [updated.context[0].content[0].message, true]
                     } else {
                         response = updated.context[0].content[0].message; // Update response for display
@@ -206,8 +204,6 @@ async function handlePrompt() {
                 }
             });
         });
-
-        console.log(response);
 
         // Remove loading spinner after adding memory box
         loadingSpinner.remove();
@@ -317,6 +313,8 @@ function addMemoryBox(prompt, response, downloadlink) {
     if (downloadlink == true) {
         const downloadButton = document.createElement("button");
         downloadButton.classList.add("toolbarChildButton")
+        downloadButton.style.width = "40%";
+        downloadButton.textContent = "download";
         memoryBox.appendChild(downloadButton);
 
         downloadButton.addEventListener("click", function(event) {
@@ -375,7 +373,6 @@ const interval = setInterval(() => {
 
 //rebuild class selections and past chats
 async function rebuildPage() {
-    resetAllMemory();
     try {
         await new Promise((resolve, reject) => {
             try{
@@ -402,8 +399,6 @@ async function rebuildPage() {
                     for (let i = context[1].classes.length - 1; i >= 0; i--) {
                         addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
                     };
-
-                    console.log('final: ', context)
 
                     // Save updated list back to local storage
                     chrome.storage.local.set({ Context_CanvasAI: context}, function() {
@@ -457,7 +452,6 @@ function resetAllMemory() {
     });
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         console.log(result.Context_CanvasAI);
-        console.log(result.Context_CanvasAI[1].user_id);
     });
 }
 
@@ -547,9 +541,7 @@ async function pushClasses(id, domain, classes){
     let boolean1 = await isUpdating(id, domain);
     console.log(boolean1);
     if (boolean1 == false) {
-        console.log("going");
         try {
-            console.log("gone")
             //add new pydantic model for pass
             const requestBody = {
                 user_id: id,
@@ -563,10 +555,8 @@ async function pushClasses(id, domain, classes){
                 },
                 body: JSON.stringify(requestBody),
             });
-            console.log("good")
             return true
         } catch (error) {
-            console.log("error")
             return false;
         }
     } else {
@@ -576,11 +566,9 @@ async function pushClasses(id, domain, classes){
 }
 
 async function isUpdating(user_id, domain){
-    console.log("active")
     try {
             const response = await fetch(`https://canvasclassmate.me/endpoints/check_update_status?user_id=${user_id}&domain=${domain}`);
             const updating = await response.json(); // Add await here
-            console.log(updating)
             return updating
     } catch (error) {
         console.log("error1")

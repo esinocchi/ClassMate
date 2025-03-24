@@ -543,7 +543,6 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-                For example, if the user asks for the next 3 upcoming assignments, you will check which 3 assignments are next relative to the current date.
             - For note creation requests, respond with the note pdf file that was created.
             -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
         """
