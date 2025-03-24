@@ -545,11 +545,8 @@ class ConversationHandler:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             file = []
-        print(f"File: {file}")
-        print(f"File type: {type(file)}")
-        print(f"file name: {file[0]['filename']}")
-        print(f"file url: {file[0]['url']}")
-        file_description = [file[0]["filename"], file[0]["url"]]
+        
+        file_description = [file[0]["document"]["filename"], file[0]["document"]["url"]]
         return file_description
 
     async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
