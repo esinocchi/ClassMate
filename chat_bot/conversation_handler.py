@@ -408,7 +408,7 @@ class ConversationHandler:
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should be based on the query"
+                                    "description": "this should always be ['assignment']"
                                 },
                                 "query": {
                                     "type": "string",
@@ -486,7 +486,7 @@ class ConversationHandler:
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
             - For note creation requests, generate arguments as defined in the function list.
-            - For grade calculation requests, the arguments should be studnet_id, target_grade_letter, and search_parameters. within the search parameters, the keywords should be based of the assignment name. For example, if they say "Lab week 9", the keywords should be ["lab"]. Do not include anything extra. 
+            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
