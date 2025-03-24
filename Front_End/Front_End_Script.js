@@ -37,10 +37,6 @@ chat.innerHTML = `
 </div>
 <div id="toolbar" class="footer">
     <button id="clearPromptButton" class="toolbarChildButton">New Chat</button>
-    <div class="dropdown" id="dropdown">
-        <button class="toolbarChildButton" onclick="toggleDropdown()">Select Recent Doc</button>
-        <div class="dropdown-menu" id="dropdownMenu">
-    </div>
   </div>
 </div>
 `;
@@ -135,21 +131,7 @@ document.addEventListener("keydown", function(event) {
 window.addEventListener("load", () => {
     rebuildPage();
 });
-  
-  // Close dropdown if user clicks outside
-  document.addEventListener('click', function(event) {
-    const dropdown = document.getElementById('dropdown');
-    if (!dropdown.contains(event.target)) {
-      document.getElementById('dropdownMenu').classList.remove('show');
-    }
-  });
-
-// Function to toggle the dropdown menu
-function toggleDropdown() {
-    const menu = document.getElementById('dropdownMenu');
-    menu.classList.toggle('show'); // Toggles visibility
-  }
-
+ 
 //main functionality for prompt handling
 async function handlePrompt() {
     // Get and remove value from the prompt entry box
@@ -161,6 +143,19 @@ async function handlePrompt() {
         return;
     }
     try {
+
+        const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
+        
+        dynamicBoxesContainer.classList.add("used"); // Adds 'used' class to dynamicBoxesContainer for any additional styling
+
+        // Create and append loading spinner
+        const loadingSpinner = document.createElement("div");
+        loadingSpinner.classList.add("loading-spinner"); // Ensure you have CSS for this class
+        loadingSpinner.innerHTML = `<div class="loader"></div>`; // Adjust styling in CSS
+        dynamicBoxesContainer.appendChild(loadingSpinner);
+
+        dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Keeps the scroll position at the bottom
+
 
         // Wait for the promptPairs to be updated in local storage
         await new Promise((resolve, reject) => {
@@ -213,6 +208,9 @@ async function handlePrompt() {
         });
 
         console.log(response);
+
+        // Remove loading spinner after adding memory box
+        loadingSpinner.remove();
 
         if (Array.isArray(response)){
             addMemoryBox(prompt, response, true); //add memory box for display
@@ -395,7 +393,7 @@ async function rebuildPage() {
                     console.log(context)
 
                     for (let i = context[0].content.length - 1; i >= 0; i--) {
-                        addMemoryBox(context[1].content[i], context[0].content[i].message); //reload chat history context based on storage
+                        addMemoryBox(context[1].content[i], context[0].content[i].message, false); //reload chat history context based on storage
                     };
 
                     if (context[1].classes[0].id == ""){
