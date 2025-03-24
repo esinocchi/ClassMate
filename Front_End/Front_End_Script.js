@@ -195,7 +195,7 @@ async function handlePrompt() {
 
                     //check for pdf notes output
                     if(updated.context[0].content[0].function[0] == "create_notes") {
-                        response = [updated.context[0].content[0].message, ]
+                        response = [updated.context[0].content[0].message, true]
                     } else {
                         response = updated.context[0].content[0].message; // Update response for display
                     }
@@ -293,7 +293,7 @@ function addClassSetting(classID, checked) {
 }
 
 //create memory box for previous chats
-function addMemoryBox(prompt, response, downloadlink = false) {
+function addMemoryBox(prompt, response, downloadlink) {
     if (prompt == '') {
         return -1;
     }
@@ -320,7 +320,7 @@ function addMemoryBox(prompt, response, downloadlink = false) {
         memoryBox.appendChild(downloadButton);
 
         downloadButton.addEventListener("click", function(event) {
-            
+            pullPDF();
         });
     }
 
@@ -564,6 +564,26 @@ async function isUpdating(user_id, domain){
             return updating
     } catch (error) {
         console.log("error1")
+        return false;
+    }
+}
+
+async function pullPDF(user_id, domain) {
+    try {
+        const response = await fetch(`https://canvasclassmate.me/endpoints/pullNotes?user_id=${user_id}&domain=${domain}`);
+
+        if (!response.ok) {
+            console.error('Failed to download document');
+            return;
+        }
+    
+        const blob = await response.blob();  // Convert the response to a Blob object
+        const url = URL.createObjectURL(blob);
+    
+        // Open the PDF in a new tab
+        window.open(url, '_blank');
+    } catch (error) {
+        console.log("error pulling pdf")
         return false;
     }
 }
