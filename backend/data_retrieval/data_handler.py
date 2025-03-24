@@ -1,4 +1,3 @@
-from docx import Document 
 import aiohttp
 import os
 import time
@@ -7,6 +6,7 @@ from .get_all_user_data import get_all_user_data
 import asyncio
 import threading
 from dotenv import load_dotenv
+import shutil
 
 load_dotenv()
 
@@ -328,11 +328,10 @@ class DataHandler:
         backend_dir = os.path.dirname(current_dir)
         CanvasAI_dir = os.path.dirname(backend_dir)
 
-        pdf_file_path = f"{CanvasAI_dir}/media_output/{self.domain}/{self.id}/latexoutput.pdf"
-        if os.path.exists(pdf_file_path):
-            os.remove(pdf_file_path)
-            
+        output_file_path = f"{CanvasAI_dir}/media_output/{self.domain}/{self.id}"
+        clear_directory(output_file_path)   
         user_data["current_chat_context"] = ""
+        
         return self.save_user_data(user_data)
     
     def update_courses_selected(self, courses_selected: dict):
@@ -373,7 +372,23 @@ class DataHandler:
             
         return self.save_user_data(user_data)
 
+def clear_directory(directory_path):
+    """Clears all files and subdirectories within a directory.
 
+    Args:
+        directory_path: The path to the directory to clear.
+    """
+    for filename in os.listdir(directory_path):
+        file_path = os.path.join(directory_path, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print(f"Failed to delete {file_path}. Reason: {e}")
+    return "Directory Cleared"
+    
 
 
 

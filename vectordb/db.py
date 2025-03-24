@@ -1052,7 +1052,28 @@ class VectorDatabase:
                     'is_related': True
                 })
 
-    async def search(self, search_parameters: Optional[dict] = None, top_k: int = 5,
+    def determine_top_k(self, search_parameters):
+        """
+        Determine the number of top results to return based on the search parameters.
+        """
+        generality_mapping = {
+            "LOW": 5,
+            "MEDIUM": 10,
+            "HIGH": 20
+        }
+
+        generality = search_parameters.get("generality")
+
+        try:
+            top_k = int(generality) # if generality is a specific number, return that number
+        except ValueError:
+            if generality in generality_mapping:
+                return generality_mapping[generality] # if generality is a valid generality, return the corresponding number
+            else:
+                return generality_mapping["MEDIUM"]
+        return top_k
+
+    async def search(self, search_parameters: Optional[dict] = None,
                include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
         """
         Search for documents similar to the query.
@@ -1072,15 +1093,19 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        # Build query for ChromaDB including time-based filters
+        # Build query for ChromaDB including course id, item type, and time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
+        top_k = self.determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
         logger.debug(f"Search query: '{normalized_query}'")
         logger.debug(f"Search parameters: {search_parameters}")
+
+        task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
+        formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
         
         # Execute ChromaDB query
-        results = await self._execute_chromadb_query(normalized_query, query_where, top_k)
+        results = await self._execute_chromadb_query(formatted_query, query_where, top_k)
         
         # Process results
         search_results = []
@@ -1090,9 +1115,10 @@ class VectorDatabase:
         # Process each document
         for i, doc_id in enumerate(doc_ids):
             doc = self.document_map.get(doc_id)
-            logger.info(f"Processing document: {doc.get('name', '')}")
             if not doc:
                 continue
+
+            logger.info(f"Processing document: {doc.get('name', '')}")
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)

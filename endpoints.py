@@ -167,6 +167,8 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
+
+    print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
     
     #pull all classes from canvas api
     async with aiohttp.ClientSession() as session:
@@ -179,10 +181,13 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course.get("id") not in courses_added and course.get("name"):
+        if str(course.get("id")) not in courses_added and course.get("name"):
             print(course)
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
+            courses_added += [str(course.get("id"))]
+
+    print(f"\n\n\n these are the courses added: {courses_added} after pulling all classes\n\n\n")
 
     #classes are returned in the format {course_id: course_name}
     return {'courses': all_courses}
@@ -216,6 +221,7 @@ async def pushCourses(classesData: PushClassesObject):
             courses_selected[course.id] = course.name
     
     handler = DataHandler(classesData.user_id, classesData.domain)
+    
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
     handler.update_user_data()
@@ -360,10 +366,9 @@ async def check_chat_requirements(contextArray: ContextObject):
         print(user_context.classes[i].selected)
         if user_context.classes[i].selected == True:
             return "None"
-        else:
-            return "Please select at least one course in the settings page to continue"
-    #if user has all requirements, return "None" as in no chat requirements
-    return "None"
+    
+    return "Please select at least one course in the settings page to continue"
+    
 
 @app.get('/endpoints/check_update_status')
 async def check_update_status(user_id, domain):

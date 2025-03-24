@@ -91,7 +91,7 @@ class ConversationHandler:
         }
         self.generality_definitions = {
             "SPECIFIC": {
-                "description": "Used when the user is looking for a single, clearly identified number of items with specific details",
+                "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
                 "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
                 "result_type": "Very targeted set of results"
             },
@@ -429,7 +429,7 @@ class ConversationHandler:
                     "search_parameters": {{
                     "course_id": "<course_id>",
                     "time_range": "<FUTURE|RECENT_PAST|EXTENDED_PAST|ALL_TIME>",
-                    "generality": "<LOW|MEDIUM|HIGH|SPECIFIC>",
+                    "generality": "<LOW|MEDIUM|HIGH|SPECIFIC#>",
                     "item_types": ["assignment", "quiz", ...],
                     "specific_dates": ["YYYY-MM-DD", "YYYY-MM-DD"],
                     "keywords": ["keyword1", "keyword2", ...],

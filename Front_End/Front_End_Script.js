@@ -26,7 +26,6 @@ const imageUrl3 = chrome.runtime.getURL('images/settings.png');
 chat.innerHTML = `
 <div class="header">
     <img src="${imageUrl3}" alt="NotFound" id="settingsIcon" height="20px" width="20px">
-    <button id="clearPromptButton" class="settingsChildButton">New Chat</button>
     <span id="titleText">What can we help you with?</span>
 </div>
 <div id="dynamicBoxesContainer"></div>
@@ -35,6 +34,14 @@ chat.innerHTML = `
     <button id="promptEntryButton">
         <img src="${imageUrl2}" alt="NotFound" height="35px" width="35px">
     </button>
+</div>
+<div id="toolbar" class="footer">
+    <button id="clearPromptButton" class="toolbarChildButton">New Chat</button>
+    <div class="dropdown" id="dropdown">
+        <button class="toolbarChildButton" onclick="toggleDropdown()">Select Recent Doc</button>
+        <div class="dropdown-menu" id="dropdownMenu">
+    </div>
+  </div>
 </div>
 `;
 
@@ -47,20 +54,14 @@ const imageUrl4 = chrome.runtime.getURL('images/BackArrow.png');
 settings.innerHTML = `
 <div class="header">
     <img src="${imageUrl4}" alt="NotFound" id="homeArrow" height="20px" width="20px">
-    <span id="settingsTitleText">Settings</span>
+    <span id="classesTitleText">Your Active Classes</span>
 </div>
 <div id="settingsContainer">
-    <div class="settingsChild">
-        <span id="clearPromptLabel" class="settingsChildLabel">Clear Prompt History:</span>
-    </div>
     <div id="classesBox">
-        <div class="header">
-            <span id="classesTitleText">Your Active Classes</span>
-        </div>
         <div id="classesHolder">
         </div>
         <div class="footer">
-            <button id="saveClassesButton" class="settingsChildButton">Save Class Selections</button>
+            <button id="saveClassesButton" class="toolbarChildButton">Save Class Selections</button>
         </div>
     </div>
 </div>
@@ -127,6 +128,20 @@ document.addEventListener("keydown", function(event) {
 window.addEventListener("load", () => {
     rebuildPage();
 });
+  
+  // Close dropdown if user clicks outside
+  document.addEventListener('click', function(event) {
+    const dropdown = document.getElementById('dropdown');
+    if (!dropdown.contains(event.target)) {
+      document.getElementById('dropdownMenu').classList.remove('show');
+    }
+  });
+
+// Function to toggle the dropdown menu
+function toggleDropdown() {
+    const menu = document.getElementById('dropdownMenu');
+    menu.classList.toggle('show'); // Toggles visibility
+  }
 
 //main functionality for prompt handling
 async function handlePrompt() {
@@ -446,7 +461,7 @@ async function retrieveClassList(studentID, domain) {
             let context = result.Context_CanvasAI || dataHolder;
     
             // Modify the classes portion of the structure
-            context[1].classes = classes;
+            context[1].classes = data.courses;
     
             // Save the updated structure
             chrome.storage.local.set({ "Context_CanvasAI": context }, function() {});
@@ -475,8 +490,12 @@ async function retrieveID(domain) {
 }
 
 async function pushClasses(id, domain, classes){
-    if (isUpdating(id, domain) == false) {
+    let boolean1 = await isUpdating(id, domain)
+    console.log(boolean1);
+    if (boolean1 == false) {
+        console.log("going");
         try {
+            console.log("gone")
             //add new pydantic model for pass
             const requestBody = {
                 user_id: id,
@@ -490,9 +509,10 @@ async function pushClasses(id, domain, classes){
                 },
                 body: JSON.stringify(requestBody),
             });
-
+            console.log("good")
             return response
         } catch (error) {
+            console.log("error")
             return false;
         }
     } else {
@@ -502,12 +522,14 @@ async function pushClasses(id, domain, classes){
 }
 
 async function isUpdating(user_id, domain){
+    console.log("active")
     try {
             const response = await fetch(`https://canvasclassmate.me/endpoints/check_update_status?user_id=${user_id}&domain=${domain}`);
             const updating = await response.json(); // Add await here
-            console.log(updating);
+            console.log(updating)
             return updating
     } catch (error) {
+        console.log("error1")
         return false;
     }
 }
