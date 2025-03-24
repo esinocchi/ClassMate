@@ -4,14 +4,16 @@
         "name": "Evan Sinocchi",
         "token": "1050~DCDVEkmvVh933crarPzUJuxExZWRcERTxFAxr2Ka6uJJaaeHG6YrvRXtR8HvXNEL",
         "domain": "psu",
-        "updated_at": 1742435164.43937,
+        "updated_at": 1742711479.834687,
+        "token_updated_at": 1742711394.724277,
         "courses_selected": {
             "2361957": "CMPSC 465",
             "2379517": "CMPSC 311",
             "2361815": "EARTH 103N",
             "2361972": "CMPEN331",
             "2364485": "ACCT 211"
-        }
+        },
+        "is_updating": false
     },
     "courses": [
         {
@@ -308,6 +310,21 @@
         },
         {
             "course_id": 2379517,
+            "id": 175811871,
+            "type": null,
+            "folder_id": 21412288,
+            "display_name": "build.pdf",
+            "filename": "build.pdf",
+            "url": "https://psu.instructure.com/files/175811871/download?download_frd=1&verifier=ggvYxbWUZGdUJuJ9oGznz6YjqoMvS4Wy7SPEcxGb",
+            "size": 556241,
+            "updated_at": "2025-03-21T17:04:13Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": 5475170,
+            "module_name": "Week 10"
+        },
+        {
+            "course_id": 2379517,
             "id": 174452348,
             "type": null,
             "folder_id": 21266156,
@@ -323,6 +340,21 @@
         },
         {
             "course_id": 2379517,
+            "id": 175854624,
+            "type": null,
+            "folder_id": 21266157,
+            "display_name": "cmpsc_311_exercise_solutions.c",
+            "filename": "cmpsc_311_exercise_solutions.c",
+            "url": "https://psu.instructure.com/files/175854624/download?download_frd=1&verifier=GBvY9E3SmTLwnzwTS5dEcYgpehdNvXnyDw2Ll9jn",
+            "size": 3057,
+            "updated_at": "2025-03-21T23:21:20Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2379517,
             "id": 174452347,
             "type": null,
             "folder_id": 21266156,
@@ -331,6 +363,21 @@
             "url": "https://psu.instructure.com/files/174452347/download?download_frd=1&verifier=xH9a5n2Rx0FVSCqAZ8X3YamSjmMkbFiQpzNnksOT",
             "size": 3885,
             "updated_at": "2025-02-14T20:54:03Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2379517,
+            "id": 175854706,
+            "type": null,
+            "folder_id": 21266157,
+            "display_name": "cmpsc_311_exercise.c",
+            "filename": "cmpsc_311_exercise.c",
+            "url": "https://psu.instructure.com/files/175854706/download?download_frd=1&verifier=zEyVq6oeFkNUjNKq75uCDqfbuP4MxGtUOyNEdu0V",
+            "size": 2192,
+            "updated_at": "2025-03-21T23:23:58Z",
             "locked": false,
             "lock_explanation": null,
             "module_id": null,
@@ -608,6 +655,21 @@
         },
         {
             "course_id": 2379517,
+            "id": 175854625,
+            "type": null,
+            "folder_id": 21266157,
+            "display_name": "Practice Assignment 4 - ReadMe.pdf",
+            "filename": "Practice+Assignment+4+-+ReadMe.pdf",
+            "url": "https://psu.instructure.com/files/175854625/download?download_frd=1&verifier=Rjjrpl8EIx7N0yDsjoIQZpeWxkXPKu2pnYVQHavw",
+            "size": 54631,
+            "updated_at": "2025-03-22T00:03:52Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2379517,
             "id": 175125675,
             "type": null,
             "folder_id": 21266158,
@@ -781,6 +843,36 @@
             "url": "https://psu.instructure.com/files/175704713/download?download_frd=1&verifier=OA7HJ7b1xT61mHTKBaUHUVyWGVrnABZW8GPsLC8e",
             "size": 1170447,
             "updated_at": "2025-03-19T00:38:22Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2361957,
+            "id": 175810028,
+            "type": null,
+            "folder_id": 21411254,
+            "display_name": "B2-handout.pdf",
+            "filename": "B2-handout.pdf",
+            "url": "https://psu.instructure.com/files/175810028/download?download_frd=1&verifier=YtJE8UJl2qIRRthSkQMkpv6DFXJU9zIRNCA64tJb",
+            "size": 393802,
+            "updated_at": "2025-03-21T00:38:38Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2361957,
+            "id": 175810026,
+            "type": null,
+            "folder_id": 21411254,
+            "display_name": "B2.pdf",
+            "filename": "B2.pdf",
+            "url": "https://psu.instructure.com/files/175810026/download?download_frd=1&verifier=oJQpdt0srzKNYM1SnahmnGhAplNemXDHnaRCVDkM",
+            "size": 872110,
+            "updated_at": "2025-03-21T01:24:16Z",
             "locked": false,
             "lock_explanation": null,
             "module_id": null,
@@ -991,6 +1083,21 @@
             "url": "https://psu.instructure.com/files/175110311/download?download_frd=1&verifier=N1Gj8wtO0gNHgOaqqvUBlgozBfYly45N2SbT9tDL",
             "size": 189193,
             "updated_at": "2025-02-28T02:50:59Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": null,
+            "module_name": null
+        },
+        {
+            "course_id": 2361957,
+            "id": 175866245,
+            "type": null,
+            "folder_id": 21411255,
+            "display_name": "HW7Sol.pdf",
+            "filename": "HW7Sol.pdf",
+            "url": "https://psu.instructure.com/files/175866245/download?download_frd=1&verifier=xlspBpUo3kt9Z3pKxLCEFjgfA9W5507muvIxiVKK",
+            "size": 252956,
+            "updated_at": "2025-03-22T11:04:07Z",
             "locked": false,
             "lock_explanation": null,
             "module_id": null,
@@ -1523,6 +1630,21 @@
         },
         {
             "course_id": 2361972,
+            "id": 175868392,
+            "type": null,
+            "folder_id": 20974430,
+            "display_name": "Verilog_Debugging-2.pdf",
+            "filename": "Verilog_Debugging-2.pdf",
+            "url": "https://psu.instructure.com/files/175868392/download?download_frd=1&verifier=sfalAgVFSq4TPbdLxU8i0iBusS6LvzmHtgWPUTsE",
+            "size": 885177,
+            "updated_at": "2025-03-22T16:45:31Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": 5595831,
+            "module_name": "Verilog Slides"
+        },
+        {
+            "course_id": 2361972,
             "id": 172965814,
             "type": null,
             "folder_id": 20974430,
@@ -1959,6 +2081,33 @@
     ],
     "announcements": [
         {
+            "id": 16658503,
+            "title": "Lab4 Released ",
+            "message": "<div class=\"\" data-testid=\"notHighlighted\">\n<div class=\"css-h20mns-view--flex-flex\" dir=\"ltr\" data-testid=\"discussion-topic-container\">\n<div class=\"css-g6u2uf-view\" dir=\"ltr\">\n<div class=\"userMessage mobile\">\n<p data-start=\"140\" data-end=\"149\">Hi All,</p>\n<p data-start=\"151\" data-end=\"380\">As you might have noticed Lab 4 is now available! This lab builds upon the concepts from Lab 3, so completing Lab 3 is essential for success in this and future labs. If you struggled with Lab 3, we strongly recommend complete it before beginning Lab 4.</p>\n<h3 data-start=\"382\" data-end=\"407\"><strong data-start=\"386\" data-end=\"405\">Lab 4 Resources</strong></h3>\n<p data-start=\"408\" data-end=\"610\">To help you with Lab 4, we have provided a set of resources, including a helper video. Be sure to carefully read the <strong data-start=\"552\" data-end=\"571\">ReadMe_LAB4.pdf</strong> before starting your implementation.</p>\n<h3 data-start=\"612\" data-end=\"668\"><strong data-start=\"616\" data-end=\"666\">Practice Assignment (Optional but Recommended)</strong></h3>\n<p data-start=\"669\" data-end=\"831\">To reinforce key concepts, we have provided a practice assignment that aligns with Lab 4. You can find it in the <strong data-start=\"782\" data-end=\"793\">Modules </strong>section or access it directly here:</p>\n<p data-start=\"833\" data-end=\"871\">https://psu.instructure.com/courses/2379517/assignments/16665039</p>\n<p data-start=\"873\" data-end=\"986\">While optional, completing this assignment will help you understand the foundational material needed for Lab 4.</p>\n<h3 data-start=\"988\" data-end=\"1022\"><strong data-start=\"992\" data-end=\"1020\">Lab 4 Submission Details</strong></h3>\n<ul data-start=\"1023\" data-end=\"1336\">\n<li data-start=\"1023\" data-end=\"1072\"><strong data-start=\"1025\" data-end=\"1044\">Final Deadline: April 4th 2025</strong>, by 11:59 PM</li>\n<li data-start=\"1073\" data-end=\"1336\"><strong data-start=\"1075\" data-end=\"1103\">Submission Requirements:</strong>\n<ul data-start=\"1108\" data-end=\"1336\">\n<li data-start=\"1108\" data-end=\"1173\">Commit &amp; push your latest code to GitHub before the deadline.</li>\n<li data-start=\"1176\" data-end=\"1240\">Submit your commit ID on Canvas (No extra text or comments).</li>\n<li data-start=\"1243\" data-end=\"1336\">Late penalties apply based on the Canvas submission timestamp, NOT your GitHub push time.</li>\n</ul>\n</li>\n</ul>\n<p data-start=\"1338\" data-end=\"1410\">Start early and reach out if you have questions. Good luck with Lab 4!<br><br></p>\n</div>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2379517,
+            "posted_at": "2025-03-21T23:48:57Z",
+            "discussion_type": "threaded",
+            "course_name": "CMPSC 311: Intro Sys Prog - SP25"
+        },
+        {
+            "id": 16657862,
+            "title": "Lab Assignment#3 is due today",
+            "message": "<p>Dear Students,</p>\n<p>&nbsp;</p>\n<p>The submission deadline for<span>&nbsp;</span><a title=\"Lab Assignment 3\" href=\"https://psu.instructure.com/courses/2379517/assignments/16665030\" data-course-type=\"assignments\" data-published=\"true\">Lab Assignment#3</a><span>&nbsp;</span>is March 21st (today). Please attend office hours if you encounter difficulties; we are here to assist you. We are offering 24 office hours every week. Please refer to the syllabus for details on the office hours schedule.</p>\n<p>&nbsp;</p>\n<p><span style=\"color: #e03e2d;\">Lab assignments are assessed a 10% per day late penalty, up to a maximum of three days, after which a zero grade will be given. There are no exceptions. Period. The student must have a functioning and suitably powerful computer to run their virtual machines. Hardware or software failures are the student's responsibility and can not be used as an excuse for late assignments.&nbsp;</span></p>\n<p>&nbsp;</p>\n<p>Regards</p>\n<p>Dr. Saha</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2379517,
+            "posted_at": "2025-03-21T15:42:12Z",
+            "discussion_type": "threaded",
+            "course_name": "CMPSC 311: Intro Sys Prog - SP25"
+        },
+        {
+            "id": 16656850,
+            "title": "Lab3: ",
+            "message": "<p data-start=\"69\" data-end=\"83\">Hi Everyone,</p>\n<p data-start=\"85\" data-end=\"217\">If you are experiencing issues with Lab 3, please watch the <a class=\"inline_disabled\" href=\"https://psu.mediaspace.kaltura.com/media/CMPSC311%3A+Lab+3+Helper+Video/1_pad72mhu\" target=\"_blank\"><span style=\"text-decoration: underline;\"><strong data-start=\"148\" data-end=\"170\">Lab 3 Helper Video</strong></span></a>, as it covers some common issues that you might be facing.</p>\n<h3 data-start=\"219\" data-end=\"253\"><strong data-start=\"223\" data-end=\"251\">Key Reminders for Lab 3:</strong></h3>\n<ol data-start=\"254\" data-end=\"916\">\n<li data-start=\"254\" data-end=\"421\"><strong data-start=\"257\" data-end=\"279\">Read Before Write:</strong> The <code data-start=\"284\" data-end=\"302\">JBOD_WRITE_BLOCK</code> command overwrites an <strong data-start=\"325\" data-end=\"341\">entire block</strong>, so <span style=\"text-decoration: underline;\"><em><strong>make sure you read and modify the existing data before writing</strong></em></span> if needed.</li>\n<li data-start=\"422\" data-end=\"612\"><strong data-start=\"425\" data-end=\"460\">Correct Disk and Block Seeking:</strong> Before performing <strong data-start=\"479\" data-end=\"510\">any read or write operation</strong>, ensure that you navigate to the correct <strong data-start=\"552\" data-end=\"570\">disk and block</strong> to avoid unintended data modifications.</li>\n<li data-start=\"613\" data-end=\"916\"><strong data-start=\"616\" data-end=\"643\">Tester vs. Trace Files:</strong> <strong data-start=\"644\" data-end=\"723\">Passing the tester alone does NOT guarantee your implementation is correct.</strong> The tester only checks basic conditions, while the trace files perform <strong data-start=\"795\" data-end=\"823\">comprehensive validation</strong> of your code. You must pass <strong data-start=\"852\" data-end=\"860\">both</strong> the tester and the trace files to ensure correctness.</li>\n</ol>\n<p data-start=\"918\" data-end=\"974\">If you have further questions, please make use of campuswire and office hours or directly reach out to the TAs/LAs.<br><br>Regards,<br>Neeraj</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2379517,
+            "posted_at": "2025-03-21T00:25:35Z",
+            "discussion_type": "threaded",
+            "course_name": "CMPSC 311: Intro Sys Prog - SP25"
+        },
+        {
             "id": 16653745,
             "title": "Lab Assignment#3 (Gentle Reminder)",
             "message": "<p>Dear Students,</p>\n<p>&nbsp;</p>\n<p>The submission deadline for<span>&nbsp;</span><a title=\"Lab Assignment 3\" href=\"https://psu.instructure.com/courses/2379517/assignments/16665030\" data-course-type=\"assignments\" data-published=\"true\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/assignments/16665030\" data-api-returntype=\"Assignment\">Lab Assignment#3</a><span>&nbsp;</span>is March 21st (Friday). Please attend office hours if you encounter difficulties; we are here to assist you. We are offering 24 office hours every week. Please refer to the syllabus for details on the office hours schedule.</p>\n<p>&nbsp;</p>\n<p><span style=\"color: #e03e2d;\">Lab assignments are assessed a 10% per day late penalty, up to a maximum of three days, after which a zero grade will be given. There are no exceptions. Period.</span><br><span style=\"color: #e03e2d;\">The student must have a functioning and suitably powerful computer to run their virtual machines. Hardware or software failures are the student's responsibility and can not be used as an excuse for late assignments.&nbsp;</span></p>\n<p>&nbsp;</p>\n<p>Regards</p>\n<p>Dr. Saha</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
@@ -1995,22 +2144,13 @@
             "course_name": "CMPSC 311: Intro Sys Prog - SP25"
         },
         {
-            "id": 16643030,
-            "title": "Lab 2 grades are released",
-            "message": "<p data-start=\"60\" data-end=\"93\">Lab 2 grades are now available.</p>\n<p data-start=\"95\" data-end=\"333\">If you believe there was an obvious grading mistake, please contact your assigned TA based on your last name, either during office hours or via email. <strong data-start=\"246\" data-end=\"301\">Only reach out to the TA assigned to your last name</strong> according to the table below:</p>\n<table data-start=\"335\" data-end=\"738\">\n<thead data-start=\"335\" data-end=\"375\">\n<tr data-start=\"335\" data-end=\"375\">\n<th data-start=\"335\" data-end=\"349\"><strong data-start=\"337\" data-end=\"348\">TA/LA Name</strong></th>\n<th data-start=\"349\" data-end=\"375\"><strong data-start=\"351\" data-end=\"373\">Last Names Covered</strong></th>\n</tr>\n</thead>\n<tbody data-start=\"415\" data-end=\"738\">\n<tr data-start=\"415\" data-end=\"447\">\n<td>MD Amit Hasan Arovi</td>\n<td>A - Bi</td>\n</tr>\n<tr data-start=\"448\" data-end=\"471\">\n<td>Yilu Dong</td>\n<td>Bo - Fa</td>\n</tr>\n<tr data-start=\"472\" data-end=\"503\">\n<td>Md Rafi Ur Rashid</td>\n<td>Fi - Ho</td>\n</tr>\n<tr data-start=\"504\" data-end=\"541\">\n<td>Ashwin Senthil Arumugam</td>\n<td>Hu - Ka</td>\n</tr>\n<tr data-start=\"542\" data-end=\"574\">\n<td>Amrutha Somasundar</td>\n<td>Ke - Lu</td>\n</tr>\n<tr data-start=\"575\" data-end=\"612\">\n<td>Srujan Reddy Singareddy</td>\n<td>Ma - Na</td>\n</tr>\n<tr data-start=\"613\" data-end=\"643\">\n<td>Prudhvi Gadupudi</td>\n<td>Ng - Pe</td>\n</tr>\n<tr data-start=\"644\" data-end=\"678\">\n<td>Naga Aravind Kundeti</td>\n<td>Pi - Sh</td>\n</tr>\n<tr data-start=\"679\" data-end=\"713\">\n<td>Naga Sri Hita Veleti</td>\n<td>Si - Tr</td>\n</tr>\n<tr data-start=\"714\" data-end=\"738\">\n<td>Vivek Reddy</td>\n<td>Tu - Z</td>\n</tr>\n</tbody>\n</table>\n<p data-start=\"740\" data-end=\"849\">If you are unable to reach your assigned TA or are not satisfied with the response, please reach out to me (Neeraj).</p>\n<p data-start=\"851\" data-end=\"1029\">For this semester, you have <strong data-start=\"879\" data-end=\"919\">one week from the grade release date</strong> to dispute your grade. After this period, grades will be finalized and cannot be changed by TAs or graders.</p>\n<p data-start=\"1031\" data-end=\"1146\">For <strong data-start=\"1035\" data-end=\"1044\">Lab 2</strong>, beacuse &nbsp;the deadline to dispute grades is <strong data-start=\"1080\" data-end=\"1093\">March 21st</strong>. After this date, all Lab 2 grades will be locked.</p>\n<p data-start=\"1148\" data-end=\"1186\" data-is-last-node=\"\" data-is-only-node=\"\">Let me know us you have any questions!<br><br><span>Meanwhile, enjoy your </span><strong data-start=\"1347\" data-end=\"1363\">Spring Break</strong><span>, and let me know if you have any questions!</span><br><br>Regards,<br>Neeraj</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2379517,
-            "posted_at": "2025-03-08T03:50:41Z",
+            "id": 16656638,
+            "title": "Makeup exam this Saturday",
+            "message": "<p>Dear Students,</p>\n<p>This is to inform you that a makeup exam has been scheduled for this Saturday in Westgate building W375, Mar 22, 10:00 AM. This will be the only opportunity to take the makeup exam.</p>\n<p>Everyone who did not attend the midterm and requested a makeup is allowed to come.</p>\n<p>Important details:</p>\n<ul>\n<li>Location: Westgate building W375</li>\n<li>Day: Saturday Mar 22, 10:00 AM</li>\n</ul>\n<p>Please note that this is the only chance to take the makeup exam. If you have any scheduling conflicts, please contact me as soon as possible.</p>\n<p>Thank you,</p>\n<p>Maksym Lupei.</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361957,
+            "posted_at": "2025-03-20T21:23:12Z",
             "discussion_type": "threaded",
-            "course_name": "CMPSC 311: Intro Sys Prog - SP25"
-        },
-        {
-            "id": 16638865,
-            "title": "Issues with jbod_arm64.o",
-            "message": "<p data-start=\"0\" data-end=\"77\">We have been made aware that <strong data-start=\"27\" data-end=\"43\">jbod_arm64.o</strong> is not functioning as expected for some students.</p>\n<p data-start=\"79\" data-end=\"274\">To resolve this, if you are using an <strong data-start=\"116\" data-end=\"161\">ARM-based platform (e.g., newer MacBooks)</strong>, please use the <a class=\"instructure_file_link inline_disabled\" title=\"jbod_arm64.o\" href=\"https://psu.instructure.com/courses/2379517/files/175345071?verifier=FHzemh6eQYqeYJa61dptgc2qQWkUyP5PWkKc2WlR&amp;wrap=1\" target=\"_blank\" data-canvas-previewable=\"false\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/175345071\" data-api-returntype=\"File\">jbod_arm64.o</a>&nbsp;file attached here or the version available on the assignment page in Canvas.</p>\n<p data-start=\"276\" data-end=\"349\" data-is-last-node=\"\" data-is-only-node=\"\">If you encounter any issues, feel free to reach out to us for assistance.</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2379517,
-            "posted_at": "2025-03-05T16:24:19Z",
-            "discussion_type": "threaded",
-            "course_name": "CMPSC 311: Intro Sys Prog - SP25"
+            "course_name": "CMPSC465 Spring 2025 Section 1/2"
         },
         {
             "id": 16651253,
@@ -2020,6 +2160,33 @@
             "posted_at": "2025-03-18T03:00:40Z",
             "discussion_type": "threaded",
             "course_name": "CMPSC465 Spring 2025 Section 1/2"
+        },
+        {
+            "id": 16403860,
+            "title": "Yellowdig Module 7 closes tonight",
+            "message": "<p>Yellowdig Module 7 closes tonight, please enter your piece before 10PM, thanks.</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361815,
+            "posted_at": "2025-03-22T10:00:00Z",
+            "discussion_type": "not_threaded",
+            "course_name": "Earth 103N (Spring 2025)"
+        },
+        {
+            "id": 16403924,
+            "title": "Plastic in the ocean--a devastating problem",
+            "message": "<p><iframe title=\"YouTube video player\" src=\"https://www.youtube.com/embed/ju_2NuK5O-E\" width=\"560\" height=\"315\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" loading=\"lazy\"></iframe></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361815,
+            "posted_at": "2025-03-21T10:00:00Z",
+            "discussion_type": "not_threaded",
+            "course_name": "Earth 103N (Spring 2025)"
+        },
+        {
+            "id": 16403925,
+            "title": "Harmful algal blooms",
+            "message": "<p><iframe title=\"YouTube video player\" src=\"https://www.youtube.com/embed/b-J-8e-1LvY\" width=\"560\" height=\"315\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" loading=\"lazy\"></iframe></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361815,
+            "posted_at": "2025-03-20T10:00:00Z",
+            "discussion_type": "not_threaded",
+            "course_name": "Earth 103N (Spring 2025)"
         },
         {
             "id": 16403921,
@@ -2040,18 +2207,18 @@
             "course_name": "Earth 103N (Spring 2025)"
         },
         {
-            "id": 16403926,
-            "title": "Bleaching",
-            "message": "<p><iframe title=\"YouTube video player\" src=\"https://www.youtube.com/embed/OJMRiOzv2js\" width=\"560\" height=\"315\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" loading=\"lazy\"></iframe></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "id": 16403923,
+            "title": "Module 7 lab",
+            "message": "<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi, Students:</p>\n<p>In module 7 lab you will be looking modern reefs in images, videos and maps.&nbsp; The lab is focused on reef health and it cements what you will be learning in the module.&nbsp; <strong>It is really important to get the hang of the questions in the practice so please do this first and then email me if you have any questions.</strong></p>\n<p>Best,</p>\n<p>Tim</p>\n</div>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "course_id": 2361815,
             "posted_at": "2025-03-18T10:00:00Z",
             "discussion_type": "not_threaded",
             "course_name": "Earth 103N (Spring 2025)"
         },
         {
-            "id": 16403923,
-            "title": "Module 7 lab",
-            "message": "<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi, Students:</p>\n<p>In module 7 lab you will be looking modern reefs in images, videos and maps.&nbsp; The lab is focused on reef health and it cements what you will be learning in the module.&nbsp; <strong>It is really important to get the hang of the questions in the practice so please do this first and then email me if you have any questions.</strong></p>\n<p>Best,</p>\n<p>Tim</p>\n</div>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "id": 16403926,
+            "title": "Bleaching",
+            "message": "<p><iframe title=\"YouTube video player\" src=\"https://www.youtube.com/embed/OJMRiOzv2js\" width=\"560\" height=\"315\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" loading=\"lazy\"></iframe></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "course_id": 2361815,
             "posted_at": "2025-03-18T10:00:00Z",
             "discussion_type": "not_threaded",
@@ -2085,31 +2252,13 @@
             "course_name": "Earth 103N (Spring 2025)"
         },
         {
-            "id": 16403928,
-            "title": "Midterm closes tonight",
-            "message": "<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi, Students:</p>\n<p>The Midterm closes tonight.&nbsp; Please allow plenty of time to take the test and make sure you have a good internet connection before you start.</p>\n<p>Have a great spring break!</p>\n<p>Best wishes,</p>\n<p>Tim</p>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2361815,
-            "posted_at": "2025-03-09T11:00:00Z",
-            "discussion_type": "not_threaded",
-            "course_name": "Earth 103N (Spring 2025)"
-        },
-        {
-            "id": 16403822,
-            "title": "Midterm closes tomorrow night",
-            "message": "<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi, Students:</p>\n<p>The Midterm closes tomorrow night.&nbsp; Please allow plenty of time to take the test and make sure you have a good internet connection before you start.</p>\n<p>Best wishes,</p>\n<p>Tim</p>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2361815,
-            "posted_at": "2025-03-08T13:00:00Z",
-            "discussion_type": "not_threaded",
-            "course_name": "Earth 103N (Spring 2025)"
-        },
-        {
-            "id": 16403791,
-            "title": "Midterm",
-            "message": "<p>Hi Students:</p>\n<p>Just a reminder the midterm is closed book.&nbsp; Please do the practice first.&nbsp;<strong> Also please make sure you have a stable internet connection before you start, there will be no retakes under any circumstances.</strong></p>\n<p><strong>Also please do not use Safari for the test.&nbsp; It will not load images. </strong></p>\n<p>Good luck,</p>\n<p>Tim</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2361815,
-            "posted_at": "2025-03-05T05:00:03Z",
+            "id": 16656141,
+            "title": "Northwest Cash Flow Review/Extra Help Next Week",
+            "message": "<h2><strong>Northwest Cash Flow</strong></h2>\n<ul>\n<li><em>Once again, we HIGHLY RECOMMEND you solving this problem as part of your Exam 3 preparation.&nbsp; In addition, we HIGHLY RECOMMEND you try your best to solve as much as possible without referring to your notes or the solution. </em>The problem as well as the solution is provided under Lesson 7 Lecture Videos and is titled \u201cNorthwest (NW) Cash Flow Review Problem\u201d in Canvas. <em></em><strong><u>Note that the Sample exam for Module 3 is light on Lesson 7 calculations - we expect students to use the Northwest Cash Flow problem as part of the exam preparation for Module 3.</u></strong></li>\n</ul>\n<p><strong>REMINDER: Lesson 8 homework is due Monday, March 24<sup>th</sup> . Extra credit assignments are due on Tuesday, March 25th</strong></p>\n<div class=\"userMessage\">\n<p><span style=\"text-decoration: underline;\"><strong>Extra help on Monday 3/24 and Tuesday 3/25:</strong></span>&nbsp; Office hours will be held as regularly scheduled on Monday 3/24 (see office hour schedule in Canvas).&nbsp; Extra office hours will be held by our TAs for the majority of the day on Tuesday 3/25 to help students with questions as they prepare for Exam 3. Please see the announcement that will be posted on Monday in canvas for specific details on times and locations.&nbsp; Please remember once the exam window opens on Wednesday 3/26 our instructional team cannot answer any content questions until after the exam window closes on Thursday 3/27. So office hours on Tuesday is your last opportunity to receive help before the exam.&nbsp; &nbsp;</p>\n<p>Also note there will be no in person lecture held on Tuesday 3/25 OR Thursday 3/27.&nbsp; Professor Curling will be available in her office during class time on Tuesday to answer any questions students may have as well.&nbsp; There is also no Tuesday lab on 3/25 or Friday lab on 3/28.</p>\n<p>Have a great weekend!&nbsp; Remember to work the Northwest Cash Flow problem!!!</p>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2364485,
+            "posted_at": "2025-03-21T13:00:09Z",
             "discussion_type": "threaded",
-            "course_name": "Earth 103N (Spring 2025)"
+            "course_name": "SP25 ACCTG 211, Sect 002 Sohn"
         },
         {
             "id": 16649786,
@@ -2130,31 +2279,31 @@
             "course_name": "SP25 ACCTG 211, Sect 002 Sohn"
         },
         {
-            "id": 16642856,
-            "title": "Exam 2 Grades Posted\u00a0",
-            "message": "<h2><strong>Final Exam Scheduled</strong></h2>\n<ul>\n<li>ACCTG 211 Exam 5 will be taken during final exam week.&nbsp;<strong>ACCTG 211 is scheduled for Tuesday, May 6<sup>th</sup>, 8am - 11pm EST, in 107 Pollock Building.</strong>You will register to take the exam at a time anytime from 8am - 11pm EST. Please make sure when the registration opens you do not register to take your exam at a time you are scheduled to take another final exam.</li>\n<li>Please note any conflict with Exam 5, taken during Final exam week, needs to be sent to the Registrar.\u202fThe final exam conflict period ends this Sunday, March 9<sup>th</sup>.</li>\n</ul>\n<h2><strong>Exam 2 Grades</strong></h2>\n<p>Confirming the posting of the Module 2 Exam scores on Canvas and providing some follow-up information.\u202f The median score for all students who took\u202fthe Module 2 Exam was 73, and this is fairly consistent with past median scores during the spring semester when exams were given in the Pollock Testing Center. Great job with attending class (in-person or via WEB videos) and following the Read, Watch, Do, Review Process!!&nbsp;</p>\n<p>We conduct various checks after the conclusion of each exam in an effort to validate the exam scores prior to posting them to our Canvas grade book.\u202fAs a result of this validation process and combined with observations that we made during the administration of the exam, we have decided to provide the equivalent points associated with one\u202fexam question as credit back to all students.&nbsp;</p>\n<p>Please note that we included the effect of this credit in your Module 2 Exam score when we uploaded the results to Canvas\u2026so your Canvas score for the Module 2 Exam already includes the effect of these additional points. Some of you may notice that your exam score exceeds 100% as a result of these additional points. Canvas treats any amount in excess of 100% as extra credit in the course. If you are interested to review your exam, please sign-up via this link:\u202f<a href=\"https://app.smeal.psu.edu/acctg/exam-review/\"><span>Exam 2 Reviews</span></a>.</p>\n<p>We would like to remind you to make use of the \"Grade Calculator\" excel file to determine your current overall grade in the course. A reminder that Extra Credit assignments ONLY help your grade. Let's say you earn 50% on all extra credit assignments then at the end of the semester you would increase your grade by 2% i.e. possibly going from 88% to 90%. You have unlimited attempts on the Extra Credit assignments and we post the highest grade on Extra Credit assignments.\u202f&nbsp;</p>\n<p>The highest assignment grade for HW for Lesson 1 - Lesson 6 and for EC for Lesson 1 - Lesson 6 have been posted to Canvas. Please confirm you see your highest assignment grade for each of these assignments.\u202f&nbsp;</p>\n<p>Great job overall on the Module 2 Exam!&nbsp;&nbsp;</p>\n<p>~ Your ACCTG 211 Instructional Team.&nbsp;</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2364485,
-            "posted_at": "2025-03-07T20:30:01Z",
+            "id": 16658793,
+            "title": "Reference waveform for Lab 3 and debugging Verilog slides",
+            "message": "<p>Please find the reference waveform attached here for Lab 3. Also, I have included the \"Verilog_Debugging-2.pdf\" under Verilog Slides. Please look into it for possible common debugging problems</p>\n<p>Let me know if you have further questions!</p>\n<p><img src=\"https://psu.instructure.com/courses/2361972/files/175868564/preview?verifier=Qt5dqRhOTWCSBVNdJTZB3hPGkjhS0lJj4ckavDfO\" alt=\"image.png\" loading=\"lazy\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2361972/files/175868564\" data-api-returntype=\"File\"></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361972,
+            "posted_at": "2025-03-22T16:32:43Z",
             "discussion_type": "threaded",
-            "course_name": "SP25 ACCTG 211, Sect 002 Sohn"
+            "course_name": "Spring2025 Merged CMPEN331"
         },
         {
-            "id": 16640384,
-            "title": "Exam 3 Registration",
-            "message": "<p>The ACCTG 211 Module 3 Exam is scheduled for Wednesday, March 26<sup>th</sup> and Thursday, March 27<sup>th</sup>.\u202f You should receive an email from eTesting (<a href=\"mailto:etest@psu.edu\">etest@psu.edu</a>) on Wednesday, March 12<sup>th</sup> to schedule your Module 3 exam with directions on how to schedule your exam. To register for your exam, go to the following link at the dates/times below:\u202f<a href=\"https://testingapps.it.psu.edu/etesting/students\">Pollock Testing Center</a><u> </u>\u202fand select the link at the top of the page, \"Students: Choose Exam Time.\"&nbsp;</p>\n<p>Please note that scheduling for the final exam is also open at this time.</p>\n<p><strong>Please note: </strong>popular times get taken quickly and the instructional team CANNOT schedule your exam for you.</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2364485,
-            "posted_at": "2025-03-07T14:00:06Z",
+            "id": 16657875,
+            "title": "Office hours for Wasih today ",
+            "message": "<p>Please note that my office hours for today (4:30 - 6 PM) would be <strong>postponed for tomorrow, Saturday, from 12 - 1:30 PM (zoom).</strong> (Just for this week).</p>\n<p>Regards,</p>\n<p>Wasih&nbsp;</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361972,
+            "posted_at": "2025-03-21T15:51:35Z",
             "discussion_type": "threaded",
-            "course_name": "SP25 ACCTG 211, Sect 002 Sohn"
+            "course_name": "Spring2025 Merged CMPEN331"
         },
         {
-            "id": 16638963,
-            "title": "Starting Lesson 7\u00a0",
-            "message": "<h2><strong><em>Great job on your 2nd ACCTG 211 Exam!</em></strong></h2>\n<p><strong><em>&nbsp;</em></strong>We plan to post results by Friday, March 7<sup>th</sup>.&nbsp;</p>\n<p><span style=\"background-color: #fbeeb8;\"><strong>Please note that the Module 3 Exam (Lessons 7 and 8) is coming up in just over two weeks.&nbsp; You should receive the notification from the testing center on Wednesday, March 12<sup>th</sup>. Please note: this is while you are on Spring Break. </strong></span></p>\n<h3><strong>Lesson 7: Instructor Lecture or Lesson 7 Videos\u202f&nbsp;</strong></h3>\n<ul>\n<li>Please refer to the \"Lesson 7 -- Understanding the Statement of Cash Flows\" page for Learning Objectives, and what to do as you go through the Read, Watch, Do, Review process.</li>\n<li><strong>Attend class as we start Lesson 7.\u202f</strong>The PPT files for the live lecture on Lesson 7 can be found in \"<a href=\"https://pennstateoffice365.sharepoint.com/:f:/s/eLDIGCourses/Eg18Rq9qmG9HlGRulRAdo2cBuom01s0628-anHmHqK7SuQ?e=D3PEYY\">Lesson 7 files</a>\". It is recommended you download / review the PPT slides prior to coming to class.</li>\n<li>All students including WEB students are welcome to attend in person lectures and labs.</li>\n<li><strong>Or if you are attending via WEB option, start watching the Lesson 7 Videos (pre-recorded videos) in Canvas.\u202f</strong>The <a href=\"https://pennstateoffice365.sharepoint.com/:f:/s/eLDIGCourses/Eo5WQLyY9QdAtjvsxlPiS-IB-N0dDzl4wXRlfCmAshp0kw?e=K7skJG\">PPT files</a> for the L7 Videos are found in each respective video page and should be located above each video. Reminder: There are many videos found in the L7 video pages since the videos are broken down into mini-lectures.\u202f&nbsp;</li>\n</ul>\n<p><strong>All students (even WEB students) are invited to attend class in person as we begin Lesson on Thursday, March 6<sup>th</sup>.\u202f Please note we will continue this unless we have capacity issues in the lecture halls.&nbsp;&nbsp;</strong></p>\n<ul>\n<li><strong>All lectures are on Tuesdays and Thursdays</strong></li>\n</ul>\n<table style=\"border-collapse: collapse; width: 100%;\" border=\"3\" width=\"630\">\n<tbody>\n<tr>\n<td width=\"79\">\n<p><strong>Section</strong></p>\n</td>\n<td width=\"176\">\n<p><strong>Time</strong></p>\n</td>\n<td width=\"169\">\n<p><strong>Location</strong></p>\n</td>\n<td width=\"206\">\n<p><strong>Instructor</strong></p>\n</td>\n</tr>\n<tr>\n<td width=\"79\">\n<p>1</p>\n</td>\n<td width=\"176\">\n<p>Tu Th 9:05-10:20 am</p>\n</td>\n<td width=\"169\">\n<p>110 Business</p>\n</td>\n<td width=\"206\">\n<p>Shelley Curling</p>\n</td>\n</tr>\n<tr>\n<td width=\"79\">\n<p>3</p>\n</td>\n<td width=\"176\">\n<p>Tu Th 10:35-11:50 am</p>\n</td>\n<td width=\"169\">\n<p>101 Ag Sci and Ind</p>\n</td>\n<td width=\"206\">\n<p>Shelley Curling</p>\n</td>\n</tr>\n</tbody>\n</table>\n<p>&nbsp;</p>\n<h3><strong>TA Labs&nbsp;</strong></h3>\n<p><strong>There is lesson 7 lab this Friday 3/8.&nbsp; Follow this link to download the \u202f</strong><a href=\"https://pennstateoffice365.sharepoint.com/:b:/s/eLDIGCourses/EdpWIfV8xKdHnTil6P_uSLoBNhFkQvuHfmucwoAI0gwW9w?e=NrGaMJ\">Weekly Class Schedule.\u202f</a></p>\n<h3><strong>\u202f<em>Homework / Extra Credit&nbsp;</em></strong></h3>\n<ul>\n<li><strong>Lesson 7 HW is due Wednesday, March 19<sup>th</sup>.\u202f</strong></li>\n<li><strong>Remember to continue working on the EP assignments (Extra Credit) in Connect as you are working on the HW assignments.\u202f</strong>\u202fAlthough the assignments are not due until Tuesday, March 25<sup>th</sup>, we expect students to be working on the EP assignments as we conclude each lesson.\u202f Just a reminder that these assignments are the\u202f<u>only extra credit opportunity</u>\u202fprovided in the course.&nbsp;</li>\n</ul><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2364485,
-            "posted_at": "2025-03-05T18:00:14Z",
+            "id": 16655259,
+            "title": "Quiz 7 ",
+            "message": "<div class=\"userMessage\">\n<div class=\"userMessage\">\n<div class=\"userMessage\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi Class,</p>\n<p>Quiz 7 (closed notes and books) is scheduled for Thursday, March 27th, during our class session. It will encompass the other part of chapter 4 through the content presented in the slides of week 9 in addition to week 7 and week 8.</p>\n<p>We will be able to accommodate students with approved accommodations through the SDR office in class.</p>\n<p>Please ensure that you have your personal calculator for the quiz; the use of cell phones or sharing calculators with fellow students will not be permitted.</p>\n<p>Rest rooms are not allowed during the quiz time. If you have any medical problem, please let the instructor know and provide appropriate document by the beginning of the quiz.</p>\n<p>The file containing review questions for <strong>Ch4_Review_2</strong> is accessible on Canvas for your reference.</p>\n<p>Thank you,<br>Dr. Almekkawy</p>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361972,
+            "posted_at": "2025-03-20T07:34:41Z",
             "discussion_type": "threaded",
-            "course_name": "SP25 ACCTG 211, Sect 002 Sohn"
+            "course_name": "Spring2025 Merged CMPEN331"
         },
         {
             "id": 16646210,
@@ -2358,9 +2507,9 @@
             "id": 16665031,
             "type": null,
             "name": "Lab Assignment 4",
-            "description": null,
+            "description": "<p><span class=\"value\"><span>Note: <strong data-start=\"207\" data-end=\"286\">You will not be able to complete the this lab if you do not finish Lab 3. Please complete the implmentation of lab2 and lab3 before starting lab4.</strong></span></span></p>\n<h2><strong>Instructions</strong></h2>\n<div class=\"description user_content enhanced\">\n<ul>\n<li>Log in to your virtual machine.</li>\n<li>Click on this <a class=\"inline_disabled\" href=\"https://classroom.github.com/a/w9N2XV0V\" target=\"_blank\"><span>invitational link</span></a>&nbsp;and a private repository will be created for you after accepting the assignment.&nbsp;</li>\n<li>Clone the repository by running<span> git clone git@github.com:PSU-CMPSC311-SAHA/sp25-lab4-&lt;your_github_username&gt;.git</span></li>\n<li>Read ReadMe_LAB4.pdf and start your implementation</li>\n</ul>\n</div>\n<div class=\"description user_content enhanced\">\n<p>Remember to push your code to your repository before the deadline</p>\n<p>To help you better understand this lab, we have created &nbsp;a helper video which we hope you find useful: &nbsp;<a href=\"https://psu.mediaspace.kaltura.com/media/CMPSC311+Lab+4+Helper+Video/1_stvah2zo\" target=\"_blank\">https://psu.mediaspace.kaltura.com/media/CMPSC311+Lab+4+Helper+Video/1_stvah2zo</a>&nbsp;<br>Please do not use the video as a substitute for ReadMe. &nbsp;</p>\n</div>\n<div class=\"description user_content enhanced\">\n<h2>To turn in:</h2>\n<p>Commit and push your latest code to Github. Then, submit on Canvas the<span>&nbsp;</span><strong>commit ID</strong><span>&nbsp;</span>that should be graded<span>&nbsp;</span><strong>with no additional text/word/comment around it.</strong></p>\n<p><strong>Note:</strong><span>&nbsp;</span>To get the commit ID that you want to be graded (usually the latest one), go to your repository page on GitHub.com, click on the last column named \"&lt;#&gt; commits\" in the top right, and copy the commit ID (7 characters long ).</p>\n<p><strong><span>Grading Rubrics: &nbsp;</span></strong></p>\n<ul>\n<li>Passing test cases: 70%<br>- Passing trace files: 25%<br>- Descriptive/relevant comments/: 5%</li>\n<li><i>If you have any make errors or warnings or program is stuck in a loop then you will receive a </i><i>straight 0. Make sure your code does not have any make error before submitting.</i></li>\n<li><i></i><i style=\"font-family: inherit; font-size: 1rem;\">If you do not submit your commit ID on canvas you will receive a straight 0</i></li>\n</ul>\n<p><i>\u2022 Passing all test cases with ./tester but <strong>lacking use of cache in mdadm_write</strong> &nbsp;</i><i>will be awarded 0.&nbsp;</i></p>\n</div>\n<p>&nbsp;</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "created_at": "2024-11-15T12:37:47Z",
-            "updated_at": "2025-03-03T13:54:38Z",
+            "updated_at": "2025-03-21T15:16:59Z",
             "due_at": "2025-04-05T03:59:59Z",
             "course_id": 2379517,
             "submission_types": [
@@ -2377,9 +2526,9 @@
             "id": 16665039,
             "type": null,
             "name": "Practice Problems-Assignment #4",
-            "description": "<p><span>Before attempting Assignment #4, please review the problems in the attached files. This practice will aid in comprehending the challenges you'll encounter in the assignment. Please download the following files to do practice.</span></p>\n<p><span><a class=\"instructure_file_link instructure_scribd_file inline_disabled\" title=\"Practice_Assignment#4_Readme.docx\" href=\"https://psu.instructure.com/courses/2379517/files/170417531?wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/170417531\" data-api-returntype=\"File\">Practice_Assignment#4_Readme.docx</a></span></p>\n<p><span><a class=\"instructure_file_link inline_disabled\" title=\"Lab#4_practice.c\" href=\"https://psu.instructure.com/courses/2379517/files/170417530?wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/170417530\" data-api-returntype=\"File\">Lab#4_practice.c</a></span></p>\n<p><span><a class=\"instructure_file_link inline_disabled\" title=\"Lab#4_practice_solutions.c\" href=\"https://psu.instructure.com/courses/2379517/files/170417529?wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/170417529\" data-api-returntype=\"File\">Lab#4_practice_solutions.c</a></span></p>\n<p>&nbsp;</p>\n<p>&nbsp;</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "description": "<p><span>Before attempting Assignment #4, please review the problems in the attached files. This practice will aid in comprehending the challenges you'll encounter in the assignment. Please download the following files to do practice.</span></p>\n<p><a class=\"instructure_file_link inline_disabled\" title=\"cmpsc_311_exercise.c\" href=\"https://psu.instructure.com/courses/2379517/files/175854706?verifier=zEyVq6oeFkNUjNKq75uCDqfbuP4MxGtUOyNEdu0V&amp;wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/175854706\" data-api-returntype=\"File\">cmpsc_311_exercise.c</a></p>\n<p><a class=\"instructure_file_link inline_disabled\" title=\"cmpsc_311_exercise_solutions.c\" href=\"https://psu.instructure.com/courses/2379517/files/175854624?verifier=GBvY9E3SmTLwnzwTS5dEcYgpehdNvXnyDw2Ll9jn&amp;wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/175854624\" data-api-returntype=\"File\">cmpsc_311_exercise_solutions.c</a></p>\n<p><a class=\"instructure_file_link instructure_scribd_file inline_disabled\" title=\"Practice Assignment 4 - ReadMe.pdf\" href=\"https://psu.instructure.com/courses/2379517/files/175854625?verifier=Rjjrpl8EIx7N0yDsjoIQZpeWxkXPKu2pnYVQHavw&amp;wrap=1\" target=\"_blank\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2379517/files/175854625\" data-api-returntype=\"File\">Practice Assignment 4 - ReadMe.pdf</a></p>\n<p>&nbsp;</p>\n<p>&nbsp;</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "created_at": "2024-11-15T12:37:50Z",
-            "updated_at": "2025-03-14T04:00:05Z",
+            "updated_at": "2025-03-21T23:24:32Z",
             "due_at": null,
             "course_id": 2379517,
             "submission_types": [
@@ -2392,7 +2541,7 @@
             "module_name": "Week 10",
             "content": [
                 {
-                    "Practice_Assignment#4_Readme.docx": "https://psu.instructure.com/courses/2379517/files/170417531?wrap=1"
+                    "Practice Assignment 4 - ReadMe.pdf": "https://psu.instructure.com/courses/2379517/files/175854625?verifier=Rjjrpl8EIx7N0yDsjoIQZpeWxkXPKu2pnYVQHavw&wrap=1"
                 }
             ]
         },
@@ -2606,6 +2755,29 @@
             "content": [
                 {
                     "HW2.pdf": "https://psu.instructure.com/courses/2361957/files/173373749?verifier=CVZ1qMxhsjiOle9pYEBwiEtZifpdaPaZM4YQYBGG&wrap=1"
+                }
+            ]
+        },
+        {
+            "id": 17102315,
+            "type": null,
+            "name": "Assignment 8",
+            "description": "<p><a id=\"175801469\" class=\"instructure_file_link instructure_scribd_file inline_disabled\" title=\"Link\" href=\"https://psu.instructure.com/courses/2361957/files/175801469?verifier=zoRGlPW52PLJrri39qdDH86tsxXXzm40XQYFGkOT&amp;wrap=1\" target=\"_blank\" data-canvas-previewable=\"true\" data-api-endpoint=\"https://psu.instructure.com/api/v1/courses/2361957/files/175801469\" data-api-returntype=\"File\">assignment08.pdf</a></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "created_at": "2025-03-20T20:40:52Z",
+            "updated_at": "2025-03-20T20:42:40Z",
+            "due_at": "2025-03-28T03:59:59Z",
+            "course_id": 2361957,
+            "submission_types": [
+                "external_tool"
+            ],
+            "can_submit": null,
+            "graded_submission_exist": null,
+            "graded_submissions_exist": null,
+            "module_id": null,
+            "module_name": null,
+            "content": [
+                {
+                    "assignment08.pdf": "https://psu.instructure.com/courses/2361957/files/175801469?verifier=zoRGlPW52PLJrri39qdDH86tsxXXzm40XQYFGkOT&wrap=1"
                 }
             ]
         },
@@ -3563,7 +3735,7 @@
             "id": 16927026,
             "type": null,
             "name": "Lesson 7 Study Attempts (Non-Graded)",
-            "description": null,
+            "description": "<p><strong>Study Attempts (Non-Graded)</strong>&nbsp;- these non-graded assignments are duplicate copies of the homework assignment. They are available if you want to re-work the homework problems after the due date. No points are earned with completion of the study attempt assignment.</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "created_at": "2025-01-10T18:00:03Z",
             "updated_at": "2025-01-23T18:53:11Z",
             "due_at": null,
@@ -4130,6 +4302,25 @@
             "content": []
         },
         {
+            "id": 16926957,
+            "type": null,
+            "name": "Exam_3_ACCTG211_SP25 - Requires Respondus LockDown Browser",
+            "description": null,
+            "created_at": "2025-01-10T17:59:23Z",
+            "updated_at": "2025-03-20T14:50:37Z",
+            "due_at": "2025-03-28T03:00:00Z",
+            "course_id": 2364485,
+            "submission_types": [
+                "online_quiz"
+            ],
+            "can_submit": null,
+            "graded_submission_exist": null,
+            "graded_submissions_exist": null,
+            "module_id": null,
+            "module_name": null,
+            "content": []
+        },
+        {
             "id": 16995672,
             "type": null,
             "name": "Quiz 1",
@@ -4534,8 +4725,8 @@
             "name": "PS7",
             "description": "<p>Solve the following from the <strong><u>computer organization zybook</u></strong>:</p>\n<ul>\n<li>Participation and challenging activities 4.5, 4.6, 4.7, 4.8, 4.9, 4.13, 4.14.</li>\n</ul><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "created_at": "2025-01-14T05:46:25Z",
-            "updated_at": "2025-03-04T21:41:25Z",
-            "due_at": "2025-03-21T15:30:00Z",
+            "updated_at": "2025-03-21T07:56:28Z",
+            "due_at": "2025-03-22T03:30:00Z",
             "course_id": 2361972,
             "submission_types": [
                 "none"
@@ -5251,20 +5442,6 @@
         }
     ],
     "calendar_events": [
-        {
-            "id": 4971290,
-            "title": "YellowDig Assignment Mod 8 Due",
-            "start_at": "2025-03-23T03:59:00Z",
-            "end_at": "2025-03-23T03:59:00Z",
-            "description": "",
-            "location_name": null,
-            "location_address": null,
-            "context_code": "course_2361815",
-            "context_name": "Earth 103N (Spring 2025)",
-            "all_context_codes": "course_2361815",
-            "url": "https://psu.instructure.com/api/v1/calendar_events/4971290",
-            "course_id": 2361815
-        },
         {
             "id": 4971283,
             "title": "YellowDig Assignment Mod 9 Due",

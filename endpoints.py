@@ -86,7 +86,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
     #[{"role": "assistant", "content": [{"message":"", "function": [""]}]},
     # {"role": "user", "id": "", "domain": "","recentDocs": [], "content": [], "classes": []}];
     chat_requirements = await check_chat_requirements(contextArray)
-
+    print("these are the chat requirements: ", chat_requirements)
     if chat_requirements == "None":
             
 
@@ -126,7 +126,7 @@ async def mainPipelineEntry(contextArray: ContextObject):
         print("=== STAGE 6: Returning response ===\n")
         return response  # Return the modified Context
     else:
-        contextArray.context[0].content[0] = {"message": chat_requirements,"function":""}
+        contextArray.context[0].content[0] = {"message": chat_requirements,"function":[""]}
         return contextArray
 
 
@@ -179,7 +179,7 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course.get("id") not in courses_added and course.get("name"):
+        if str(course.get("id")) not in courses_added and course.get("name"):
             print(course)
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
@@ -216,6 +216,7 @@ async def pushCourses(classesData: PushClassesObject):
             courses_selected[course.id] = course.name
     
     handler = DataHandler(classesData.user_id, classesData.domain)
+    
     handler.update_courses_selected(courses_selected)
     #after updating courses_selected, update the user data to ensure all data only exists if the user has selected the course
     handler.update_user_data()
@@ -350,14 +351,19 @@ async def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    if await check_update_status(user_context.user_id, user_context.domain):
-        return "User data update currently in progress, please try again in a few minutes"
+    #if await check_update_status(user_context.user_id, user_context.domain):
+    #    return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
-    if user_context.classes == []:
-        return "Please select at least one course in the settings page to continue"
-    #if user has all requirements, return "None" as in no chat requirements
-    return "None"
+    print("active")
+
+    for i in range(len(user_context.classes)):
+        print(user_context.classes[i].selected)
+        if user_context.classes[i].selected == True:
+            return "None"
+    
+    return "Please select at least one course in the settings page to continue"
+    
 
 @app.get('/endpoints/check_update_status')
 async def check_update_status(user_id, domain):
