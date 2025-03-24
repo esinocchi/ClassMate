@@ -387,7 +387,6 @@ async def check_update_status(user_id, domain):
     """
     handler = DataHandler(user_id, domain)
     user_data = handler.grab_user_data()
-    print(f"\n\n\n this is the user data: {user_data} \n\n\n")
     return user_data["user_metadata"]["is_updating"]
 
 async def oauthTokenGenerator():
