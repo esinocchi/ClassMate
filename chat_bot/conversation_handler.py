@@ -362,18 +362,6 @@ class ConversationHandler:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "course_id": {
-                            "type": "string",
-                            "description": "The course ID of the assignment"
-                        },
-                        "canvas_base_url": {
-                            "type": "string",
-                            "description": "The user's canvas base url"
-                        },
-                        "access_token": {
-                            "type": "string",
-                            "description": "The user's canvas access token"
-                        },
                         "target_grade_letter": {
                             "type": "string",
                             "description": "The target grade letter of the assignment"
@@ -381,10 +369,6 @@ class ConversationHandler:
                         "student_id": {
                             "type": "string",
                             "description": "The user's ID number"
-                        },
-                        "hf_api_token": {
-                            "type": "string",
-                            "description": "The user's huggingface api token"
                         },
                         "search_parameters": {
                             "type": "object",
