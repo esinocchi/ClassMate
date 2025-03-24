@@ -89,6 +89,7 @@ def prompt_to_pdf(prompt: str, user_id, domain: str):
     print("herehereherherherherhe")
     print(domain)
     latex_file_path = f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.tex"
+    print(latex_file_path)
      #this will depend on the directory structure of CanvasAI
 
 
