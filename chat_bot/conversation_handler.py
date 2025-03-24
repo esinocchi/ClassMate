@@ -266,7 +266,7 @@ class ConversationHandler:
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH"],
                                     "description": "Context for how many items to retrieve"
                                 },
                                 "specific_amount": {
