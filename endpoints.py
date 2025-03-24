@@ -175,12 +175,23 @@ async def pullCourses(user_id, domain):
     
     #pull all classes from canvas api
 
+    page_number = 1
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
-            if response.status == 200:
-                courses += await response.json()
-            else:
-                return {"message": "Error pulling courses from canvas api"}
+        headers = {"Authorization": f"Bearer {handler.grab_user_data()['user_metadata']['token']}"}
+        while True:
+            async with session.get(
+                f"{handler.API_URL}/courses/",
+                params={"enrollment_state": "active", "include[]": ["all_courses", "syllabus_body"], "page": page_number},
+                headers=headers
+            ) as response:
+                if response.status == 200:
+                    courses_data = await response.json()
+                    if not courses_data:  # Break if no more courses are returned
+                        break
+                    courses += courses_data
+                else:
+                    return {"message": "Error pulling courses from Canvas API"}
+            page_number += 1
     
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
@@ -416,4 +427,7 @@ async def oauthTokenGenerator():
 async def pullPDF(domain, user_id):
     pdf_path = f"media_output/{domain}/{user_id}"
     return FileResponse(pdf_path, media_type='application/pdf', filename="your_file.pdf")
+
+
+
 
