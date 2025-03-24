@@ -342,19 +342,41 @@ class VectorDatabase:
     
     
         
-    async def process_data(self, force_reload: bool = True) -> bool:
+    async def process_data(self, force_reload: bool = False) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
         Args:
             force_reload: Whether to force reload data even if cache exists.
-            
+                          If True, delete existing collection and recreate.
+                          If False, only add new documents not already in the collection.
+        
         Returns:
-            True if data was processed, False if using cached data.
+            True if data was processed, False if using cached data with no new documents.
         """
-        # Check if we can use cached data
-        if not force_reload and self._load_from_cache():
-            return False
+        # If force_reload is True, delete the existing collection and recreate it
+        if force_reload:
+            try:
+                # Delete existing collection
+                self.client.delete_collection(self.collection_name)
+                print(f"Deleted collection: {self.collection_name}")
+                
+                # Recreate the collection
+                self.collection = self.client.create_collection(
+                    name=self.collection_name,
+                    embedding_function=self.embedding_function,
+                    metadata={"hnsw:space": "cosine"}
+                )
+                print(f"Created new collection: {self.collection_name}")
+                
+                # Reset in-memory data
+                self.documents = []
+                self.document_map = {}
+                self.course_map = {}
+                self.syllabus_map = {}
+                
+            except Exception as e:
+                print(f"Error resetting collection: {e}")
         
         # Load documents from JSON file
         try:
@@ -378,6 +400,18 @@ class VectorDatabase:
             if syllabus:
                 self.syllabus_map[course_id] = syllabus
 
+        # Get existing document IDs if not force_reload
+        existing_ids = set()
+        if not force_reload:
+            try:
+                # Get all existing IDs from the collection
+                result = self.collection.get()
+                if result and 'ids' in result:
+                    existing_ids = set(result['ids'])
+                    print(f"Found {len(existing_ids)} existing documents in collection")
+            except Exception as e:
+                print(f"Error getting existing IDs: {e}")
+        
         ids = [] # list of document IDs
         texts = [] # list of preprocessed text for each document
         metadatas = [] # list of metadata for each document
@@ -387,14 +421,14 @@ class VectorDatabase:
             if not syllabus or syllabus == "None":
                 continue
             
+            # Generate a unique ID for the syllabus
+            syllabus_id = f"syllabus_{course_id}"
+            
             # Parse the HTML content to extract plain text
             parsed_syllabus = self._parse_html_content(syllabus)
             if not parsed_syllabus:
                 print(f"No content extracted from syllabus for course {course_id}")
                 continue
-            
-            # Generate a unique ID for the syllabus
-            syllabus_id = f"syllabus_{course_id}"
             
             # Create a syllabus document
             syllabus_doc = {
@@ -405,23 +439,27 @@ class VectorDatabase:
                 'content': parsed_syllabus  # Use the parsed content
             }
             
-            # Store document in memory
+            # Store document in memory - ALWAYS do this regardless of force_reload
             self.documents.append(syllabus_doc)
             self.document_map[syllabus_id] = syllabus_doc
             
-            # Prepare for ChromaDB
-            ids.append(syllabus_id)
-            texts.append(self._preprocess_text_for_embedding(syllabus_doc))
-            
-            # Create metadata
-            metadata = {
-                'id': syllabus_id,
-                'type': 'syllabus',
-                'course_id': course_id
-            }
-            
-            metadatas.append(metadata)
-            print(f"Added syllabus for course {course_id}")
+            # Only add to ChromaDB if new or force_reload
+            if force_reload or syllabus_id not in existing_ids:
+                # Prepare for ChromaDB
+                ids.append(syllabus_id)
+                texts.append(self._preprocess_text_for_embedding(syllabus_doc))
+                
+                # Create metadata
+                metadata = {
+                    'id': syllabus_id,
+                    'type': 'syllabus',
+                    'course_id': course_id
+                }
+                
+                metadatas.append(metadata)
+                print(f"Added syllabus for course {course_id} to ChromaDB")
+            else:
+                print(f"Syllabus for course {course_id} already in collection (skipping ChromaDB add)")
         
         # Process all document types
         document_types = {
@@ -439,80 +477,86 @@ class VectorDatabase:
             items = data.get(collection_key, [])
             
             for item in items:
-
                 item_id = item.get('id')
                 if not item_id:
                     continue
                 
+                # Add the type info to the item
                 item['type'] = document_types[collection_key]
                     
-                # Store document in memory
+                # ALWAYS store document in memory regardless of force_reload
                 self.documents.append(item)
                 self.document_map[str(item_id)] = item
                 
-                # Prepare for ChromaDB
-                ids.append(str(item_id))
-                texts.append(self._preprocess_text_for_embedding(item))
-                
-                # Create base metadata
-                metadata = {
-                    'id': str(item_id),
-                    'type': doc_type,
-                    'course_id': str(item.get('course_id', ''))
-                }
+                # Only add to ChromaDB if it's a new item or if force_reload
+                if force_reload or str(item_id) not in existing_ids:
+                    # Prepare for ChromaDB
+                    ids.append(str(item_id))
+                    texts.append(self._preprocess_text_for_embedding(item))
+                    
+                    # Create base metadata
+                    metadata = {
+                        'id': str(item_id),
+                        'type': doc_type,
+                        'course_id': str(item.get('course_id', ''))
+                    }
 
-                # Add module_id to metadata if it exists
-                if item.get('module_id'):
-                    metadata['module_id'] = str(item['module_id'])
-                
-                # Handle event course_id from context_code
-                if doc_type == 'event' and 'context_code' in item and item['context_code'].startswith('course_'):
-                    course_id = item['context_code'].replace('course_', '')
-                    item['course_id'] = course_id
-                    metadata['course_id'] = str(course_id)
-                
-                # Add date fields to metadata based on document type
-                date_field_mapping = {
-                    'assignment': ('due_at', 'due_timestamp'),
-                    'announcement': ('posted_at', 'posted_timestamp'),
-                    'quiz': ('due_at', 'due_timestamp'),
-                    'event': ('start_at', 'start_timestamp'),
-                    'file': ('updated_at', 'updated_timestamp')
-                }
-                
-                if doc_type in date_field_mapping:
-                    source_field, target_field = date_field_mapping[doc_type]
-                    if item.get(source_field):
-                        try:
-                            date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
-                            metadata[target_field] = int(date_obj.timestamp())
-                        except (ValueError, AttributeError):
-                            pass
-                
-                # Add file-specific metadata
-                if doc_type == 'file':
-                    metadata['folder_id'] = str(item.get('folder_id', ''))
-                
-                metadatas.append(metadata)
+                    # Add module_id to metadata if it exists
+                    if item.get('module_id'):
+                        metadata['module_id'] = str(item['module_id'])
+                    
+                    # Handle event course_id from context_code
+                    if doc_type == 'event' and 'context_code' in item and item['context_code'].startswith('course_'):
+                        course_id = item['context_code'].replace('course_', '')
+                        item['course_id'] = course_id
+                        metadata['course_id'] = str(course_id)
+                    
+                    # Add date fields to metadata based on document type
+                    date_field_mapping = {
+                        'assignment': ('due_at', 'due_timestamp'),
+                        'announcement': ('posted_at', 'posted_timestamp'),
+                        'quiz': ('due_at', 'due_timestamp'),
+                        'event': ('start_at', 'start_timestamp'),
+                        'file': ('updated_at', 'updated_timestamp')
+                    }
+                    
+                    if doc_type in date_field_mapping:
+                        source_field, target_field = date_field_mapping[doc_type]
+                        if item.get(source_field):
+                            try:
+                                date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
+                                metadata[target_field] = int(date_obj.timestamp())
+                            except (ValueError, AttributeError):
+                                pass
+                    
+                    # Add file-specific metadata
+                    if doc_type == 'file':
+                        metadata['folder_id'] = str(item.get('folder_id', ''))
+                    
+                    metadatas.append(metadata)
         
-        # Build document relations
+        # Build document relations for ALL documents (not just new ones)
         self._build_document_relations(self.documents)
         
-        # Generate embeddings first
-        embeddings = self.embedding_function(texts)
-        print(f"Generated embeddings with shape: {embeddings.shape}")
-        # Then add to collection with explicit embeddings
-        self.collection.add(
-            ids=ids,
-            embeddings=embeddings,  # Pass pre-computed embeddings
-            documents=texts,
-            metadatas=metadatas
-        )
-        
-        # Save to cache
-        self._save_to_cache()
-        
-        return True
+        # Only add to ChromaDB if there are new documents to add
+        if ids:
+            print(f"Generating embeddings for {len(texts)} documents")
+            embeddings = self.embedding_function(texts)
+            print(f"Generated embeddings with shape: {embeddings.shape if hasattr(embeddings, 'shape') else len(embeddings)}")
+            
+            # Then add to collection with explicit embeddings
+            self.collection.add(
+                ids=ids,
+                embeddings=embeddings,  # Pass pre-computed embeddings
+                documents=texts,
+                metadatas=metadatas
+            )
+            
+            print(f"Added {len(ids)} new documents to collection")
+            return True
+        else:
+            print("No new documents to add to ChromaDB")
+            return False
     
     async def _load_document_metadata(self):
         """
@@ -1199,8 +1243,10 @@ class VectorDatabase:
         distances = results.get('distances', [[]])[0]
         
         # Process each document
+        print(doc_ids)
         for i, doc_id in enumerate(doc_ids):
             doc = self.document_map.get(doc_id)
+            print(doc)
             if not doc:
                 continue
 

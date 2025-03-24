@@ -61,22 +61,24 @@ def get_canvas_data():
 async def search_db():
     hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
     db = VectorDatabase('user_data/psu/7214035/user_data.json', hf_api_token=hf_api_token)
+    await db.process_data(force_reload=False)
     
     output = await db.search({
         "course_id": "all_courses",
         "time_range": "NEAR_FUTURE",
         "item_types": ["assignment", "announcement"],
-        "specific_dates": [],
-        "keywords": ["next"],
-        "generality": "LOW",
-        "query": "What is my next assignment?"
+        "specific_dates": ["2025-03-25"],
+        "keywords": ["tomorrow"],
+        "generality": "SPECIFIC",
+        "specific_amount": 3,
+        "query": "What are my assignments due next tomorrow?"
     })
     
     return output
 
 # Run the async function using asyncio
 if __name__ == "__main__":
-    get_canvas_data()
-    result = asyncio.run(search_db())
-    print(result)
+    #get_canvas_data()
+    results = asyncio.run(search_db())
+    print(results)
     
