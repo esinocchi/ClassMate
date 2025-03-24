@@ -179,7 +179,7 @@ async def pullCourses(user_id, domain):
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
 
-        if course.get("id") not in courses_added and course.get("name"):
+        if str(course.get("id")) not in courses_added and course.get("name"):
             print(course)
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]

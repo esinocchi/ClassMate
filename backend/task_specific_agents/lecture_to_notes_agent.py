@@ -61,7 +61,7 @@ def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
 
 
 def prompt_to_pdf(prompt: str, user_id, domain: str):
-    client = openai.OpenAI(api_key=os.getenv("API_KEY"))
+    client = openai.OpenAI(api_key=os.getenv("LECTURE_TO_PDF_API_KEY"))
     
 
     print("herehereherherherherhe")
@@ -70,7 +70,7 @@ def prompt_to_pdf(prompt: str, user_id, domain: str):
      #this will depend on the directory structure of CanvasAI
 
     clear_directory(f"{CanvasAI_dir}/media_output/{domain}/{user_id}")
-    
+
     response = client.chat.completions.create(
         model="ft:gpt-4o-mini-2024-07-18:personal:input-to-latex:AjGUuIsy",
         messages=[
