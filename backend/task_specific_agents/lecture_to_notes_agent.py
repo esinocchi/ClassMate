@@ -40,6 +40,8 @@ def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     
     handler = DataHandler(user_id, domain)
 
+    os.makedirs(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}", exist_ok=True)
+
     clear_directory(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}")
 
     API_TOKEN = handler.grab_user_data()["user_metadata"]["token"]
