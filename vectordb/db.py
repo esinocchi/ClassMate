@@ -50,7 +50,7 @@ sys.path.append(str(root_dir))
 
 from backend.data_retrieval.get_all_user_data import extract_text_and_images
 from vectordb.embedding_model import create_hf_embedding_function
-
+from vectordb.content_extraction import parse_file_content
 
 # Load environment variables
 load_dotenv()
@@ -1191,7 +1191,7 @@ class VectorDatabase:
         
         return search_results
 
-    async def search(self, search_parameters, include_related=True, minimum_score=0.3):
+    async def search(self, search_parameters, include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
@@ -1239,7 +1239,6 @@ class VectorDatabase:
                 continue
 
             print(f"Processing document: {doc.get('name', '')}")
-            print(doc)
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
@@ -1248,19 +1247,13 @@ class VectorDatabase:
             if similarity < minimum_score:
                 print(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
                 continue
-            
-            # Extract content for files if needed
-            if doc.get('type') == 'assignment':
+
+            if doc.get('type') == 'file':
                 try:
-                    # Use our content extractor to process the assignment
-                    processed_description = await self.extract_file_content(doc.copy())
-                    
-                    # Update the document with processed content
-                    if processed_description and processed_description != doc.get('description'):
-                        print(f"Updated content for assignment: {doc.get('name', '')}")
-                        doc['description'] = processed_description
+                    doc['content'] = await parse_file_content(doc.get('url'))
                 except Exception as e:
-                    print(f"Failed to process assignment: {e}")
+                    print(f"Failed to extract content for file {doc.get('display_name', '')}: {e}")
+
             
             # Add to results
             print(f"Adding doc {doc.get('name', '')} to results with similarity {similarity}")
@@ -1282,6 +1275,7 @@ class VectorDatabase:
         for result in combined_results:
             result.pop('similarity', None)  # Remove similarity score from each result
         
+        print(combined_results)
         return combined_results[:top_k]
     
     async def get_available_courses(self) -> List[Dict[str, Any]]:
@@ -1395,142 +1389,3 @@ class VectorDatabase:
             text = re.sub(r'<[^>]*>', ' ', html_content)
             text = re.sub(r'\s+', ' ', text)
             return text.strip()
-
-    async def extract_file_content(self, doc):
-        """
-        Extract text content from a document, especially for PDF files linked in assignments.
-        
-        Args:
-            doc: Document dictionary
-            
-        Returns:
-            Extracted text content
-        """
-        try:
-            # Import the ContentExtractor from the content_extraction module
-            from vectordb.content_extraction import ContentExtractor
-            
-            # Initialize the content extractor with the Canvas API token
-            extractor = ContentExtractor(canvas_api_token=os.getenv("CANVAS_API_TOKEN"))
-            
-            # Define a document finder function that will search our document_map
-            def find_document_by_name(filename):
-                """Find a document in document_map by filename or display_name"""
-                for doc_id, document in self.document_map.items():
-                    if document.get('type') == 'file':
-                        if document.get('filename') == filename or document.get('display_name') == filename:
-                            print(f"Found file in document_map: {filename}")
-                            return document
-                return None
-            
-            # Set the document finder function
-            extractor.set_document_finder(find_document_by_name)
-            
-            # Augment with a link resolver function
-            async def resolve_link_to_filename(url):
-                """Follow a link to determine what file it points to"""
-                import requests
-                from bs4 import BeautifulSoup
-                
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-                
-                try:
-                    # Make a HEAD request first to see if we get a Content-Disposition header
-                    head_response = requests.head(url, headers=headers, allow_redirects=True)
-                    content_disposition = head_response.headers.get('Content-Disposition', '')
-                    
-                    if 'filename=' in content_disposition:
-                        # Extract filename from Content-Disposition
-                        import re
-                        filename_match = re.search(r'filename="?([^";]+)"?', content_disposition)
-                        if filename_match:
-                            return filename_match.group(1)
-                    
-                    # If no filename in headers, make a GET request and check page title or content
-                    response = requests.get(url, headers=headers)
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    
-                    # Check various places where the filename might be
-                    # 1. Page title
-                    if soup.title:
-                        title = soup.title.string
-                        if '.pdf' in title.lower():
-                            return title.strip()
-                    
-                    # 2. Look for download links with filenames
-                    for link in soup.find_all('a'):
-                        if link.get('download'):
-                            return link.get('download')
-                        
-                        # Check if link text has a PDF name
-                        if link.text and '.pdf' in link.text.lower():
-                            return link.text.strip()
-                    
-                    # 3. Last resort - extract from the URL
-                    if '.pdf' in url:
-                        filename = url.split('/')[-1].split('?')[0]
-                        if '.pdf' in filename:
-                            return filename
-                    
-                    return None
-                except Exception as e:
-                    print(f"Error resolving link: {e}")
-                    return None
-            
-            # For assignments, process to extract file content
-            if doc.get('type') == 'assignment':
-                # First check if the content field already has identified files
-                if doc.get('content') and isinstance(doc.get('content'), list):
-                    for item in doc.get('content'):
-                        if isinstance(item, dict):
-                            for filename, url in item.items():
-                                # Look for this file in the document map
-                                file_doc = find_document_by_name(filename)
-                                if file_doc:
-                                    text = await extractor.extract_text_from_pdf_url(file_doc.get('url'))
-                                    if text:
-                                        return text
-                                
-                                # Try the direct URL
-                                text = await extractor.extract_text_from_pdf_url(url)
-                                if text:
-                                    return text
-                
-                # If we're here, we need to parse the HTML and follow links
-                if doc.get('description'):
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(doc.get('description'), 'html.parser')
-                    
-                    # Find all links
-                    for link in soup.find_all('a'):
-                        url = link.get('href')
-                        if not url:
-                            continue
-                        
-                        # Follow the link to determine what file it actually points to
-                        real_filename = await resolve_link_to_filename(url)
-                        if real_filename:
-                            print(f"Link resolved to file: {real_filename}")
-                            
-                            # Now search for this file in the document map
-                            file_doc = find_document_by_name(real_filename)
-                            if file_doc:
-                                text = await extractor.extract_text_from_pdf_url(file_doc.get('url'))
-                                if text:
-                                    return text
-                        
-                        # Direct attempt if we couldn't resolve the filename
-                        text = await extractor.extract_text_from_pdf_url(url)
-                        if text:
-                            return text
-                
-                # As a fallback, try the regular process_assignment method
-                processed_doc = await extractor.process_assignment(doc)
-                return processed_doc.get('description', '')
-                
-            return doc.get('description', '')
-        except Exception as e:
-            print(f"Error extracting content: {e}")
-            return doc.get('description', '')
