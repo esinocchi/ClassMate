@@ -1,6 +1,5 @@
 import os
 import sys
-import requests
 import shutil
 import openai
 from pdflatex import PDFLaTeX
