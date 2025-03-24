@@ -211,6 +211,7 @@ class DataHandler:
         Grabs the user_data from the user's data file
         """
         file_path = self._get_user_data_path()
+        print(f"FILE PATH: {file_path}")
         if not os.path.exists(file_path):
             print("\n\n\nNOOOOOOOOOOOOOT FOUUUUUUUUUUUUUUND \n\n\n")
             return "User data file not found"
