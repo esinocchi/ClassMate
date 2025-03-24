@@ -546,6 +546,9 @@ class ConversationHandler:
             print(f"Error type: {type(e)}")
             file = []
         print(f"File: {file}")
+        print(f"File type: {type(file)}")
+        print(f"file name: {file[0]['filename']}")
+        print(f"file url: {file[0]['url']}")
         file_description = [file[0]["filename"], file[0]["url"]]
         return file_description
 
