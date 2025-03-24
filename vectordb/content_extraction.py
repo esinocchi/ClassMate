@@ -5,7 +5,7 @@ import os
 import fitz  # PyMuPDF
 from docx import Document
 from pptx import Presentation
-    
+import re
 
 async def parse_file_content(url: str):
     """Parse content from PDF, DOCX, or PPTX file at the given URL."""
@@ -98,3 +98,71 @@ async def parse_file_content(url: str):
         text = f"Error processing file: {str(e)}"
     
     return text
+
+def parse_html_content(html_content: str) -> str:
+        """
+        Parse HTML content to extract plain text.
+        
+        Args:
+            html_content: HTML content string to parse
+            
+        Returns:
+            Plain text extracted from HTML content
+        """
+        if not html_content or html_content == "None":
+            return ""
+        
+        try:
+            from html.parser import HTMLParser
+            
+            class HTMLTextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.text_parts = []
+                    self.in_script = False
+                    self.in_style = False
+                    
+                def handle_starttag(self, tag, attrs):
+                    if tag.lower() == "script":
+                        self.in_script = True
+                    elif tag.lower() == "style":
+                        self.in_style = True
+                    elif tag.lower() == "br" or tag.lower() == "p":
+                        self.text_parts.append("\n")
+                    elif tag.lower() == "li":
+                        self.text_parts.append("\n• ")
+                
+                def handle_endtag(self, tag):
+                    if tag.lower() == "script":
+                        self.in_script = False
+                    elif tag.lower() == "style":
+                        self.in_style = False
+                    elif tag.lower() in ["div", "h1", "h2", "h3", "h4", "h5", "h6", "tr"]:
+                        self.text_parts.append("\n")
+                
+                def handle_data(self, data):
+                    if not self.in_script and not self.in_style:
+                        # Only append non-empty strings after stripping whitespace
+                        text = data.strip()
+                        if text:
+                            self.text_parts.append(text)
+            
+                def get_text(self):
+                    # Join all text parts and normalize whitespace
+                    text = " ".join(self.text_parts)
+                    # Replace multiple whitespace with a single space
+                    text = re.sub(r'\s+', ' ', text)
+                    # Replace multiple newlines with a single newline
+                    text = re.sub(r'\n+', '\n', text)
+                    return text.strip()
+            
+            extractor = HTMLTextExtractor()
+            extractor.feed(html_content)
+            return extractor.get_text()
+            
+        except Exception as e:
+            print(f"Error parsing HTML content: {e}")
+            # Fallback to a simple tag stripping approach if the parser fails
+            text = re.sub(r'<[^>]*>', ' ', html_content)
+            text = re.sub(r'\s+', ' ', text)
+            return text.strip()

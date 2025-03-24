@@ -464,6 +464,7 @@ class ConversationHandler:
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
                 - The keyword list must contain a maximum of 10 items.
+                - Keywords must be specific and unique to the user's query.
                 - Do not duplicate the compulsory elements; include only additional relevant keywords.
 
             3. **JSON Response Structure for Function Calls:**
@@ -500,6 +501,7 @@ class ConversationHandler:
             - **Time Range Fail-Safe:** If unsure, default to "ALL_TIME".
             - **Course Fail-Safe:** If the course mentioned does not match exactly, select the closest course based on string similarity.
             - **Generality Fail-Safe:** If the user does not specify a generality, default to "MEDIUM".
+            - **Function Fail-Safe:** If unsure about which function to call, default to "find_assignments_and_events".
 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
