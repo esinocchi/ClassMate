@@ -301,7 +301,7 @@ class ConversationHandler:
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", ,"generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types","generality","keywords", "query"]
                         }
                     },
                     "required": ["search_parameters"]
