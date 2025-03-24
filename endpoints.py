@@ -350,6 +350,7 @@ async def check_chat_requirements(contextArray: ContextObject):
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
+    print(f"\n\n\n{user_context}\n\n\n")
 
     #if user data update is currently in progress, return error message
     if await check_update_status(user_context.user_id, user_context.domain):

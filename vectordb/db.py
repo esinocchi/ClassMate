@@ -56,16 +56,19 @@ from vectordb.embedding_model import create_hf_embedding_function
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("canvas_vector_db")
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+#     handlers=[
+#         logging.StreamHandler()
+#     ]
+# )
+# logger = logging.getLogger("canvas_vector_db")
 
 
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir, collection_name: str = None, hf_api_token: str = None):
+    def __init__(self, json_file_path: str, cache_dir = "chroma_data/", collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
@@ -76,7 +79,7 @@ class VectorDatabase:
             hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
-        self.cache_dir = "chroma_data/"
+        self.cache_dir = cache_dir
         
         # Load JSON file to extract user_id if collection_name is not provided
         if collection_name is None:
@@ -86,7 +89,7 @@ class VectorDatabase:
                 user_id = data.get('user_metadata', {}).get('id', 'default')
                 self.collection_name = f"canvas_embeddings_{user_id}"
             except Exception as e:
-                logger.error(f"Error loading JSON file to get user_id: {e}")
+                print(f"Error loading JSON file to get user_id: {e}")
                 self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
@@ -112,10 +115,10 @@ class VectorDatabase:
                 name=self.collection_name,
                 embedding_function=self.embedding_function
             )
-            logger.info(f"Using existing collection: {self.collection_name}")
+            print(f"Using existing collection: {self.collection_name}")
         
         except Exception: # If no existing collection, collection is created
-            logger.info(f"Creating new collection: {self.collection_name}")
+            print(f"Creating new collection: {self.collection_name}")
             self.collection = self.client.create_collection(
                 name=self.collection_name,
                 embedding_function=self.embedding_function,
@@ -345,25 +348,47 @@ class VectorDatabase:
         
         Args:
             force_reload: Whether to force reload data even if cache exists.
-            
+                          If True, delete existing collection and recreate.
+                          If False, only add new documents not already in the collection.
+        
         Returns:
-            True if data was processed, False if using cached data.
+            True if data was processed, False if using cached data with no new documents.
         """
-        # Check if we can use cached data
-        if not force_reload and self._load_from_cache():
-            return False
+        # If force_reload is True, delete the existing collection and recreate it
+        if force_reload:
+            try:
+                # Delete existing collection
+                self.client.delete_collection(self.collection_name)
+                print(f"Deleted collection: {self.collection_name}")
+                
+                # Recreate the collection
+                self.collection = self.client.create_collection(
+                    name=self.collection_name,
+                    embedding_function=self.embedding_function,
+                    metadata={"hnsw:space": "cosine"}
+                )
+                print(f"Created new collection: {self.collection_name}")
+                
+                # Reset in-memory data
+                self.documents = []
+                self.document_map = {}
+                self.course_map = {}
+                self.syllabus_map = {}
+                
+            except Exception as e:
+                print(f"Error resetting collection: {e}")
         
         # Load documents from JSON file
         try:
             with open(self.json_file_path, 'r') as f:
                 data = json.load(f)
         except Exception as e:
-            logger.error(f"Error loading JSON file: {e}")
+            print(f"Error loading JSON file: {e}")
             return False
         
         # Extract user metadata
         user_metadata = data.get('user_metadata', {})
-        logger.info(f"Processing data for user ID: {user_metadata.get('id')}")
+        print(f"Processing data for user ID: {user_metadata.get('id')}")
         
         # Extract courses and build course and syllabus maps
         courses = data.get('courses', [])
@@ -375,6 +400,18 @@ class VectorDatabase:
             if syllabus:
                 self.syllabus_map[course_id] = syllabus
 
+        # Get existing document IDs if not force_reload
+        existing_ids = set()
+        if not force_reload:
+            try:
+                # Get all existing IDs from the collection
+                result = self.collection.get()
+                if result and 'ids' in result:
+                    existing_ids = set(result['ids'])
+                    print(f"Found {len(existing_ids)} existing documents in collection")
+            except Exception as e:
+                print(f"Error getting existing IDs: {e}")
+        
         ids = [] # list of document IDs
         texts = [] # list of preprocessed text for each document
         metadatas = [] # list of metadata for each document
@@ -384,14 +421,14 @@ class VectorDatabase:
             if not syllabus or syllabus == "None":
                 continue
             
+            # Generate a unique ID for the syllabus
+            syllabus_id = f"syllabus_{course_id}"
+            
             # Parse the HTML content to extract plain text
             parsed_syllabus = self._parse_html_content(syllabus)
             if not parsed_syllabus:
-                logger.warning(f"No content extracted from syllabus for course {course_id}")
+                print(f"No content extracted from syllabus for course {course_id}")
                 continue
-            
-            # Generate a unique ID for the syllabus
-            syllabus_id = f"syllabus_{course_id}"
             
             # Create a syllabus document
             syllabus_doc = {
@@ -402,23 +439,27 @@ class VectorDatabase:
                 'content': parsed_syllabus  # Use the parsed content
             }
             
-            # Store document in memory
+            # Store document in memory - ALWAYS do this regardless of force_reload
             self.documents.append(syllabus_doc)
             self.document_map[syllabus_id] = syllabus_doc
             
-            # Prepare for ChromaDB
-            ids.append(syllabus_id)
-            texts.append(self._preprocess_text_for_embedding(syllabus_doc))
-            
-            # Create metadata
-            metadata = {
-                'id': syllabus_id,
-                'type': 'syllabus',
-                'course_id': course_id
-            }
-            
-            metadatas.append(metadata)
-            logger.info(f"Added syllabus for course {course_id}")
+            # Only add to ChromaDB if new or force_reload
+            if force_reload or syllabus_id not in existing_ids:
+                # Prepare for ChromaDB
+                ids.append(syllabus_id)
+                texts.append(self._preprocess_text_for_embedding(syllabus_doc))
+                
+                # Create metadata
+                metadata = {
+                    'id': syllabus_id,
+                    'type': 'syllabus',
+                    'course_id': course_id
+                }
+                
+                metadatas.append(metadata)
+                print(f"Added syllabus for course {course_id} to ChromaDB")
+            else:
+                print(f"Syllabus for course {course_id} already in collection (skipping ChromaDB add)")
         
         # Process all document types
         document_types = {
@@ -436,81 +477,86 @@ class VectorDatabase:
             items = data.get(collection_key, [])
             
             for item in items:
-
                 item_id = item.get('id')
                 if not item_id:
                     continue
                 
+                # Add the type info to the item
                 item['type'] = document_types[collection_key]
                     
-                # Store document in memory
+                # ALWAYS store document in memory regardless of force_reload
                 self.documents.append(item)
                 self.document_map[str(item_id)] = item
                 
-                # Prepare for ChromaDB
-                ids.append(str(item_id))
-                texts.append(self._preprocess_text_for_embedding(item))
-                
-                # Create base metadata
-                metadata = {
-                    'id': str(item_id),
-                    'type': doc_type,
-                    'course_id': str(item.get('course_id', ''))
-                }
+                # Only add to ChromaDB if it's a new item or if force_reload
+                if force_reload or str(item_id) not in existing_ids:
+                    # Prepare for ChromaDB
+                    ids.append(str(item_id))
+                    texts.append(self._preprocess_text_for_embedding(item))
+                    
+                    # Create base metadata
+                    metadata = {
+                        'id': str(item_id),
+                        'type': doc_type,
+                        'course_id': str(item.get('course_id', ''))
+                    }
 
-                # Add module_id to metadata if it exists
-                if item.get('module_id'):
-                    metadata['module_id'] = str(item['module_id'])
-                
-                # Handle event course_id from context_code
-                if doc_type == 'event' and 'context_code' in item and item['context_code'].startswith('course_'):
-                    course_id = item['context_code'].replace('course_', '')
-                    item['course_id'] = course_id
-                    metadata['course_id'] = str(course_id)
-                
-                # Add date fields to metadata based on document type
-                date_field_mapping = {
-                    'assignment': ('due_at', 'due_timestamp'),
-                    'announcement': ('posted_at', 'posted_timestamp'),
-                    'quiz': ('due_at', 'due_timestamp'),
-                    'event': ('start_at', 'start_timestamp'),
-                    'file': ('updated_at', 'updated_timestamp')
-                }
-                
-                if doc_type in date_field_mapping:
-                    source_field, target_field = date_field_mapping[doc_type]
-                    if item.get(source_field):
-                        try:
-                            date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
-                            metadata[target_field] = int(date_obj.timestamp())
-                        except (ValueError, AttributeError):
-                            pass
-                
-                # Add file-specific metadata
-                if doc_type == 'file':
-                    metadata['folder_id'] = str(item.get('folder_id', ''))
-                
-                metadatas.append(metadata)
+                    # Add module_id to metadata if it exists
+                    if item.get('module_id'):
+                        metadata['module_id'] = str(item['module_id'])
+                    
+                    # Handle event course_id from context_code
+                    if doc_type == 'event' and 'context_code' in item and item['context_code'].startswith('course_'):
+                        course_id = item['context_code'].replace('course_', '')
+                        item['course_id'] = course_id
+                        metadata['course_id'] = str(course_id)
+                    
+                    # Add date fields to metadata based on document type
+                    date_field_mapping = {
+                        'assignment': ('due_at', 'due_timestamp'),
+                        'announcement': ('posted_at', 'posted_timestamp'),
+                        'quiz': ('due_at', 'due_timestamp'),
+                        'event': ('start_at', 'start_timestamp'),
+                        'file': ('updated_at', 'updated_timestamp')
+                    }
+                    
+                    if doc_type in date_field_mapping:
+                        source_field, target_field = date_field_mapping[doc_type]
+                        if item.get(source_field):
+                            try:
+                                date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
+                                metadata[target_field] = int(date_obj.timestamp())
+                            except (ValueError, AttributeError):
+                                pass
+                    
+                    # Add file-specific metadata
+                    if doc_type == 'file':
+                        metadata['folder_id'] = str(item.get('folder_id', ''))
+                    
+                    metadatas.append(metadata)
         
-        # Build document relations
+        # Build document relations for ALL documents (not just new ones)
         self._build_document_relations(self.documents)
         
-        # Generate embeddings first
-        embeddings = self.embedding_function(texts)
-        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
-
-        # Then add to collection with explicit embeddings
-        self.collection.add(
-            ids=ids,
-            embeddings=embeddings,  # Pass pre-computed embeddings
-            documents=texts,
-            metadatas=metadatas
-        )
-        
-        # Save to cache
-        self._save_to_cache()
-        
-        return True
+        # Only add to ChromaDB if there are new documents to add
+        if ids:
+            print(f"Generating embeddings for {len(texts)} documents")
+            embeddings = self.embedding_function(texts)
+            print(f"Generated embeddings with shape: {embeddings.shape if hasattr(embeddings, 'shape') else len(embeddings)}")
+            
+            # Then add to collection with explicit embeddings
+            self.collection.add(
+                ids=ids,
+                embeddings=embeddings,  # Pass pre-computed embeddings
+                documents=texts,
+                metadatas=metadatas
+            )
+            
+            print(f"Added {len(ids)} new documents to collection")
+            return True
+        else:
+            print("No new documents to add to ChromaDB")
+            return False
     
     async def _load_document_metadata(self):
         """
@@ -523,7 +569,7 @@ class VectorDatabase:
             
             # Extract user metadata
             user_metadata = data.get('user_metadata', {})
-            logger.info(f"Loading metadata for user ID: {user_metadata.get('id')}")
+            print(f"Loading metadata for user ID: {user_metadata.get('id')}")
             
             # Extract courses and build course map
             courses = data.get('courses', [])
@@ -559,10 +605,10 @@ class VectorDatabase:
             # Build document relations
             self._build_document_relations(self.documents)
             
-            logger.info(f"Successfully loaded metadata for {len(self.documents)} items")
+            print(f"Successfully loaded metadata for {len(self.documents)} items")
             
         except Exception as e:
-            logger.error(f"Error loading document metadata: {e}")
+            print(f"Error loading document metadata: {e}")
     
     def _build_document_relations(self, documents: List[Dict[str, Any]]) -> None:
         """
@@ -627,10 +673,10 @@ class VectorDatabase:
             if count > 0:
                 # Load document metadata
                 self._load_document_metadata()
-                logger.info(f"Loaded {count} documents from ChromaDB cache")
+                print(f"Loaded {count} documents from ChromaDB cache")
                 return True
         except Exception as e:
-            logger.error(f"Error checking ChromaDB cache: {e}")
+            print(f"Error checking ChromaDB cache: {e}")
         
         return False
     
@@ -680,7 +726,7 @@ class VectorDatabase:
         # Skip if no URL
         url = doc.get('url')
         if not url:
-            logger.warning(f"No URL found for document: {doc.get('display_name', '')}")
+            print(f"No URL found for document: {doc.get('display_name', '')}")
             return ""
         
         # Get file extension
@@ -692,11 +738,11 @@ class VectorDatabase:
         
         # Try to download the file
         try:
-            logger.info(f"Downloading file: {doc.get('display_name', '')}")
+            print(f"Downloading file: {doc.get('display_name', '')}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status != 200:
-                        logger.warning(f"Failed to download file {url}: {response.status}")
+                        print(f"Failed to download file {url}: {response.status}")
                         return ""
                     
                     # Get the raw file content as bytes
@@ -707,7 +753,7 @@ class VectorDatabase:
             return extracted_text
                 
         except Exception as e:
-            logger.error(f"Error downloading or processing file {url}: {e}")
+            print(f"Error downloading or processing file {url}: {e}")
             return "" 
     
     
@@ -790,7 +836,7 @@ class VectorDatabase:
                 specific_date = datetime.strptime(date_str, "%Y-%m-%d")
                 specific_dates.append(specific_date)
             except ValueError:
-                logger.warning(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
+                print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
         
         if not specific_dates:
             return []  # No valid specific dates to filter on
@@ -927,7 +973,7 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            logger.info(f"Executing ChromaDB query with query_text: {query_text}")
+            print(f"Executing ChromaDB query with query_text: {query_text}")
             # Use asyncio to prevent blocking the event loop during the ChromaDB query
             results = await asyncio.to_thread(
                 self.collection.query,
@@ -938,13 +984,13 @@ class VectorDatabase:
             )
             return results
         except Exception as e:
-            logger.error(f"ChromaDB query error with filters: {e}")
-            logger.error(f"Failed query where clause: {query_where}")
+            print(f"ChromaDB query error with filters: {e}")
+            print(f"Failed query where clause: {query_where}")
             
             # If the complex query fails, try with just the course_id filter
             if isinstance(query_where, dict) and "type" in query_where and "course_id" in query_where:
                 try:
-                    logger.info("Trying query with only course_id filter...")
+                    print("Trying query with only course_id filter...")
                     simplified_where = {"course_id": query_where["course_id"]}
                     results = await asyncio.to_thread(
                         self.collection.query,
@@ -955,11 +1001,11 @@ class VectorDatabase:
                     )
                     return results
                 except Exception as e2:
-                    logger.error(f"Course-only filter failed: {e2}")
+                    print(f"Course-only filter failed: {e2}")
             
             # Last resort: try with no filters
             try:
-                logger.info("Trying query with no filters...")
+                print("Trying query with no filters...")
                 results = await asyncio.to_thread(
                     self.collection.query,
                     query_texts=[query_text],
@@ -968,7 +1014,7 @@ class VectorDatabase:
                 )
                 return results
             except Exception as e3:
-                logger.error(f"No-filter query also failed: {e3}")
+                print(f"No-filter query also failed: {e3}")
                 return {}
 
     def _post_process_results(self, search_results, normalized_query):
@@ -1179,11 +1225,11 @@ class VectorDatabase:
         """
         # Build query for ChromaDB including course id, item type, and time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
-        top_k = self.determine_top_k(search_parameters)
+        top_k = self._determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
-        logger.debug(f"Search query: '{normalized_query}'")
-        logger.debug(f"Search parameters: {search_parameters}")
+        print(f"Search query: '{normalized_query}'")
+        print(f"Search parameters: {search_parameters}")
 
         task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
         formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
@@ -1197,19 +1243,21 @@ class VectorDatabase:
         distances = results.get('distances', [[]])[0]
         
         # Process each document
+        print(doc_ids)
         for i, doc_id in enumerate(doc_ids):
             doc = self.document_map.get(doc_id)
+            print(doc)
             if not doc:
                 continue
 
-            logger.info(f"Processing document: {doc.get('name', '')}")
+            print(f"Processing document: {doc.get('name', '')}")
             
             # Calculate similarity score
             similarity = 1.0 - (distances[i] / 2.0)
             
             # Skip results below minimum score
             if similarity < minimum_score:
-                logger.info(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
+                print(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
                 continue
             
             # Extract content for files if needed
@@ -1217,12 +1265,12 @@ class VectorDatabase:
                 try:
                     doc['content'] = await self.extract_file_content(doc)
                     if doc['content']:
-                        logger.info(f"Extracted content for file: {doc.get('display_name', '')}")
+                        print(f"Extracted content for file: {doc.get('display_name', '')}")
                 except Exception as e:
-                    logger.error(f"Failed to extract content: {e}")
+                    print(f"Failed to extract content: {e}")
             
             # Add to results
-            logger.info(f"Adding doc {doc_id} to results with similarity {similarity}")
+            print(f"Adding doc {doc_id} to results with similarity {similarity}")
             search_results.append({
                 'document': doc,
                 'similarity': similarity
@@ -1237,6 +1285,7 @@ class VectorDatabase:
 
         # Augment results with additional information
         combined_results = self._augment_results(combined_results)
+        print(combined_results)
         
         return combined_results[:top_k]
     
@@ -1265,7 +1314,7 @@ class VectorDatabase:
         """
         try:
             await asyncio.to_thread(self.client.delete_collection, self.collection_name)
-            logger.info(f"Deleted collection: {self.collection_name}")
+            print(f"Deleted collection: {self.collection_name}")
             
             # Recreate the collection
             self.collection = await asyncio.to_thread(
@@ -1274,7 +1323,7 @@ class VectorDatabase:
                 embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
             )
-            logger.info(f"Created new collection: {self.collection_name}")
+            print(f"Created new collection: {self.collection_name}")
             
             # Reset in-memory data
             self.documents = []
@@ -1282,7 +1331,7 @@ class VectorDatabase:
             self.course_map = {}
             
         except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
+            print(f"Error clearing cache: {e}")
 
     def _parse_html_content(self, html_content: str) -> str:
         """
@@ -1346,7 +1395,7 @@ class VectorDatabase:
             return extractor.get_text()
             
         except Exception as e:
-            logger.error(f"Error parsing HTML content: {e}")
+            print(f"Error parsing HTML content: {e}")
             # Fallback to a simple tag stripping approach if the parser fails
             text = re.sub(r'<[^>]*>', ' ', html_content)
             text = re.sub(r'\s+', ' ', text)

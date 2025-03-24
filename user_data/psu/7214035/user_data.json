@@ -4,8 +4,8 @@
         "name": "Evan Sinocchi",
         "token": "1050~DCDVEkmvVh933crarPzUJuxExZWRcERTxFAxr2Ka6uJJaaeHG6YrvRXtR8HvXNEL",
         "domain": "psu",
-        "updated_at": 1742780268.265727,
-        "token_updated_at": 1742780161.498375,
+        "updated_at": 1742791126.5494242,
+        "token_updated_at": 1742791030.6104808,
         "courses_selected": {
             "2361957": "CMPSC 465",
             "2379517": "CMPSC 311",
@@ -1780,6 +1780,21 @@
         },
         {
             "course_id": 2361972,
+            "id": 172965879,
+            "type": null,
+            "folder_id": 20974430,
+            "display_name": "Lab4_CMPEN_331.pdf",
+            "filename": "Lab4_CMPEN_331.pdf",
+            "url": "https://psu.instructure.com/files/172965879/download?download_frd=1&verifier=DL1PuPp3oMPemEKf5FeLwdblELQ7MAF4GfH7tYx5",
+            "size": 1746813,
+            "updated_at": "2025-03-24T03:46:17Z",
+            "locked": false,
+            "lock_explanation": null,
+            "module_id": 5595832,
+            "module_name": "Labs"
+        },
+        {
+            "course_id": 2361972,
             "id": 172965805,
             "type": null,
             "folder_id": 20974430,
@@ -1897,51 +1912,6 @@
             "lock_explanation": null,
             "module_id": 5595834,
             "module_name": "Review Questions"
-        },
-        {
-            "course_id": 2361972,
-            "id": 174844099,
-            "type": null,
-            "folder_id": 20974430,
-            "display_name": "q1_solution.pdf",
-            "filename": "q1_solution.pdf",
-            "url": "https://psu.instructure.com/files/174844099/download?download_frd=1&verifier=vrRe7Cj5fs6eMvkSA2lyyRtlgqeBwd0eUDTLHhtS",
-            "size": 99590,
-            "updated_at": "2025-02-24T18:54:13Z",
-            "locked": false,
-            "lock_explanation": null,
-            "module_id": 5595835,
-            "module_name": "Quizzes"
-        },
-        {
-            "course_id": 2361972,
-            "id": 174844101,
-            "type": null,
-            "folder_id": 20974430,
-            "display_name": "q2_solution.pdf",
-            "filename": "q2_solution.pdf",
-            "url": "https://psu.instructure.com/files/174844101/download?download_frd=1&verifier=9SmcIScUI3bohtgIwJoEf9WDwfTDBr6zt4qJPrMZ",
-            "size": 182329,
-            "updated_at": "2025-02-24T18:54:14Z",
-            "locked": false,
-            "lock_explanation": null,
-            "module_id": 5595835,
-            "module_name": "Quizzes"
-        },
-        {
-            "course_id": 2361972,
-            "id": 174844103,
-            "type": null,
-            "folder_id": 20974430,
-            "display_name": "q3_solution.pdf",
-            "filename": "q3_solution.pdf",
-            "url": "https://psu.instructure.com/files/174844103/download?download_frd=1&verifier=b8WGAOsPUblHrPYhL59RNtnFXCo4rxmKIgqRuCqO",
-            "size": 96448,
-            "updated_at": "2025-02-24T18:54:14Z",
-            "locked": false,
-            "lock_explanation": null,
-            "module_id": 5595835,
-            "module_name": "Quizzes"
         },
         {
             "course_id": 2361972,
@@ -2270,6 +2240,15 @@
             "course_name": "CMPSC465 Spring 2025 Section 1/2"
         },
         {
+            "id": 16403820,
+            "title": "Yellowdig for Module 8",
+            "message": "<p>Hi, Students:</p>\n<p>Please post on anything related to water resources and climate change.</p>\n<p>Have fun!</p>\n<p>Tim</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "course_id": 2361815,
+            "posted_at": "2025-03-24T04:00:07Z",
+            "discussion_type": "not_threaded",
+            "course_name": "Earth 103N (Spring 2025)"
+        },
+        {
             "id": 16659319,
             "title": "More bad news for Australian reefs",
             "message": "<p>Hi, Students:</p>\n<p>Ningaloo in particular is very troubling:</p>\n<p><a href=\"https://www.theguardian.com/environment/2025/mar/23/ningaloo-and-great-barrier-reef-hit-by-profoundly-distressing-simultaneous-coral-bleaching-events\" target=\"_blank\">https://www.theguardian.com/environment/2025/mar/23/ningaloo-and-great-barrier-reef-hit-by-profoundly-distressing-simultaneous-coral-bleaching-events</a></p>\n<p>Tim</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
@@ -2279,18 +2258,18 @@
             "course_name": "Earth 103N (Spring 2025)"
         },
         {
-            "id": 16403907,
-            "title": "Module 7 quiz ",
-            "message": "<p>Hi, Students:</p>\n<p>The Module 7 Quiz closes tonight.</p>\n<p>Have a great day.</p>\n<p>Tim</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "id": 16403910,
+            "title": "Module 8 study guide",
+            "message": "<ul>\n<li>Hydrological cycle, reservoirs of water</li>\n<li>Water table, saturated zone</li>\n<li>Behavior of water table</li>\n<li>Aquifers</li>\n<li>Permeability</li>\n<li>Subsidence, flooding, cone of depression</li>\n<li>Overpumping</li>\n<li>Water contamination</li>\n<li>Salt water incursion</li>\n<li>Impact of climate change</li>\n<li>Drought</li>\n<li>Water management in Australia, China and California</li>\n<li>Desalinization</li>\n</ul><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "course_id": 2361815,
             "posted_at": "2025-03-23T11:00:00Z",
             "discussion_type": "not_threaded",
             "course_name": "Earth 103N (Spring 2025)"
         },
         {
-            "id": 16403910,
-            "title": "Module 8 study guide",
-            "message": "<ul>\n<li>Hydrological cycle, reservoirs of water</li>\n<li>Water table, saturated zone</li>\n<li>Behavior of water table</li>\n<li>Aquifers</li>\n<li>Permeability</li>\n<li>Subsidence, flooding, cone of depression</li>\n<li>Overpumping</li>\n<li>Water contamination</li>\n<li>Salt water incursion</li>\n<li>Impact of climate change</li>\n<li>Drought</li>\n<li>Water management in Australia, China and California</li>\n<li>Desalinization</li>\n</ul><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
+            "id": 16403907,
+            "title": "Module 7 quiz ",
+            "message": "<p>Hi, Students:</p>\n<p>The Module 7 Quiz closes tonight.</p>\n<p>Have a great day.</p>\n<p>Tim</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "course_id": 2361815,
             "posted_at": "2025-03-23T11:00:00Z",
             "discussion_type": "not_threaded",
@@ -2338,15 +2317,6 @@
             "message": "<p><iframe title=\"YouTube video player\" src=\"https://www.youtube.com/embed/fg7zS6RSow8\" width=\"560\" height=\"315\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture\" loading=\"lazy\"></iframe></p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "course_id": 2361815,
             "posted_at": "2025-03-19T10:00:00Z",
-            "discussion_type": "not_threaded",
-            "course_name": "Earth 103N (Spring 2025)"
-        },
-        {
-            "id": 16403923,
-            "title": "Module 7 lab",
-            "message": "<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<div class=\"discussion-section message_wrapper\">\n<div class=\"message user_content enhanced\" data-bind=\"message\">\n<p>Hi, Students:</p>\n<p>In module 7 lab you will be looking modern reefs in images, videos and maps.&nbsp; The lab is focused on reef health and it cements what you will be learning in the module.&nbsp; <strong>It is really important to get the hang of the questions in the practice so please do this first and then email me if you have any questions.</strong></p>\n<p>Best,</p>\n<p>Tim</p>\n</div>\n</div>\n</div>\n</div><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
-            "course_id": 2361815,
-            "posted_at": "2025-03-18T10:00:00Z",
             "discussion_type": "not_threaded",
             "course_name": "Earth 103N (Spring 2025)"
         },
@@ -2761,9 +2731,9 @@
             "id": 17104795,
             "type": null,
             "name": "Week #10",
-            "description": null,
+            "description": "<p><strong>Weekly Quiz and Extra Credit Opportunity</strong></p>\n<p>This quiz consists of 10 questions based on the topics covered so far in the class in the week, with a 10-minute time limit for completion. Participation in this quiz offers you the chance to earn extra credit. For detailed information about the weekly extra credit opportunities, please refer to the syllabus on Canvas (<a title=\"Syllabus\" href=\"https://psu.instructure.com/courses/2379517/assignments/syllabus\" data-course-type=\"navigation\">Syllabus for CMPSC 311: Intro Sys Prog - SP25)</a>.</p>\n<p>Each week, you will have one quiz like this, focusing on the material covered during that week. As a reminder, this quiz is purely for extra credit and does not affect the general grading scheme.</p>\n<p>To help you prepare, we are providing additional study materials each week. You can find these resources in the \"Files\" section of the Canvas course under the \"Microlearning\" folder.<span>&nbsp;</span><a class=\"inline_disabled\" href=\"https://psu.instructure.com/courses/2379517/files/folder/Microlearning/Week%20%2310\" target=\"_blank\">(Files (instructure.com))</a></p>\n<p>This week's resources include:</p>\n<ol>\n<li>\n<p><strong>Flashcards</strong>: These flashcards highlight key concepts from the week's content, making them perfect for quick, focused study sessions.</p>\n</li>\n<li>\n<p><strong>Short Summaries</strong>: These summaries offer a concise overview of each section's main points, ideal for quick review.</p>\n</li>\n<li>\n<p><strong>Scenario-Based Activities</strong>: Engage with hands-on exercises designed to reinforce key concepts in lexical analysis while encouraging critical thinking.</p>\n</li>\n</ol>\n<p>New files will be added to the corresponding weekly folder in the \"Microlearning\" section on Canvas. Make sure to take advantage of these resources to enhance your learning and perform well on the quizzes!</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "created_at": "2025-03-23T15:44:24Z",
-            "updated_at": "2025-03-23T16:31:40Z",
+            "updated_at": "2025-03-24T04:00:14Z",
             "due_at": "2025-03-31T03:59:00Z",
             "course_id": 2379517,
             "submission_types": [
@@ -4842,8 +4812,27 @@
             "name": "Lab3",
             "description": "",
             "created_at": "2025-01-14T05:46:21Z",
-            "updated_at": "2025-02-23T22:08:17Z",
-            "due_at": "2025-03-24T03:59:00Z",
+            "updated_at": "2025-03-24T03:47:24Z",
+            "due_at": "2025-03-26T03:59:00Z",
+            "course_id": 2361972,
+            "submission_types": [
+                "online_upload"
+            ],
+            "can_submit": null,
+            "graded_submission_exist": null,
+            "graded_submissions_exist": null,
+            "module_id": null,
+            "module_name": null,
+            "content": []
+        },
+        {
+            "id": 16995659,
+            "type": null,
+            "name": "Lab4",
+            "description": "",
+            "created_at": "2025-01-14T05:46:21Z",
+            "updated_at": "2025-03-24T03:48:02Z",
+            "due_at": "2025-04-14T03:59:00Z",
             "course_id": 2361972,
             "submission_types": [
                 "online_upload"
@@ -5198,14 +5187,14 @@
             "id": 5296227,
             "title": "Week #10",
             "preview_url": null,
-            "description": "",
+            "description": "<p><strong>Weekly Quiz and Extra Credit Opportunity</strong></p>\n<p>This quiz consists of 10 questions based on the topics covered so far in the class in the week, with a 10-minute time limit for completion. Participation in this quiz offers you the chance to earn extra credit. For detailed information about the weekly extra credit opportunities, please refer to the syllabus on Canvas (<a title=\"Syllabus\" href=\"https://psu.instructure.com/courses/2379517/assignments/syllabus\" data-course-type=\"navigation\">Syllabus for CMPSC 311: Intro Sys Prog - SP25)</a>.</p>\n<p>Each week, you will have one quiz like this, focusing on the material covered during that week. As a reminder, this quiz is purely for extra credit and does not affect the general grading scheme.</p>\n<p>To help you prepare, we are providing additional study materials each week. You can find these resources in the \"Files\" section of the Canvas course under the \"Microlearning\" folder.<span>&nbsp;</span><a class=\"inline_disabled\" href=\"https://psu.instructure.com/courses/2379517/files/folder/Microlearning/Week%20%2310\" target=\"_blank\">(Files (instructure.com))</a></p>\n<p>This week's resources include:</p>\n<ol>\n<li>\n<p><strong>Flashcards</strong>: These flashcards highlight key concepts from the week's content, making them perfect for quick, focused study sessions.</p>\n</li>\n<li>\n<p><strong>Short Summaries</strong>: These summaries offer a concise overview of each section's main points, ideal for quick review.</p>\n</li>\n<li>\n<p><strong>Scenario-Based Activities</strong>: Engage with hands-on exercises designed to reinforce key concepts in lexical analysis while encouraging critical thinking.</p>\n</li>\n</ol>\n<p>New files will be added to the corresponding weekly folder in the \"Microlearning\" section on Canvas. Make sure to take advantage of these resources to enhance your learning and perform well on the quizzes!</p><script src=\"https://instructure-uploads.s3.amazonaws.com/account_10500000000085746/attachments/88254828/Mobile.js\"></script>",
             "quiz_type": "assignment",
             "time_limit": 10,
             "allowed_attempts": 1,
             "points_possible": 10.0,
             "due_at": "2025-03-31T03:59:00Z",
-            "locked_for_user": true,
-            "lock_explanation": "This quiz is locked until Mar 24 at 12am.",
+            "locked_for_user": false,
+            "lock_explanation": null,
             "module_id": 5475170,
             "module_name": "Week 10",
             "course_id": 2379517
@@ -5620,8 +5609,8 @@
             "allowed_attempts": -1,
             "points_possible": 15.0,
             "due_at": "2025-03-24T03:59:00Z",
-            "locked_for_user": false,
-            "lock_explanation": null,
+            "locked_for_user": true,
+            "lock_explanation": "This quiz was locked Mar 23 at 11:59pm.",
             "module_id": 5479591,
             "module_name": "Module 7: Ocean Acidification, Red Tides, and Monster Jellyfish (Week 7)",
             "course_id": 2361815
@@ -5636,8 +5625,8 @@
             "allowed_attempts": 1,
             "points_possible": 15.0,
             "due_at": "2025-03-24T03:59:00Z",
-            "locked_for_user": false,
-            "lock_explanation": null,
+            "locked_for_user": true,
+            "lock_explanation": "This quiz was locked Mar 23 at 11:59pm.",
             "module_id": 5479591,
             "module_name": "Module 7: Ocean Acidification, Red Tides, and Monster Jellyfish (Week 7)",
             "course_id": 2361815
