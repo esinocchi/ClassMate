@@ -1181,7 +1181,7 @@ class VectorDatabase:
         """
         # Build query for ChromaDB including course id, item type, and time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
-        top_k = self.determine_top_k(search_parameters)
+        top_k = self._determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
         logger.debug(f"Search query: '{normalized_query}'")
