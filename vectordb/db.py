@@ -65,7 +65,7 @@ logger = logging.getLogger("canvas_vector_db")
 
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir, collection_name: str = None, hf_api_token: str = None):
+    def __init__(self, json_file_path: str, cache_dir = "chroma_data/", collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
@@ -76,7 +76,7 @@ class VectorDatabase:
             hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
-        self.cache_dir = "chroma_data/"
+        self.cache_dir = cache_dir
         
         # Load JSON file to extract user_id if collection_name is not provided
         if collection_name is None:
