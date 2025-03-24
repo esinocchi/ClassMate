@@ -167,8 +167,6 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course_id, name=course_name, selected=True)
             all_courses += [course_formatted]
             courses_added += [course_id]
-
-    print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
     
     #pull all classes from canvas api
     async with aiohttp.ClientSession() as session:
@@ -186,10 +184,8 @@ async def pullCourses(user_id, domain):
             course_formatted = ClassesDict(id=course.get("id"), name=course.get("name"), selected=False)
             all_courses += [course_formatted]
             courses_added += [str(course.get("id"))]
-
-    print(f"\n\n\n these are the courses added: {courses_added} after pulling all classes\n\n\n")
-
     #classes are returned in the format {course_id: course_name}
+
     return {'courses': all_courses}
 
 @app.post('/endpoints/pushCourses')
@@ -356,8 +352,8 @@ async def check_chat_requirements(contextArray: ContextObject):
     user_context = contextArray.context[1]
 
     #if user data update is currently in progress, return error message
-    #if await check_update_status(user_context.user_id, user_context.domain):
-    #    return "User data update currently in progress, please try again in a few minutes"
+    if await check_update_status(user_context.user_id, user_context.domain):
+        return "User data update currently in progress, please try again in a few minutes"
     
     #if there are no courses selected, tell user to select courses in the settings page by returning error message
     print("active")
