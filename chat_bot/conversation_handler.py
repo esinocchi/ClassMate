@@ -419,7 +419,7 @@ class ConversationHandler:
                         }
                     }   
                 },
-                "required": ["target_grade_letter", "search_parameters"]
+                "required": ["target_grade_letter","student_id", "search_parameters"]
             }
         ]
         return functions
@@ -486,7 +486,7 @@ class ConversationHandler:
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
             - For note creation requests, generate arguments as defined in the function list.
-
+            - For grade calculation requests, the arguments should be studnet_id, target_grade_letter, and search_parameters.
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
