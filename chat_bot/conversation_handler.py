@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Union
 from pydantic import BaseModel
 from backend.task_specific_agents.lecture_to_notes_agent import lecture_file_to_notes_pdf
+from backend.task_specific_agents.grade_calculator_agent import calculate_grade
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -354,6 +355,87 @@ class ConversationHandler:
                     },
                     "required": ["user_id", "domain", "search_parameters"]
                 }
+            },
+            {
+                "name": "calculate_grade",
+                "description": "Calculate the grade required to achieve a certain letter grade on an assignment",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "course_id": {
+                            "type": "string",
+                            "description": "The course ID of the assignment"
+                        },
+                        "canvas_base_url": {
+                            "type": "string",
+                            "description": "The user's canvas base url"
+                        },
+                        "access_token": {
+                            "type": "string",
+                            "description": "The user's canvas access token"
+                        },
+                        "target_grade_letter": {
+                            "type": "string",
+                            "description": "The target grade letter of the assignment"
+                        },
+                        "student_id": {
+                            "type": "string",
+                            "description": "The user's ID number"
+                        },
+                        "hf_api_token": {
+                            "type": "string",
+                            "description": "The user's huggingface api token"
+                        },
+                        "search_parameters": {
+                            "type": "object",
+                            "properties": {
+                                "course_id": {
+                                    "type": "string",
+                                    "description": "Specific Course ID"
+                                },
+                                "time_range": {
+                                    "type": "string", 
+                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
+                                    "description": "Temporal context for search"
+                                },
+                                "generality": {
+                                    "type": "string", 
+                                    "enum": ["LOW", "MEDIUM", "HIGH",],
+                                    "description": "Context for how many items to retrieve"
+                                },
+                                "item_types": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                    },
+                                    "description": "This should always be ['file']"
+                                },
+                                "specific_dates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string" 
+                                    },
+                                    "description": "This should always be ['lecture','notes','slides']"
+                                },
+                                "query": {
+                                    "type": "string",
+                                    "description": "User's original query for semantic search"
+                                }
+                            },
+                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
+                        }
+                    }   
+                },
+                "required": ["target_grade_letter", "search_parameters"]
             }
         ]
         return functions
@@ -660,9 +742,12 @@ class ConversationHandler:
             print(f"Function call detected: {function_call.name}")
             try:
                 arguments = json.loads(function_call.arguments)
-                if function_name == "create_event":
+                if function_name == "create_event" or function_name == "calculate_grade":
                     arguments["canvas_base_url"] = self.canvas_api_url
                     arguments["access_token"] = self.canvas_api_token
+                    if function_name == "calculate_grade":
+                        arguments["hf_api_token"] = self.hf_api_token
+                        
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
