@@ -169,7 +169,7 @@ class VectorDatabase:
             display_name = doc.get('display_name', '')
             if display_name:
                 # Normalize the display name to improve matching
-                normalized_name = self._normalize_text(display_name)
+                normalized_name = self.normalize_text(display_name)
                 # Add the name at the beginning for emphasis
                 text_parts.insert(0, f"Filename: {normalized_name}")
                 # Also add it as a title for better matching
@@ -180,7 +180,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None: # error prevention
                     # Normalize any text fields to handle special characters
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -190,7 +190,7 @@ class VectorDatabase:
             name = doc.get('name', '')
             if name:
                 # Normalize the name to improve matching
-                normalized_name = self._normalize_text(name)
+                normalized_name = self.normalize_text(name)
                 # Add the name at the beginning for emphasis
                 text_parts.insert(0, f"Assignment: {normalized_name}")
                 text_parts.insert(0, f"Title: {normalized_name}")
@@ -204,7 +204,7 @@ class VectorDatabase:
                     else:
                         # Normalize any text fields
                         if isinstance(doc[field], str):
-                            value = self._normalize_text(doc[field])
+                            value = self.normalize_text(doc[field])
                         else:
                             value = doc[field]
                         # e.g. HW2 (name) -> Name: HW2
@@ -223,7 +223,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Announcement: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -232,7 +232,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None: # error prevention
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -242,7 +242,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Quiz: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -255,7 +255,7 @@ class VectorDatabase:
                 elif field in doc and doc[field] is not None:
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -265,7 +265,7 @@ class VectorDatabase:
             title = doc.get('title', '')
             if title:
                 # Normalize the title to improve matching
-                normalized_title = self._normalize_text(title)
+                normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
                 text_parts.insert(0, f"Event: {normalized_title}")
                 text_parts.insert(0, f"Title: {normalized_title}")
@@ -276,7 +276,7 @@ class VectorDatabase:
                 if field in doc and doc[field] is not None:
                     # Normalize any text fields
                     if isinstance(doc[field], str):
-                        value = self._normalize_text(doc[field])
+                        value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
                     text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
@@ -290,7 +290,7 @@ class VectorDatabase:
         if module_name:
             # Normalize module name
             if isinstance(module_name, str):
-                module_name = self._normalize_text(module_name)
+                module_name = self.normalize_text(module_name)
             text_parts.append(f"Module Name: {module_name}")
         
         # Join all parts with newlines for better separation
@@ -318,7 +318,8 @@ class VectorDatabase:
         # ]
         return "\n".join(text_parts)
     
-    def _normalize_text(self, text: str) -> str:
+    @staticmethod
+    def normalize_text(text: str) -> str:
         """
         Normalize text by handling special characters and standardizing formats.
         
@@ -741,51 +742,7 @@ class VectorDatabase:
                     seen_ids.add(related_id)
         
         return related_docs
-    
-    async def extract_file_content(self, doc: Dict[str, Any]) -> str:
-        """
-        Extract content from a file URL when needed.
-        
-        Args:
-            doc: Document dictionary containing file metadata
-            
-        Returns:
-            Extracted text content as a string
-        """
-        # Skip if no URL
-        url = doc.get('url')
-        if not url:
-            print(f"No URL found for document: {doc.get('display_name', '')}")
-            return ""
-        
-        # Get file extension
-        file_extension = doc.get('file_extension', '')
-        if not file_extension:
-            display_name = doc.get('display_name', '')
-            if display_name and '.' in display_name:
-                file_extension = display_name.split('.')[-1].lower()
-        
-        # Try to download the file
-        try:
-            print(f"Downloading file: {doc.get('display_name', '')}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        print(f"Failed to download file {url}: {response.status}")
-                        return ""
-                    
-                    # Get the raw file content as bytes
-                    file_bytes = await response.read()
-            
-            # Use the imported extract_text_and_images function
-            extracted_text = extract_text_and_images(file_bytes, file_extension)
-            return extracted_text
-                
-        except Exception as e:
-            print(f"Error downloading or processing file {url}: {e}")
-            return "" 
-    
-    
+
 
     def _build_time_range_filter(self, search_parameters):
         """
@@ -966,7 +923,7 @@ class VectorDatabase:
         """
         # Normalize the query
         query = search_parameters["query"]
-        normalized_query = self._normalize_text(query)
+        normalized_query = self.normalize_text(text=query)
         
         # Build ChromaDB where clause with proper operator
         conditions = []
@@ -1234,8 +1191,7 @@ class VectorDatabase:
         
         return search_results
 
-    async def search(self, search_parameters: Optional[dict] = None,
-               include_related: bool = True, minimum_score: float = 0.3) -> List[Dict[str, Any]]:
+    async def search(self, search_parameters, include_related=True, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
@@ -1247,7 +1203,6 @@ class VectorDatabase:
                 - item_types: List of document types to include
                 - specific_dates: Optional list of specific dates to filter by
                 - keywords: Optional list of additional keywords
-            top_k: Number of top results to return.
             include_related: Whether to include related documents.
             minimum_score: Minimum similarity score to include in results.
             
@@ -1296,13 +1251,16 @@ class VectorDatabase:
             
             # Extract content for files if needed
             if doc.get('type') == 'assignment':
-                print("\n\nworks\n\n")
                 try:
-                    doc['description'] = await self.extract_file_content(doc)
-                    if doc['description']:
-                        print(f"Extracted content for file: {doc.get('display_name', '')}")
+                    # Use our content extractor to process the assignment
+                    processed_description = await self.extract_file_content(doc.copy())
+                    
+                    # Update the document with processed content
+                    if processed_description and processed_description != doc.get('description'):
+                        print(f"Updated content for assignment: {doc.get('name', '')}")
+                        doc['description'] = processed_description
                 except Exception as e:
-                    print(f"Failed to extract content: {e}")
+                    print(f"Failed to process assignment: {e}")
             
             # Add to results
             print(f"Adding doc {doc.get('name', '')} to results with similarity {similarity}")
@@ -1437,3 +1395,142 @@ class VectorDatabase:
             text = re.sub(r'<[^>]*>', ' ', html_content)
             text = re.sub(r'\s+', ' ', text)
             return text.strip()
+
+    async def extract_file_content(self, doc):
+        """
+        Extract text content from a document, especially for PDF files linked in assignments.
+        
+        Args:
+            doc: Document dictionary
+            
+        Returns:
+            Extracted text content
+        """
+        try:
+            # Import the ContentExtractor from the content_extraction module
+            from vectordb.content_extraction import ContentExtractor
+            
+            # Initialize the content extractor with the Canvas API token
+            extractor = ContentExtractor(canvas_api_token=os.getenv("CANVAS_API_TOKEN"))
+            
+            # Define a document finder function that will search our document_map
+            def find_document_by_name(filename):
+                """Find a document in document_map by filename or display_name"""
+                for doc_id, document in self.document_map.items():
+                    if document.get('type') == 'file':
+                        if document.get('filename') == filename or document.get('display_name') == filename:
+                            print(f"Found file in document_map: {filename}")
+                            return document
+                return None
+            
+            # Set the document finder function
+            extractor.set_document_finder(find_document_by_name)
+            
+            # Augment with a link resolver function
+            async def resolve_link_to_filename(url):
+                """Follow a link to determine what file it points to"""
+                import requests
+                from bs4 import BeautifulSoup
+                
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                
+                try:
+                    # Make a HEAD request first to see if we get a Content-Disposition header
+                    head_response = requests.head(url, headers=headers, allow_redirects=True)
+                    content_disposition = head_response.headers.get('Content-Disposition', '')
+                    
+                    if 'filename=' in content_disposition:
+                        # Extract filename from Content-Disposition
+                        import re
+                        filename_match = re.search(r'filename="?([^";]+)"?', content_disposition)
+                        if filename_match:
+                            return filename_match.group(1)
+                    
+                    # If no filename in headers, make a GET request and check page title or content
+                    response = requests.get(url, headers=headers)
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Check various places where the filename might be
+                    # 1. Page title
+                    if soup.title:
+                        title = soup.title.string
+                        if '.pdf' in title.lower():
+                            return title.strip()
+                    
+                    # 2. Look for download links with filenames
+                    for link in soup.find_all('a'):
+                        if link.get('download'):
+                            return link.get('download')
+                        
+                        # Check if link text has a PDF name
+                        if link.text and '.pdf' in link.text.lower():
+                            return link.text.strip()
+                    
+                    # 3. Last resort - extract from the URL
+                    if '.pdf' in url:
+                        filename = url.split('/')[-1].split('?')[0]
+                        if '.pdf' in filename:
+                            return filename
+                    
+                    return None
+                except Exception as e:
+                    print(f"Error resolving link: {e}")
+                    return None
+            
+            # For assignments, process to extract file content
+            if doc.get('type') == 'assignment':
+                # First check if the content field already has identified files
+                if doc.get('content') and isinstance(doc.get('content'), list):
+                    for item in doc.get('content'):
+                        if isinstance(item, dict):
+                            for filename, url in item.items():
+                                # Look for this file in the document map
+                                file_doc = find_document_by_name(filename)
+                                if file_doc:
+                                    text = await extractor.extract_text_from_pdf_url(file_doc.get('url'))
+                                    if text:
+                                        return text
+                                
+                                # Try the direct URL
+                                text = await extractor.extract_text_from_pdf_url(url)
+                                if text:
+                                    return text
+                
+                # If we're here, we need to parse the HTML and follow links
+                if doc.get('description'):
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(doc.get('description'), 'html.parser')
+                    
+                    # Find all links
+                    for link in soup.find_all('a'):
+                        url = link.get('href')
+                        if not url:
+                            continue
+                        
+                        # Follow the link to determine what file it actually points to
+                        real_filename = await resolve_link_to_filename(url)
+                        if real_filename:
+                            print(f"Link resolved to file: {real_filename}")
+                            
+                            # Now search for this file in the document map
+                            file_doc = find_document_by_name(real_filename)
+                            if file_doc:
+                                text = await extractor.extract_text_from_pdf_url(file_doc.get('url'))
+                                if text:
+                                    return text
+                        
+                        # Direct attempt if we couldn't resolve the filename
+                        text = await extractor.extract_text_from_pdf_url(url)
+                        if text:
+                            return text
+                
+                # As a fallback, try the regular process_assignment method
+                processed_doc = await extractor.process_assignment(doc)
+                return processed_doc.get('description', '')
+                
+            return doc.get('description', '')
+        except Exception as e:
+            print(f"Error extracting content: {e}")
+            return doc.get('description', '')
