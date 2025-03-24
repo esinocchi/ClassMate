@@ -8,7 +8,7 @@ import tzlocal
 from datetime import datetime
 from typing import List, Union
 from pydantic import BaseModel
-
+from backend.task_specific_agents.lecture_to_notes_agent import lecture_file_to_notes_pdf
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -327,7 +327,7 @@ class ConversationHandler:
                                         "type": "string",
                                         "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
                                     },
-                                    "description": "This should always be ['syllabus']"
+                                    "description": "This should always be ['file']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -342,14 +342,14 @@ class ConversationHandler:
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should always be ['course information','course materials'] l"
+                                    "description": "This should always be ['lecture','notes','slides']"
                                 },
                                 "query": {
                                     "type": "string",
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types","generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
                         }
                     },
                     "required": ["user_id", "domain", "search_parameters"]
@@ -461,7 +461,6 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-                For example, if the user asks for the next 3 upcoming assignments, you will check which 3 assignments are next relative to the current date.
             - For note creation requests, respond with the note pdf file that was created.
             -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
         """
@@ -475,15 +474,12 @@ class ConversationHandler:
         from vectordb.db import VectorDatabase
         
         user_id_number = self.student_id.split("_")[1]
-        print(f"User ID number: {user_id_number}")
         
         vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
-        print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         await vector_db.process_data(force_reload=False)
-        print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
         try:
@@ -509,34 +505,58 @@ class ConversationHandler:
             - query
         """
         from vectordb.db import VectorDatabase
-        print("Imported VectorDatabase")
         
         user_id_number = self.student_id.split("_")[1]
-        print(f"User ID number: {user_id_number}")
         
         vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
-        print(f"Vector DB path: {vector_db_path}")
         
-        print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         await vector_db.process_data(force_reload=False)
-        print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
 
         try:
             course_information = await vector_db.search(search_parameters) 
-            print(f"Course information: {course_information}")
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             course_information = []
         
         return course_information
-          
-    async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
+
+    async def find_file(self, search_parameters: dict):
+        """Find a file using the vector search function"""
+        print("\n=== FIND_FILE: Starting ===")
+        print(f"Search parameters received: {json.dumps(search_parameters, indent=2)}")
+        from vectordb.db import VectorDatabase
         
-        return
+        user_id_number = self.student_id.split("_")[1]
+        
+        vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
+        
+        print("Initializing VectorDatabase...")
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
+        await vector_db.process_data(force_reload=False)
+        
+        try:
+            file = await vector_db.search(search_parameters) 
+        except Exception as e:
+            print(f"ERROR in vector_db.search: {str(e)}")
+            print(f"Error type: {type(e)}")
+            file = []
+        
+        file_description = [file[0]["document"]["filename"], file[0]["document"]["url"]]
+        return file_description
+
+    async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
+        """Create notes for a file using the vector search function"""
+        search_parameters["specific_dates"] = [""]
+        file_description = await self.find_file(search_parameters)
+        file_name = file_description[0]
+        file_url = file_description[1]
+
+        return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return return_value
     
     def validate_search_parameters(self, search_parameters):
         """Validates search parameters and enables fail-safes"""
@@ -671,6 +691,12 @@ class ConversationHandler:
                 result = {"error": f"Function '{function_name}' not implemented."}
 
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
+
+            if function_name == "create_notes":
+                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
+                self.chat_history.context[0].content[0] = return_value
+                return self.chat_history
+            
             chat.append({
                 'role': "function",
                 "name": function_name,

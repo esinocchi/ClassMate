@@ -25,7 +25,7 @@ async def async_file_download(file_url, api_token):
                 raise Exception(f"Failed to download file. Status code: {response.status}")
             return await response.read()
 
-def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
+async def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     """
     inputs:
     file_url: the url of the file to be downloaded
@@ -40,6 +40,8 @@ def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     
     handler = DataHandler(user_id, domain)
 
+    os.makedirs(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}", exist_ok=True)
+
     clear_directory(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}")
 
     API_TOKEN = handler.grab_user_data()["user_metadata"]["token"]
@@ -47,7 +49,7 @@ def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, domain):
     print(API_TOKEN)
     
 
-    file_bytes = asyncio.run(async_file_download(file_url, API_TOKEN))
+    file_bytes = await async_file_download(file_url, API_TOKEN)
     # Make the request to download the file
     
     # Try to extract text and images from the file
@@ -85,8 +87,9 @@ def prompt_to_pdf(prompt: str, user_id, domain: str):
     
 
     print("herehereherherherherhe")
-
+    print(domain)
     latex_file_path = f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.tex"
+    print(latex_file_path)
      #this will depend on the directory structure of CanvasAI
 
 
