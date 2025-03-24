@@ -291,71 +291,71 @@ class ConversationHandler:
                     "required": ["search_parameters"]
                 }
             },
-            {
-                "name": "create_notes",
-                "description": "Create notes for a file found in the vector search function",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "user_id": {
-                            "type": "string",
-                            "description": "The user's ID number"
-                        },
-                        "domain": {
-                            "type": "string",
-                            "description": "The user's canvas base url"
-                        },
-                        "search_parameters": {
-                            "type": "object",
-                            "properties": {
-                                "course_id": {
-                                    "type": "string",
-                                    "description": "Specific Course ID"
-                                },
-                                "time_range": {
-                                    "type": "string", 
-                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
-                                    "description": "Temporal context for search"
-                                },
-                                "generality": {
-                                    "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH",],
-                                    "description": "Context for how many items to retrieve"
-                                },
-                                "item_types": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
-                                    },
-                                    "description": "This should always be ['file']"
-                                },
-                                "specific_dates": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "format": "date"
-                                    },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
-                                },
-                                "keywords": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string" 
-                                    },
-                                    "description": "This should always be ['lecture','notes','slides']"
-                                },
-                                "query": {
-                                    "type": "string",
-                                    "description": "User's original query for semantic search"
-                                }
-                            },
-                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
-                        }
-                    },
-                    "required": ["user_id", "domain", "search_parameters"]
-                }
-            },
+            #{
+                #name": "create_notes",
+                #"description": "Create notes for a file found in the vector search function",
+                #"parameters": {
+                #    "type": "object",
+                #    "properties": {
+                #        "user_id": {
+                #            "type": "string",
+                #            "description": "The user's ID number"
+                #        },
+                #        "domain": {
+                #            "type": "string",
+                #            "description": "The user's canvas base url"
+                #        },
+                #           "search_parameters": {
+                #            "type": "object",
+                #            "properties": {
+                #                "course_id": {
+                #                    "type": "string",
+                #                    "description": "Specific Course ID"
+                #                },
+                #                "time_range": {
+                #                    "type": "string", 
+                #                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
+                #                    "description": "Temporal context for search"
+                #                },
+                #                "generality": {
+                #                    "type": "string", 
+                #                    "enum": ["LOW", "MEDIUM", "HIGH",],
+                #                    "description": "Context for how many items to retrieve"
+                #                },
+                #                "item_types": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string",
+                #                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                #                    },
+                #                    "description": "This should always be ['file']"
+                #                },
+                #                "specific_dates": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string",
+                #                        "format": "date"
+                #                    },
+                #                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                #                },
+                #                "keywords": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string" 
+                #                    },
+                #                    "description": "This should always be ['lecture','notes','slides']"
+                #                },
+                #                "query": {
+                #                    "type": "string",
+                #                    "description": "User's original query for semantic search"
+                #                }
+                #            },
+                #            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
+                #        }
+                #    },
+                #       "required": ["user_id", "domain", "search_parameters"]
+                #}
+           # },
             {
                 "name": "calculate_grade",
                 "description": "Calculate the grade required to achieve a certain letter grade on an assignment",
@@ -484,9 +484,9 @@ class ConversationHandler:
                 }}
                 }}
                 ```
+            - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
-            - For note creation requests, generate arguments as defined in the function list.
             - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above.
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
@@ -677,7 +677,7 @@ class ConversationHandler:
         function_mapping = {
             "find_events_and_assignments": self.find_events_and_assignments,
             "find_course_information": self.find_course_information,
-            "create_notes": self.create_notes,
+            #"create_notes": self.create_notes
             "create_event": create_event,
             "calculate_grade": calculate_grade
         }
