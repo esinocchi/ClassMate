@@ -57,14 +57,14 @@ async def calculate_grade(
     headers = {"Authorization": f"Bearer {access_token}"}
 
     # URL to retrieve current overall course score for the student.
-    current_score_url = f"{canvas_base_url}/courses/{course_code}/enrollments"
+    current_score_url = f"{canvas_base_url}/api/v1/courses/{course_code}/enrollments"
     current_score_params = {"user_id": "self", "include[]": "total_scores"}
     
     # URL to retrieve the grading scheme.
-    grading_schema_url = f"{canvas_base_url}/courses/{course_code}/grading_standards"
+    grading_schema_url = f"{canvas_base_url}/api/v1/courses/{course_code}/grading_standards"
     
     # URL to retrieve the assignment details.
-    assignment_url = f"{canvas_base_url}/courses/{course_code}/assignments/{assignment_id}"
+    assignment_url = f"{canvas_base_url}/api/v1/courses/{course_code}/assignments/{assignment_id}"
 
     should_close_session = False
     if session is None:
@@ -109,7 +109,7 @@ async def calculate_grade(
         print(f"Assignment points possible: {APP}, Assignment group ID: {assignment_group_id}")
 
         # Retrieve assignment group details (including assignments with submission details)
-        assignment_group_url = f"{canvas_base_url}/courses/{course_code}/assignment_groups/{assignment_group_id}"
+        assignment_group_url = f"{canvas_base_url}/api/v1/courses/{course_code}/assignment_groups/{assignment_group_id}"
         group_params = {"include[]": ["assignments", "submission"]}
         async with session.get(assignment_group_url, headers=headers, params=group_params) as response:
             response.raise_for_status()
