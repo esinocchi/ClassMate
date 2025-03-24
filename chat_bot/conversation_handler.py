@@ -64,7 +64,7 @@ class ConversationHandler:
         self.canvas_api_url = domain
         self.canvas_api_token = canvas_api_token
         self.openai_api_key = openai_api_key
-        
+        self.hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
         # Define valid types and time range definitions
         self.valid_types = ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
         self.time_range_definitions = {
@@ -90,11 +90,11 @@ class ConversationHandler:
             }
         }
         self.generality_definitions = {
-            "SPECIFIC": {
-                "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
-                "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
-                "result_type": "Very targeted set of results"
-            },
+            #"SPECIFIC": {
+            #    "description": "Used when the user is looking for a single, clearly identified number of items with specific details. In this case, return a single integer value e.g. 1, 2, 3, etc.",
+            #    "examples": ["Get my assignment due tomorrow in CMPSC 465", "What are my next 3 assingnemnts"],
+            #    "result_type": "Very targeted set of results"
+            #},
             "LOW": {
                 "description": "Used when the user is looking for a small set of focused results about a narrow topic",
                 "examples": ["Find quizzes about neural networks in CMPSC 444", "Show me this week's assignments"],
@@ -136,13 +136,13 @@ class ConversationHandler:
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH",],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                "specific_amount": {
-                                    "type": "integer",
-                                    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                },
+                                #"specific_amount": {
+                                #    "type": "integer",
+                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
+                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -269,10 +269,10 @@ class ConversationHandler:
                                     "enum": ["LOW", "MEDIUM", "HIGH"],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                "specific_amount": {
-                                    "type": "integer",
-                                    "description": "The number of items to retrieve if generality is SPECIFIC"
-                                },
+                                #"specific_amount": {
+                                #    "type": "integer",
+                                #    "description": "The number of items to retrieve if generality is SPECIFIC"
+                                #},
                                 "item_types": {
                                     "type": "array",
                                     "items": {
@@ -473,7 +473,7 @@ class ConversationHandler:
         print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
-        vector_db = VectorDatabase(vector_db_path)
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")

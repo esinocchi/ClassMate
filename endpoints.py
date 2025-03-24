@@ -225,11 +225,6 @@ async def pushCourses(classesData: PushClassesObject):
     handler.update_user_data()
     print("User data updated")
 
-    vector_db_path = f"user_data/psu/{classesData.user_id}/user_data.json"
-    vector_db = VectorDatabase(vector_db_path)
-    print("Initilizing vector database...")
-    await vector_db.process_data(force_reload=True)
-    print("Vector database initialized with new courses")
     return {'message': "Courses pushed to database"}
 
 
