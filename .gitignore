@@ -9,3 +9,4 @@ user_data/.DS_Store
 .gitignore
 get-pip.py
 chroma_data/
+test.py

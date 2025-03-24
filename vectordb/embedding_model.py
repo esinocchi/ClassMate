@@ -64,7 +64,7 @@ class HFEmbeddingFunction:
         
         # Handle empty input case
         if not input:
-            return np.array([])
+            return []
         
         # Constants
         max_chars = 2000  # Estimate for ~512 tokens
@@ -130,7 +130,7 @@ class HFEmbeddingFunction:
             logger.error("Generated empty embeddings array! Returning placeholder.")
             return np.zeros((len(input), self.embedding_dims), dtype=np.float32)
         
-        return final_embeddings
+        return final_embeddings.tolist()
     
     # For backward compatibility: synchronous method that calls the async one
     def generate_embeddings_sync(self, input: List[str]) -> np.ndarray:

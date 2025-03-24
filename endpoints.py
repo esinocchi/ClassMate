@@ -172,12 +172,13 @@ async def pullCourses(user_id, domain):
     print(f"\n\n\n these are the courses added: {courses_added} \n\n\n")
     
     #pull all classes from canvas api
-    async with aiohttp.ClientSession() as session:
-       async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
-        if response.status == 200:
-            courses = await response.json()
-        else:
-            return {"message": "Error pulling courses from canvas api"}
+    while True:
+       async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+            if response.status == 200:
+                courses = await response.json()
+            else:
+                return {"message": "Error pulling courses from canvas api"}
     
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
@@ -355,6 +356,7 @@ async def check_chat_requirements(contextArray: ContextObject):
     #check if user has selected any courses
     #check if user has a valid user id
     user_context = contextArray.context[1]
+    print(f"\n\n\n{user_context}\n\n\n")
 
     #if user data update is currently in progress, return error message
     #if await check_update_status(user_context.user_id, user_context.domain):

@@ -281,14 +281,14 @@ class ConversationHandler:
                                     },
                                     "description": "This should always be ['syllabus']"
                                 },
-                                "specific_dates": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "format": "date"
-                                    },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
-                                },
+                               #"specific_dates": {
+                                #    "type": "array",
+                                #    "items": {
+                                #        "type": "string",
+                                #        "format": "date"
+                                #    },
+                                #    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                                #},
                                 "keywords": {
                                     "type": "array",
                                     "items": {
@@ -301,7 +301,7 @@ class ConversationHandler:
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types","generality","keywords", "query"]
                         }
                     },
                     "required": ["search_parameters"]
@@ -499,7 +499,6 @@ class ConversationHandler:
             - generality
             - query
         """
-          
         from vectordb.db import VectorDatabase
         print("Imported VectorDatabase")
         
@@ -510,13 +509,14 @@ class ConversationHandler:
         print(f"Vector DB path: {vector_db_path}")
         
         print("Initializing VectorDatabase...")
-        vector_db = VectorDatabase(vector_db_path)
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
         print("VectorDatabase initialized")
         
         print("Calling vector_db.search...")
 
         try:
             course_information = await vector_db.search(search_parameters) 
+            print(f"Course information: {course_information}")
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
@@ -631,8 +631,9 @@ class ConversationHandler:
             print(f"Function call detected: {function_call.name}")
             try:
                 arguments = json.loads(function_call.arguments)
-                arguments["canvas_base_url"] = self.canvas_api_url
-                arguments["access_token"] = self.canvas_api_token
+                if function_name == "create_event":
+                    arguments["canvas_base_url"] = self.canvas_api_url
+                    arguments["access_token"] = self.canvas_api_token
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")

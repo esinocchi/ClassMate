@@ -15,52 +15,49 @@ async def calculate_grade(
     canvas_base_url: str,
     access_token: str,
     course_code: str,
-
     session: aiohttp.ClientSession = None
 ) -> list:
-    """
-    Retrieve calendar events from the Canvas API for a specific course code from now until the next 3 months.
-
-    Parameters:
-        canvas_base_url (str): The base URL of the Canvas instance 
-                               (e.g., 'https://canvas.instructure.com').
-        access_token (str): Your Canvas API access token.
-        course_code (str): The course code to filter the calendar events (e.g., 'course_123').
-        session (aiohttp.ClientSession, optional): An existing aiohttp session to use.
-
-    Returns:
-        list: Raw calendar events from the Canvas API
-    """
-    
-    url = f"{canvas_base_url}/courses/{course_code}/enrollments"
-
-    # Prepare the headers with the access token
     headers = {
         "Authorization": f"Bearer {access_token}"
     }
 
-    # Set up the query parameters
-    params = {
+    current_score_url = f"{canvas_base_url}/courses/{course_code}/enrollments"
+    current_score_params = {
         "user_id": "self",
         "include[]": "total_scores"
     }
+    
+    grading_schema_url = f"{canvas_base_url}/courses/{course_code}/grading_standards"
 
-    # Make the API call
+    # Create session if not provided
     should_close_session = False
     if session is None:
         session = aiohttp.ClientSession()
         should_close_session = True
 
     try:
-        async with session.get(url, headers=headers, params=params) as response:
+        # First API call: get current score
+        async with session.get(current_score_url, headers=headers, params=current_score_params) as response:
             response.raise_for_status()
             grade_data = await response.json()
+        current_score = grade_data[0]["grades"]["current_score"]
+
+        # Second API call: get grading schema
+        async with session.get(grading_schema_url, headers=headers) as response:
+            response.raise_for_status()
+            grading_schema_list = await response.json()
+        grading_schemas = grading_schema_list[0]["grading_scheme"]
+        grade_thresholds = {}
+        for schema in grading_schemas:
+            grade_thresholds[schema["name"]] = schema["value"]
+
+        print(grade_thresholds)
+        # You can now use current_score and grade_thresholds for further calculations.
+        return current_score
     finally:
         if should_close_session:
             await session.close()
-    
-    
-    return grade_data
+
 
 
 
