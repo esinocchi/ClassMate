@@ -8,7 +8,7 @@ import tzlocal
 from datetime import datetime
 from typing import List, Union
 from pydantic import BaseModel
-from backend.task_specific_agents.lecture_to_notes_agent import lecture_to_notes_pdf
+from backend.task_specific_agents.lecture_to_notes_agent import lecture_file_to_notes_pdf
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
