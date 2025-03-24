@@ -631,8 +631,9 @@ class ConversationHandler:
             print(f"Function call detected: {function_call.name}")
             try:
                 arguments = json.loads(function_call.arguments)
-                arguments["canvas_base_url"] = self.canvas_api_url
-                arguments["access_token"] = self.canvas_api_token
+                if function_name == "create_event":
+                    arguments["canvas_base_url"] = self.canvas_api_url
+                    arguments["access_token"] = self.canvas_api_token
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
