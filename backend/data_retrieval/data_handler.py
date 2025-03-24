@@ -220,7 +220,6 @@ class DataHandler:
             with open(file_path, "r") as f:
                 user_data = json.load(f)
 
-            print("\n\n\n\nGoon\n\n\n\n")
             
             # Update instance variables from loaded data
             metadata = user_data["user_metadata"]
