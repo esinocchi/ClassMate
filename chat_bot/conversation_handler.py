@@ -517,6 +517,7 @@ class ConversationHandler:
 
         try:
             course_information = await vector_db.search(search_parameters) 
+            print(f"Course information: {course_information}")
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
