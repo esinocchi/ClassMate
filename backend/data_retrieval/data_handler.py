@@ -217,6 +217,8 @@ class DataHandler:
         try:
             with open(file_path, "r") as f:
                 user_data = json.load(f)
+
+            print("Goon")
             
             # Update instance variables from loaded data
             metadata = user_data["user_metadata"]
@@ -226,6 +228,7 @@ class DataHandler:
             self.is_updating = metadata["is_updating"]
             return user_data
         except Exception as e:
+            print(f"Error grabbing user data: {str(e)}")
             return f"Error grabbing user data: {str(e)}"
 
     def update_user_data(self):
