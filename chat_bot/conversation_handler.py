@@ -545,6 +545,7 @@ class ConversationHandler:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             file = []
+        print(f"File: {file}")
         file_description = [file[0]["filename"], file[0]["url"]]
         return file_description
 
