@@ -38,7 +38,7 @@ async def find_events(
     end_date_str = end_date.strftime('%Y-%m-%d')
 
     # Build the URL for the calendar events endpoint
-    url = f"{canvas_base_url}/calendar_events"
+    url = f"{canvas_base_url}/api/v1/calendar_events"
 
     # Prepare the headers with the access token
     headers = {
