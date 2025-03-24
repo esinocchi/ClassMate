@@ -810,34 +810,37 @@ class VectorDatabase:
         
         range_conditions = []
 
-        ten_days_from_now = current_time + timedelta(days=10)
-        ten_days_from_now_timestamp = int(ten_days_from_now.timestamp())
+        future_10d = current_time + timedelta(days=10)
+        future_10d_timestamp = int(future_10d.timestamp())
+
+        past_10d = current_time - timedelta(days=10)
+        past_10d_timestamp = int(past_10d.timestamp())
         
         if time_range == "NEAR_FUTURE":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
                         {field: {"$gte": current_timestamp}},  # Now
-                        {field: {"$lte": ten_days_from_now_timestamp}}  # Now + 10 days
+                        {field: {"$lte": future_10d_timestamp}}  # Now + 10 days
                     ]
                 })
         
         elif time_range == "FUTURE":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": ten_days_from_now_timestamp}})  # Future items only
+                range_conditions.append({field: {"$gte": future_10d_timestamp}})  # Future items only
         
         elif time_range == "RECENT_PAST":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$gte": ten_days_from_now_timestamp}},  # Now - 10 days
+                        {field: {"$gte": past_10d_timestamp}},  # Now - 10 days
                         {field: {"$lte": current_timestamp}}  # Now
                     ]
                 })
         
         elif time_range == "PAST":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": ten_days_from_now_timestamp}})  # Past items only
+                range_conditions.append({field: {"$lte": past_10d_timestamp}})  # Past items only
         
         elif time_range == "ALL_TIME":
             # No filtering needed, return empty list
@@ -1256,8 +1259,12 @@ class VectorDatabase:
         top_k = self._determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
+        print("\n\n--------------------------------")
+        print(f"Top K: {top_k}")
         print(f"Search query: '{normalized_query}'")
         print(f"Search parameters: {search_parameters}")
+        print(f"Query where: {query_where}")
+        print("--------------------------------\n\n")
 
         task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
         formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
@@ -1271,10 +1278,8 @@ class VectorDatabase:
         distances = results.get('distances', [[]])[0]
         
         # Process each document
-        print(doc_ids)
         for i, doc_id in enumerate(doc_ids):
             doc = self.document_map.get(doc_id)
-            print(doc)
             if not doc:
                 continue
 
@@ -1313,7 +1318,6 @@ class VectorDatabase:
 
         # Augment results with additional information
         combined_results = self._augment_results(combined_results)
-        print(combined_results)
         
         return combined_results[:top_k]
     

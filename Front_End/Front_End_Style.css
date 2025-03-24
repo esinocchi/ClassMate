@@ -144,10 +144,11 @@
 .responseBox {
     max-width: 88%;
     height: auto;
-    white-space: normal;
+    white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 14px;
     padding-left: 20px;
+    
 }
 
 #promptEntryBox {

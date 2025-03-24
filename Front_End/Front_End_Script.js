@@ -212,6 +212,8 @@ async function handlePrompt() {
             });
         });
 
+        console.log(response);
+
         if (Array.isArray(response)){
             addMemoryBox(prompt, response, true); //add memory box for display
         } else {
@@ -320,7 +322,15 @@ function addMemoryBox(prompt, response, downloadlink) {
         memoryBox.appendChild(downloadButton);
 
         downloadButton.addEventListener("click", function(event) {
-            pullPDF();
+            chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
+                let context = result.Context_CanvasAI || dataHolder;
+
+                if (context[1].user_id == "holder") {
+                    context[1].user_id = await retrieveID(context[1].domain);
+                }
+
+                pullPDF(context[1].user_id, context[1].domain);
+            });
         });
     }
 
@@ -329,28 +339,40 @@ function addMemoryBox(prompt, response, downloadlink) {
     // Append memoryBox to dynamicBoxesContainer
     dynamicBoxesContainer.appendChild(memoryBox);
 
-    dynamicBoxesContainer.classList.add("used");
 
-    dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
 
-    // Simulate typing effect for response
-    let index = 0;
-    const typingSpeed = 2; 
-    const responseLength = response.length;
 
-    dynamicBoxesContainer.style.overflow = 'hidden';
-    dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
+    dynamicBoxesContainer.classList.add("used"); // Adds 'used' class to dynamicBoxesContainer for any additional styling
 
-    const interval = setInterval(() => {
-        if (index < responseLength) {
-            responseBox.textContent += response.charAt(index);
-            dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight;
-            index++;
-        } else {
-            clearInterval(interval); 
-            dynamicBoxesContainer.style.overflow = 'auto';
-        }
-    }, typingSpeed);
+// Ensure the container scrolls to the bottom
+dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Keeps the scroll position at the bottom
+
+// Simulate typing effect for response
+let index = 0; // Initialize index to keep track of which character we're typing
+const typingSpeed = 2; // Speed of typing effect
+const responseLength = response.length; // Length of the response text
+
+dynamicBoxesContainer.style.overflow = 'hidden'; // Hide overflow during typing to prevent scrolling
+dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Ensure the container is at the bottom when typing starts
+
+// Create the interval for typing effect
+const interval = setInterval(() => {
+    if (index < responseLength) {
+        // Add the character at the current index to the innerHTML of the responseBox
+        // Use slice() to progressively add content up to the current index + 1
+        // REPLACEMENT: Replaced 'textContent' with 'innerHTML' to allow HTML formatting (e.g., <br> for line breaks)
+        responseBox.innerHTML = response.slice(0, index + 1).replace(/\n/g, '<br>'); // Convert newlines to <br> tags
+
+        // Scroll to the bottom of the container
+        dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Keeps the scroll position at the bottom
+
+        index++; // Increment index to type the next character
+    } else {
+        clearInterval(interval); // Stop the typing effect when done
+        dynamicBoxesContainer.style.overflow = 'auto'; // Allow overflow after typing is complete
+    }
+}, typingSpeed); // Set typing speed (interval between each character typed)
+
     }
 
 //rebuild class selections and past chats
