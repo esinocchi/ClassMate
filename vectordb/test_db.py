@@ -61,17 +61,17 @@ def get_canvas_data():
 async def search_db():
     hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
     db = VectorDatabase('user_data/psu/7214035/user_data.json', hf_api_token=hf_api_token)
-    await db.process_data(force_reload=False)
+    await db.process_data(force_reload=True)
     
     output = await db.search({
         "course_id": "all_courses",
-        "time_range": "NEAR_FUTURE",
-        "item_types": ["assignment", "announcement"],
-        "specific_dates": ["2025-03-25"],
-        "keywords": ["tomorrow"],
+        "time_range": "ALL_TIME",
+        "item_types": ["syllabus"],
+        "specific_dates": [],
+        "keywords": ["grading policies"],
         "generality": "SPECIFIC",
-        "specific_amount": 3,
-        "query": "What are my assignments due next tomorrow?"
+        "specific_amount": 5,
+        "query": "Find my grading policies in my CMPSC 311 syllabus."
     })
     
     return output
