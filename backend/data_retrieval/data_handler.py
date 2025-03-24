@@ -273,7 +273,7 @@ class DataHandler:
                     
                     # Save the updated data
                     self.save_user_data(updated_user_data)
-                    db = VectorDatabase(self._get_user_data_path(), self.hf_api_token)
+                    db = VectorDatabase(self._get_user_data_path(), hf_api_token=self.hf_api_token, cache_dir="chroma_data/")
                     await db.process_data(force_reload=True)
                     self.set_is_updating(False)
                     
