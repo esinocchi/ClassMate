@@ -349,7 +349,7 @@ class ConversationHandler:
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types","generality","keywords", "query"]
+                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
                         }
                     },
                     "required": ["user_id", "domain", "search_parameters"]
@@ -550,6 +550,7 @@ class ConversationHandler:
 
     async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
         """Create notes for a file using the vector search function"""
+        search_parameters["specific_dates"] = [""]
         file_description = self.find_file(search_parameters)
         file_name = file_description[0]
         file_url = file_description[1]
@@ -692,7 +693,6 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
 
             if function_name == "create_notes":
-                {"message": final_message, "function": [function_name, json.dumps(result)]}
                 return_value = {"message": result, "function": [function_name, arguments]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
