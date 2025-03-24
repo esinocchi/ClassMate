@@ -169,12 +169,13 @@ async def pullCourses(user_id, domain):
             courses_added += [course_id]
     
     #pull all classes from canvas api
-    async with aiohttp.ClientSession() as session:
-       async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
-        if response.status == 200:
-            courses = await response.json()
-        else:
-            return {"message": "Error pulling courses from canvas api"}
+    while True:
+       async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://{domain}/api/v1/courses", headers={"Authorization": f"Bearer {user_data['user_metadata']['token']}"}) as response:
+            if response.status == 200:
+                courses = await response.json()
+            else:
+                return {"message": "Error pulling courses from canvas api"}
     
     #iterate through all classes and if not in courses_added, add to all_classes
     for course in courses:
