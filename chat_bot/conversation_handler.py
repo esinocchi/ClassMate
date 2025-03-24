@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
-# from backend.task_specific_agents.calendar_agent import find_events
 from backend.task_specific_agents.calendar_agent import create_event
 import chat_bot.context_retrieval
 from vectordb.db import VectorDatabase
@@ -438,7 +437,9 @@ class ConversationHandler:
                 }}
                 }}
                 ```
-            - For event creation requests, generate arguments as defined in the function list. Once the event is created, respond with a clear confirmation message such as "The event has been created."
+            - For event creation requests, generate arguments as defined in the function list. 
+            - For course information requests, generate arguments as defined in the function list.
+            - For note creation requests, generate arguments as defined in the function list.
 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
@@ -457,7 +458,31 @@ class ConversationHandler:
         
         return system_context
     
+    def define_system_context_for_function_output(self):
+        local_tz = tzlocal.get_localzone()
+        current_time = datetime.now(local_tz).isoformat()
+        system_context = f"""
+            [ROLE & IDENTITY]
+            You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
+            
+            [STUDENT INFORMATION & RESOURCES]
+            - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
+            
+            [DATE & TIME]
+            - Current UTC Time: {current_time}
+            - All dates and times must be in ISO8601 format.
+            - Use the current UTC time as your reference for "now."
 
+            [Instructions for Function Output]
+            - For event creation requests, respond with a clear confirmation message such as "The event has been created."
+            - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
+            - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
+                For example, if the user asks for the next 3 upcoming assignments, you will check which 3 assignments are next relative to the current date.
+            - For note creation requests, respond with the note pdf file that was created.
+            -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
+        """
+        return system_context
+    
     async def find_events_and_assignments(self, search_parameters: dict):
         """Find events and assignments using the vector search function"""
         print("\n=== FIND_EVENTS_AND_ASSIGNMENTS: Starting ===")
@@ -674,6 +699,8 @@ class ConversationHandler:
            
             try:
                 # Context is then passed back to the api in order for it to respond to the user
+                system_context_for_function_output = self.define_system_context_for_function_output()
+                chat[0]["content"] = system_context_for_function_output
                 print("About to make second OpenAI API call")
                 final_completion = client.chat.completions.create(
                     model='gpt-4o-mini',
