@@ -212,13 +212,14 @@ class DataHandler:
         """
         file_path = self._get_user_data_path()
         if not os.path.exists(file_path):
+            print("\n\n\nNOOOOOOOOOOOOOT FOUUUUUUUUUUUUUUND \n\n\n")
             return "User data file not found"
             
         try:
             with open(file_path, "r") as f:
                 user_data = json.load(f)
 
-            print("Goon")
+            print("\n\n\n\nGoon\n\n\n\n")
             
             # Update instance variables from loaded data
             metadata = user_data["user_metadata"]
