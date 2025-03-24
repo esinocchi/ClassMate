@@ -127,17 +127,21 @@ class ConversationHandler:
                             "properties": {
                                 "course_id": {
                                     "type": "string",
-                                    "description": "Course ID or 'all_courses'"
+                                    "description": "Specific Course ID(s) (e.g. 2372294) when mentioned by the user. 'all_courses': if the user asks for information about all courses or they don't mention a specific course"
                                 },
                                 "time_range": {
                                     "type": "string", 
-                                    "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
+                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
                                     "description": "Temporal context for search"
                                 },
-                                 "generality": {
+                                "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH", "SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
                                     "description": "Context for how many items to retrieve"
+                                },
+                                "specific_amount": {
+                                    "type": "integer",
+                                    "description": "The number of items to retrieve if generality is SPECIFIC"
                                 },
                                 "item_types": {
                                     "type": "array",
@@ -145,7 +149,7 @@ class ConversationHandler:
                                         "type": "string",
                                         "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
                                     },
-                                    "description": "This should always be [assignment,events,announcement]"
+                                    "description": "This should always be ['syllabus']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -153,23 +157,22 @@ class ConversationHandler:
                                         "type": "string",
                                         "format": "date"
                                     },
-                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format"
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
                                 },
                                 "keywords": {
                                     "type": "array",
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "Additional search terms (e.g., 'midterm', 'HW2', 'Quiz 3')."
+                                    "description": "This should always be ['course information','course materials'] l"
                                 },
                                 "query": {
                                     "type": "string",
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", "specific_dates", "keywords", "query"]
-                        },
-                        
+                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                        }
                     },
                     "required": ["search_parameters"]
                 }
@@ -258,13 +261,17 @@ class ConversationHandler:
                                 },
                                 "time_range": {
                                     "type": "string", 
-                                    "enum": ["FUTURE", "RECENT_PAST", "EXTENDED_PAST", "ALL_TIME"],
+                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
                                     "description": "Temporal context for search"
                                 },
                                 "generality": {
                                     "type": "string", 
-                                    "enum": ["LOW", "MEDIUM", "HIGH", "SPECIFIC"],
+                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
                                     "description": "Context for how many items to retrieve"
+                                },
+                                "specific_amount": {
+                                    "type": "integer",
+                                    "description": "The number of items to retrieve if generality is SPECIFIC"
                                 },
                                 "item_types": {
                                     "type": "array",
@@ -294,9 +301,8 @@ class ConversationHandler:
                                     "description": "User's original query for semantic search"
                                 }
                             },
-                            "required": ["course_id", "time_range", "item_types", "specific_dates", "keywords", "query"]
-                        },
-                        
+                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                        }
                     },
                     "required": ["search_parameters"]
                 }
@@ -306,11 +312,70 @@ class ConversationHandler:
                 "description": "Create a note using the vector search function",
                 "parameters": {
                     "type": "object",
-                    "properties": {},
-                    "required": []
+                    "properties": {
+                        "user_id": {
+                            "type": "string",
+                            "description": "The user's ID number"
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "The user's canvas base url"
+                        },
+                        "search_parameters": {
+                            "type": "object",
+                            "properties": {
+                                "course_id": {
+                                    "type": "string",
+                                    "description": "Specific Course ID(s) (e.g. 2372294) when mentioned by the user. 'all_courses': if the user asks for information about all courses or they don't mention a specific course"
+                                },
+                                "time_range": {
+                                    "type": "string", 
+                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
+                                    "description": "Temporal context for search"
+                                },
+                                "generality": {
+                                    "type": "string", 
+                                    "enum": ["LOW", "MEDIUM", "HIGH","SPECIFIC"],
+                                    "description": "Context for how many items to retrieve"
+                                },
+                                "specific_amount": {
+                                    "type": "integer",
+                                    "description": "The number of items to retrieve if generality is SPECIFIC"
+                                },
+                                "item_types": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                    },
+                                    "description": "This should always be ['syllabus']"
+                                },
+                                "specific_dates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned. If no specific date is mentioned,this should be today's date in ISO8601 format (e.g. 2025-03-21)"
+                                },
+                                "keywords": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string" 
+                                    },
+                                    "description": "This should always be ['course information','course materials'] l"
+                                },
+                                "query": {
+                                    "type": "string",
+                                    "description": "User's original query for semantic search"
+                                }
+                            },
+                            "required": ["course_id", "time_range", "item_types", "specific_dates","generality","keywords", "query"]
+                        }
+                    },
+                    "required": ["user_id", "domain", "search_parameters"]
                 }
             }
-            
         ]
         return functions
     
@@ -338,14 +403,14 @@ class ConversationHandler:
             [DATE & TIME]
             - Current UTC Time: {current_time}
             - All dates and times must be in ISO8601 format.
-            - Use the current UTC time as your reference for “now.”
+            - Use the current UTC time as your reference for "now."
 
             [INSTRUCTIONS FOR FUNCTION CALLS]
             1. **When to Call a Function:**
-            - If the user’s query requires additional information or action (e.g., retrieving Canvas data or creating an event), you must call the appropriate function from the provided function list.
+            - If the user's query requires additional information or action (e.g., retrieving Canvas data or creating an event), you must call the appropriate function from the provided function list.
 
             2. **Keyword Extraction for Retrieval:**
-            - Extract a concise list of keywords from the user’s prompt, ensuring the following elements are captured:
+            - Extract a concise list of keywords from the user's prompt, ensuring the following elements are captured:
                 - **Course:** Include both the course name and its course ID (from {self.courses}). If a course is not mentioned, default to "all_courses".
                 - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
@@ -373,7 +438,7 @@ class ConversationHandler:
                 }}
                 }}
                 ```
-            - For event creation requests, generate arguments as defined in the function list. Once the event is created, respond with a clear confirmation message such as “The event has been created.”
+            - For event creation requests, generate arguments as defined in the function list. Once the event is created, respond with a clear confirmation message such as "The event has been created."
 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
@@ -387,7 +452,7 @@ class ConversationHandler:
             - **Time Range Fail-Safe:** If unsure, default to "ALL_TIME".
             - **Course Fail-Safe:** If the course mentioned does not match exactly, select the closest course based on string similarity.
             
-            Remember, your final response to the user must always be clear, confirming the action taken (e.g., “I have created the event”) if a function call was executed, or directly addressing the query if not.
+            Remember, your final response to the user must always be clear, confirming the action taken (e.g., "I have created the event") if a function call was executed, or directly addressing the query if not.
             """
         
         return system_context
@@ -459,7 +524,7 @@ class ConversationHandler:
         
         return course_information
           
-    async def create_notes(self, search_parameters: dict):
+    async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
         
         return
     
@@ -578,14 +643,7 @@ class ConversationHandler:
                 return [{"message": "Error processing function arguments", "function": [""]}]
             
             print("=== PROCESS USER MESSAGE: Preparing function call ===")
-            if function_name == "vectordb_search":
-                if "search_parameters" in arguments and "keywords" in arguments["search_parameters"]:
-                    before_keywords = arguments["search_parameters"]["keywords"]
-                    arguments["search_parameters"]["keywords"] = self.validate_keywords(
-                        arguments["search_parameters"]["keywords"]
-                    )
-                    print(f"Keywords before validation: {before_keywords}")
-                    print(f"Keywords after validation: {arguments['search_parameters']['keywords']}")
+                    
             
 
             print("\n=== PROCESS USER MESSAGE: Executing function ===")
