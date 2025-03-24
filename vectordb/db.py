@@ -57,8 +57,11 @@ load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger("canvas_vector_db")
 
@@ -339,7 +342,7 @@ class VectorDatabase:
     
     
         
-    async def process_data(self, force_reload: bool = False) -> bool:
+    async def process_data(self, force_reload: bool = True) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
@@ -497,7 +500,6 @@ class VectorDatabase:
         
         # Generate embeddings first
         embeddings = self.embedding_function(texts)
-        logger.info(f"Generated embeddings with shape: {embeddings.shape}")
 
         # Then add to collection with explicit embeddings
         self.collection.add(
@@ -1179,7 +1181,7 @@ class VectorDatabase:
         """
         # Build query for ChromaDB including course id, item type, and time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
-        top_k = self.determine_top_k(search_parameters)
+        top_k = self._determine_top_k(search_parameters)
         
         # Log the search parameters for debugging
         logger.debug(f"Search query: '{normalized_query}'")
