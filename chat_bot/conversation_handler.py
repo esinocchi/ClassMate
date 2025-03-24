@@ -543,8 +543,7 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-            - For note creation requests, respond with the note pdf file that was created.
-            -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
+            -For calculating grade requirements, you are going to be ouptuted a float. This is the score that the user needs to achieve on an assignment to get a certain letter grade.
         """
         return system_context
     
@@ -693,7 +692,8 @@ class ConversationHandler:
             "find_events_and_assignments": self.find_events_and_assignments,
             "find_course_information": self.find_course_information,
             "create_notes": self.create_notes,
-            "create_event": create_event
+            "create_event": create_event,
+            "calculate_grade": calculate_grade
         }
         print(f"Function mapping: {list(function_mapping.keys())}")
 
@@ -746,7 +746,7 @@ class ConversationHandler:
                     arguments["access_token"] = self.canvas_api_token
                     if function_name == "calculate_grade":
                         arguments["hf_api_token"] = self.hf_api_token
-                        
+
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
