@@ -84,6 +84,8 @@ async def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, doma
 async def prompt_to_pdf(prompt: str, user_id, domain: str):  # Made async
     client = AsyncOpenAI(api_key=os.getenv("LECTURE_TO_PDF_API_KEY"))  # Changed to AsyncOpenAI
 
+    print(client)
+    print(os.getenv("LECTURE_TO_PDF_API_KEY"))
     print("herehereherherherherhe")
     print(domain)
     latex_file_path = f"{CanvasAI_dir}/media_output/{domain}/{user_id}/latexoutput.tex"
