@@ -42,15 +42,13 @@ from datetime import datetime, timedelta, timezone
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 import asyncio
 import aiohttp
-import re  # Adding import for re module used in _parse_html_content
-
+import re
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
-from backend.data_retrieval.get_all_user_data import extract_text_and_images
 from vectordb.embedding_model import create_hf_embedding_function
-from vectordb.content_extraction import parse_file_content
+from vectordb.content_extraction import parse_file_content, parse_html_content
 
 # Load environment variables
 load_dotenv()
@@ -153,15 +151,16 @@ class VectorDatabase:
         course_id = doc.get('course_id', '')
         
         # Build a rich text representation with all relevant fields
-        text_parts = []
+        priority_parts = []
+        regular_parts = []
         
         # Basic identification
         if doc_id:
-            text_parts.append(f"ID: {doc_id}")
+            regular_parts.append(f"ID: {doc_id}")
         if doc_type:
-            text_parts.append(f"Type: {doc_type}")
+            regular_parts.append(f"Type: {doc_type}")
         if course_id:
-            text_parts.append(f"Course ID: {course_id}")
+            regular_parts.append(f"Course ID: {course_id}")
         
         # Handle different document types
         if doc_type == 'File':
@@ -171,9 +170,9 @@ class VectorDatabase:
                 # Normalize the display name to improve matching
                 normalized_name = self.normalize_text(display_name)
                 # Add the name at the beginning for emphasis
-                text_parts.insert(0, f"Filename: {normalized_name}")
+                priority_parts.insert(0, f"Filename: {normalized_name}")
                 # Also add it as a title for better matching
-                text_parts.insert(0, f"Title: {normalized_name}")
+                priority_parts.insert(0, f"Title: {normalized_name}")
             
             for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
                             'updated_at', 'locked', 'lock_explanation']:
@@ -183,7 +182,7 @@ class VectorDatabase:
                         value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
-                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
             
         elif doc_type == 'Assignment':
             # For assignments, prioritize the name by placing it at the beginning
@@ -192,15 +191,15 @@ class VectorDatabase:
                 # Normalize the name to improve matching
                 normalized_name = self.normalize_text(name)
                 # Add the name at the beginning for emphasis
-                text_parts.insert(0, f"Assignment: {normalized_name}")
-                text_parts.insert(0, f"Title: {normalized_name}")
+                priority_parts.insert(0, f"Assignment: {normalized_name}")
+                priority_parts.insert(0, f"Title: {normalized_name}")
             
             for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
                             'submission_types', 'can_submit', 'graded_submissions_exist']:
                 if field in doc and doc[field] is not None: # error prevention
                     if field == 'submission_types' and isinstance(doc[field], list):
                         # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
-                        text_parts.append(f"Submission Types: {', '.join(doc[field])}")
+                        regular_parts.append(f"Submission Types: {', '.join(doc[field])}")
                     else:
                         # Normalize any text fields
                         if isinstance(doc[field], str):
@@ -208,15 +207,15 @@ class VectorDatabase:
                         else:
                             value = doc[field]
                         # e.g. HW2 (name) -> Name: HW2
-                        text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+                        regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
             
             # Handle content field which might contain extracted links
             content = doc.get('content', [])
             if content and isinstance(content, list):
-                text_parts.append("Content Link(s): \n")
+                regular_parts.append("Content Link(s): \n")
                 for item in content:
                     if isinstance(item, str):
-                        text_parts.append(f'\t{item}\n')
+                        regular_parts.append(f'\t{item}\n')
             
         elif doc_type == 'Announcement':
             # For announcements, prioritize the title by placing it at the beginning
@@ -225,8 +224,8 @@ class VectorDatabase:
                 # Normalize the title to improve matching
                 normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
-                text_parts.insert(0, f"Announcement: {normalized_title}")
-                text_parts.insert(0, f"Title: {normalized_title}")
+                priority_parts.insert(0, f"Announcement: {normalized_title}")
+                priority_parts.insert(0, f"Title: {normalized_title}")
             
             for field in ['title', 'message', 'posted_at', 'course_id']:
                 if field in doc and doc[field] is not None: # error prevention
@@ -235,7 +234,7 @@ class VectorDatabase:
                         value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
-                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
             
         elif doc_type == 'Quiz':
             # For quizzes, prioritize the title by placing it at the beginning
@@ -244,21 +243,21 @@ class VectorDatabase:
                 # Normalize the title to improve matching
                 normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
-                text_parts.insert(0, f"Quiz: {normalized_title}")
-                text_parts.insert(0, f"Title: {normalized_title}")
+                priority_parts.insert(0, f"Quiz: {normalized_title}")
+                priority_parts.insert(0, f"Title: {normalized_title}")
             
             for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
                             'allowed_attempts', 'points_possible', 'due_at', 
                             'locked_for_user', 'lock_explanation']:
                 if field == 'time_limit' and isinstance(doc[field], int):
-                    text_parts.append(f"Time Limit: {doc[field]} minutes")
+                    regular_parts.append(f"Time Limit: {doc[field]} minutes")
                 elif field in doc and doc[field] is not None:
                     # Normalize any text fields
                     if isinstance(doc[field], str):
                         value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
-                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
             
         elif doc_type == 'Event':
             # For events, prioritize the title by placing it at the beginning
@@ -267,8 +266,8 @@ class VectorDatabase:
                 # Normalize the title to improve matching
                 normalized_title = self.normalize_text(title)
                 # Add the title at the beginning for emphasis
-                text_parts.insert(0, f"Event: {normalized_title}")
-                text_parts.insert(0, f"Title: {normalized_title}")
+                priority_parts.insert(0, f"Event: {normalized_title}")
+                priority_parts.insert(0, f"Title: {normalized_title}")
             
             for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
                             'location_address', 'context_code', 'context_name', 
@@ -279,19 +278,19 @@ class VectorDatabase:
                         value = self.normalize_text(doc[field])
                     else:
                         value = doc[field]
-                    text_parts.append(f"{field.replace('_', ' ').title()}: {value}")
+                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
         
         # Add module information
         module_id = doc.get('module_id')
         if module_id:
-            text_parts.append(f"Module ID: {module_id}")
+            regular_parts.append(f"Module ID: {module_id}")
         
         module_name = doc.get('module_name')
         if module_name:
             # Normalize module name
             if isinstance(module_name, str):
                 module_name = self.normalize_text(module_name)
-            text_parts.append(f"Module Name: {module_name}")
+            regular_parts.append(f"Module Name: {module_name}")
         
         # Join all parts with newlines for better separation
         # After processing, the text_parts list for a singule assingment item will have the following format:
@@ -316,7 +315,9 @@ class VectorDatabase:
         #       https://www.example.com
         #       https://www.example.com
         # ]
-        return "\n".join(text_parts)
+        # The priority parts are at the beginning of the list, and the regular parts are at the end
+        output = "\n".join(priority_parts) + "\n" + "\n".join(regular_parts)
+        return output
     
     @staticmethod
     def normalize_text(text: str) -> str:
@@ -373,7 +374,6 @@ class VectorDatabase:
         else:
             # Synchronize ChromaDB by removing stale documents
             await self._synchronize_chromadb_with_local_data()
-            pass
         
         # Get existing document IDs in the collection
         existing_ids = set()
@@ -407,7 +407,7 @@ class VectorDatabase:
                 continue
             
             # Parse the HTML content to extract plain text
-            parsed_syllabus = self._parse_html_content(syllabus)
+            parsed_syllabus = parse_html_content(syllabus)
             if not parsed_syllabus:
                 print(f"No content extracted from syllabus for course {course_id}")
                 continue
@@ -1205,30 +1205,94 @@ class VectorDatabase:
                         print(f"Error converting time: {e}")
         
         return search_results
+    
+    def _handle_keywords(self, keywords, doc_ids, courses):
+        """
+        Handle keyword search by checking if any keyword matches or is very similar to any document name.
+
+        Args:
+            keywords: List of keywords to search for
+            doc_ids: List of doc_ids already found by semantic search (to avoid duplicates)
+            courses: List of courses to filter by
+        """
+
+        if isinstance(courses, str) or isinstance(courses, int):
+            courses = [courses]
+
+        keyword_matches = []
+        names = {
+            'file': 'display_name',
+            'assignment': 'name',
+            'announcement': 'title',
+            'quiz': 'title',
+            'event': 'title'
+        }
+
+        for doc_id, doc in self.document_map.items():
+            if doc_id in doc_ids:  # Skip documents already found by semantic search
+                continue
+
+            doc_type = doc.get('type')
+            if not doc_type:
+                print(f"Warning: Document {doc_id} has no type.")
+                continue  # Skip documents with no type
+
+            if doc_type == 'syllabus':
+                continue
+
+            if courses != "all_courses" and str(doc.get('course_id')) not in courses:
+                print(f"Skipping doc {doc_id} (course filter)")
+                continue
+
+            doc_name_field = names.get(doc_type)  # Use .get() to handle unknown types
+            if not doc_name_field:
+                print(f"Warning: Unknown document type '{doc_type}' for doc {doc_id}")
+                continue  # Skip documents with unknown types
+
+            doc_name = doc.get(doc_name_field, '').lower()
+
+            for keyword in keywords:
+                keyword_lower = keyword.lower()
+
+                # Direct substring match
+                if keyword_lower in doc_name:
+                    keyword_matches.append({'document': doc})
+                    print(f"Added doc {doc_id} to keyword matches (direct match)")
+                    break  # Move to the next document after a match
+
+                # Removing file extensions
+                doc_name_no_ext = re.sub(r'\.\w+$', '', doc_name)
+                keyword_no_ext = re.sub(r'\.\w+$', '', keyword_lower)
+
+                # Removing special characters
+                doc_name_clean = re.sub(r'[_\-\s.]', '', doc_name_no_ext)
+                keyword_clean = re.sub(r'[_\-\s.]', '', keyword_no_ext)
+
+                # Check if any normalized version matches
+                if (keyword_no_ext in doc_name_no_ext or doc_name_no_ext in keyword_no_ext or
+                    keyword_clean in doc_name_clean or doc_name_clean in keyword_clean):
+                    keyword_matches.append({'document': doc})
+                    print(f"Added doc {doc_id} to keyword matches (normalized match)")
+                    break  # Move to the next document after a match
+
+        return keyword_matches
+    
 
     async def search(self, search_parameters, include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
         Args:
-            search_parameters: Dictionary containing filter parameters including:
-                - query: The search query string
-                - course_id: Course ID or 'all_courses'
-                - time_range: One of 'FUTURE', 'RECENT_PAST', 'EXTENDED_PAST', 'ALL_TIME'
-                - item_types: List of document types to include
-                - specific_dates: Optional list of specific dates to filter by
-                - keywords: Optional list of additional keywords
+            search_parameters: Dictionary containing filter parameters.
             include_related: Whether to include related documents.
-            minimum_score: Minimum similarity score to include in results.
+            minimum_score: Minimum similarity score.
             
         Returns:
             List of search results.
         """
-        # Build query for ChromaDB including course id, item type, and time-based filters
         query_where, normalized_query = self._build_chromadb_query(search_parameters)
         top_k = self._determine_top_k(search_parameters)
-        
-        # Log the search parameters for debugging
+
         print("\n\n--------------------------------")
         print(f"Top K: {top_k}")
         print(f"Search query: '{normalized_query}'")
@@ -1238,170 +1302,83 @@ class VectorDatabase:
 
         task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
         formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
-        
+
         # Execute ChromaDB query
         results = await self._execute_chromadb_query(formatted_query, query_where, top_k)
-        
-        # Process results
+
+        # Initialize lists (handle empty results gracefully)
+        doc_ids = results.get('ids', [[]])[0] if results.get('ids') else []
+        distances = results.get('distances', [[]])[0] if results.get('distances') else []
         search_results = []
-        doc_ids = results.get('ids', [[]])[0]
-        distances = results.get('distances', [[]])[0]
-        
-        # Process each document
-        for i, doc_id in enumerate(doc_ids):
-            doc = self.document_map.get(doc_id)
+
+        # Process initial ChromaDB results
+        for i in range(len(doc_ids)):
+            doc_id = doc_ids[i]
+            distance = distances[i]
+            doc = self.document_map.get(doc_id)  # Get the document here
             if not doc:
                 continue
 
-            print(f"Processing document: {doc.get('name', '')}")
-            
-            # Calculate similarity score
-            similarity = 1.0 - (distances[i] / 2.0)
-            
-            # Skip results below minimum score
+            similarity = 1.0 - distance  # Calculate similarity
+
             if similarity < minimum_score:
-                print(f"Skipping doc {doc_id} because similarity {similarity} is below threshold {minimum_score}")
+                print(f"Skipping doc {doc_id} (semantic) - low similarity: {similarity}")
                 continue
 
+            search_results.append({
+                'document': doc,
+                'similarity': similarity,
+                'type': 'semantic'  # Indicate source
+            })
+
+        # --- Keyword Handling ---
+        courses = search_parameters.get("course_id", "all_courses")
+        keywords = search_parameters.get("keywords", [])
+        if keywords:
+            keyword_matches = self._handle_keywords(keywords, doc_ids, courses)
+            print(f"Keyword matches: {keyword_matches}")
+
+            for match in keyword_matches:
+                match_doc_id = match['document']['id']  # Get ID from the match
+                # No need for duplicate check here, handled in _handle_keywords
+                # Assign a default similarity for keyword matches
+                keyword_similarity = 0.93  # Or whatever value you deem appropriate
+                search_results.append({
+                    'document': match['document'],
+                    'similarity': keyword_similarity,
+                    'type': match['document'].get('type')
+                })
+
+        # --- Sort by similarity (descending) ---
+        search_results.sort(key=lambda x: x['similarity'], reverse=True)
+
+        # --- Process each document (including file content extraction) ---
+        for result in search_results:
+            doc = result['document']
+            doc_id = doc['id']
+
+            print(f"Processing document: {doc_id}, Type: {result.get('type')}")
+
+            # Check if it's a file and extract content
             if doc.get('type') == 'file':
                 try:
                     doc['content'] = await parse_file_content(doc.get('url'))
+                    print(f"Extracted content for file {doc.get('display_name', '')}")
                 except Exception as e:
                     print(f"Failed to extract content for file {doc.get('display_name', '')}: {e}")
 
-            
-            # Add to results
-            print(f"Adding doc {doc.get('name', '')} to results with similarity {similarity}")
-            search_results.append({
-                'document': doc,
-                'similarity': similarity
-            })
-        
         # Include related documents if requested
         if include_related and search_results:
             self._include_related_documents(search_results, search_parameters, minimum_score)
-        
+
         # Post-process to prioritize exact and partial matches
         combined_results = self._post_process_results(search_results, normalized_query)
 
         # Augment results with additional information
         combined_results = self._augment_results(combined_results)
 
-        for result in combined_results:
-            result.pop('similarity', None)  # Remove similarity score from each result
-            result.pop('related_docs', None) # Remove related docs from each result for now, not currently being used
-        
-        print(combined_results)
-        return combined_results[:top_k]
-    
-    async def get_available_courses(self) -> List[Dict[str, Any]]:
-        """
-        Get list of available courses.
-        
-        Returns:
-            List of course dictionaries.
-        """
-        courses = []
-        for course_id, course in self.course_map.items():
-            courses.append({
-                'id': course_id,
-                'name': course.get('name', ''),
-                'code': course.get('course_code', ''),
-                'description': course.get('public_description', ''),
-                'default_view': course.get('default_view', ''),
-                'syllabus_body': course.get('syllabus_body', '')
-            })
-        return courses
-    
-    async def clear_cache(self) -> None:
-        """
-        Clear the ChromaDB collection.
-        """
-        try:
-            await asyncio.to_thread(self.client.delete_collection, self.collection_name)
-            print(f"Deleted collection: {self.collection_name}")
-            
-            # Recreate the collection
-            self.collection = await asyncio.to_thread(
-                self.client.create_collection,
-                name=self.collection_name,
-                embedding_function=self.embedding_function,
-                metadata={"hnsw:space": "cosine"}
-            )
-            print(f"Created new collection: {self.collection_name}")
-            
-            # Reset in-memory data
-            self.documents = []
-            self.document_map = {}
-            self.course_map = {}
-            
-        except Exception as e:
-            print(f"Error clearing cache: {e}")
+        for result_item in combined_results:
+            result_item.pop('similarity', None)  # Remove similarity
+            result_item.pop('related_docs', None)  # Remove related docs
 
-    def _parse_html_content(self, html_content: str) -> str:
-        """
-        Parse HTML content to extract plain text.
-        
-        Args:
-            html_content: HTML content string to parse
-            
-        Returns:
-            Plain text extracted from HTML content
-        """
-        if not html_content or html_content == "None":
-            return ""
-        
-        try:
-            from html.parser import HTMLParser
-            
-            class HTMLTextExtractor(HTMLParser):
-                def __init__(self):
-                    super().__init__()
-                    self.text_parts = []
-                    self.in_script = False
-                    self.in_style = False
-                    
-                def handle_starttag(self, tag, attrs):
-                    if tag.lower() == "script":
-                        self.in_script = True
-                    elif tag.lower() == "style":
-                        self.in_style = True
-                    elif tag.lower() == "br" or tag.lower() == "p":
-                        self.text_parts.append("\n")
-                    elif tag.lower() == "li":
-                        self.text_parts.append("\n• ")
-                
-                def handle_endtag(self, tag):
-                    if tag.lower() == "script":
-                        self.in_script = False
-                    elif tag.lower() == "style":
-                        self.in_style = False
-                    elif tag.lower() in ["div", "h1", "h2", "h3", "h4", "h5", "h6", "tr"]:
-                        self.text_parts.append("\n")
-                
-                def handle_data(self, data):
-                    if not self.in_script and not self.in_style:
-                        # Only append non-empty strings after stripping whitespace
-                        text = data.strip()
-                        if text:
-                            self.text_parts.append(text)
-            
-                def get_text(self):
-                    # Join all text parts and normalize whitespace
-                    text = " ".join(self.text_parts)
-                    # Replace multiple whitespace with a single space
-                    text = re.sub(r'\s+', ' ', text)
-                    # Replace multiple newlines with a single newline
-                    text = re.sub(r'\n+', '\n', text)
-                    return text.strip()
-            
-            extractor = HTMLTextExtractor()
-            extractor.feed(html_content)
-            return extractor.get_text()
-            
-        except Exception as e:
-            print(f"Error parsing HTML content: {e}")
-            # Fallback to a simple tag stripping approach if the parser fails
-            text = re.sub(r'<[^>]*>', ' ', html_content)
-            text = re.sub(r'\s+', ' ', text)
-            return text.strip()
+        return combined_results[:top_k]

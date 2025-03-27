@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List, Union
 from pydantic import BaseModel
 from backend.task_specific_agents.lecture_to_notes_agent import lecture_file_to_notes_pdf
+from backend.task_specific_agents.grade_calculator_agent import calculate_grade
 
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
@@ -290,19 +291,84 @@ class ConversationHandler:
                     "required": ["search_parameters"]
                 }
             },
+            #{
+                #name": "create_notes",
+                #"description": "Create notes for a file found in the vector search function",
+                #"parameters": {
+                #    "type": "object",
+                #    "properties": {
+                #        "user_id": {
+                #            "type": "string",
+                #            "description": "The user's ID number"
+                #        },
+                #        "domain": {
+                #            "type": "string",
+                #            "description": "The user's canvas base url"
+                #        },
+                #           "search_parameters": {
+                #            "type": "object",
+                #            "properties": {
+                #                "course_id": {
+                #                    "type": "string",
+                #                    "description": "Specific Course ID"
+                #                },
+                #                "time_range": {
+                #                    "type": "string", 
+                #                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
+                #                    "description": "Temporal context for search"
+                #                },
+                #                "generality": {
+                #                    "type": "string", 
+                #                    "enum": ["LOW", "MEDIUM", "HIGH",],
+                #                    "description": "Context for how many items to retrieve"
+                #                },
+                #                "item_types": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string",
+                #                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                #                    },
+                #                    "description": "This should always be ['file']"
+                #                },
+                #                "specific_dates": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string",
+                #                        "format": "date"
+                #                    },
+                #                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                #                },
+                #                "keywords": {
+                #                    "type": "array",
+                #                    "items": {
+                #                        "type": "string" 
+                #                    },
+                #                    "description": "This should always be ['lecture','notes','slides']"
+                #                },
+                #                "query": {
+                #                    "type": "string",
+                #                    "description": "User's original query for semantic search"
+                #                }
+                #            },
+                #            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
+                #        }
+                #    },
+                #       "required": ["user_id", "domain", "search_parameters"]
+                #}
+           # },
             {
-                "name": "create_notes",
-                "description": "Create notes for a file found in the vector search function",
+                "name": "calculate_grade",
+                "description": "Calculate the grade required to achieve a certain letter grade on an assignment",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "user_id": {
+                        "target_grade_letter": {
+                            "type": "string",
+                            "description": "The target grade letter of the assignment"
+                        },
+                        "student_id": {
                             "type": "string",
                             "description": "The user's ID number"
-                        },
-                        "domain": {
-                            "type": "string",
-                            "description": "The user's canvas base url"
                         },
                         "search_parameters": {
                             "type": "object",
@@ -327,7 +393,7 @@ class ConversationHandler:
                                         "type": "string",
                                         "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
                                     },
-                                    "description": "This should always be ['file']"
+                                    "description": "This should always be ['assignment']"
                                 },
                                 "specific_dates": {
                                     "type": "array",
@@ -342,7 +408,7 @@ class ConversationHandler:
                                     "items": {
                                         "type": "string" 
                                     },
-                                    "description": "This should always be ['lecture','notes','slides']"
+                                    "description": "this should always be ['assignment']"
                                 },
                                 "query": {
                                     "type": "string",
@@ -351,9 +417,9 @@ class ConversationHandler:
                             },
                             "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
                         }
-                    },
-                    "required": ["user_id", "domain", "search_parameters"]
-                }
+                    }   
+                },
+                "required": ["target_grade_letter","student_id", "search_parameters"]
             }
         ]
         return functions
@@ -398,6 +464,7 @@ class ConversationHandler:
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
                 - The keyword list must contain a maximum of 10 items.
+                - Keywords must be specific and unique to the user's query.
                 - Do not duplicate the compulsory elements; include only additional relevant keywords.
 
             3. **JSON Response Structure for Function Calls:**
@@ -417,10 +484,10 @@ class ConversationHandler:
                 }}
                 }}
                 ```
+            - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
-            - For note creation requests, generate arguments as defined in the function list.
-
+            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above.
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
@@ -434,6 +501,7 @@ class ConversationHandler:
             - **Time Range Fail-Safe:** If unsure, default to "ALL_TIME".
             - **Course Fail-Safe:** If the course mentioned does not match exactly, select the closest course based on string similarity.
             - **Generality Fail-Safe:** If the user does not specify a generality, default to "MEDIUM".
+            - **Function Fail-Safe:** If unsure about which function to call, default to "find_assignments_and_events".
 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
@@ -461,8 +529,7 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-            - For note creation requests, respond with the note pdf file that was created.
-            -For calculating grade requirements, you are going to be ouptuted a float between 0 and 100. This is the percentage that the user needs to achieve on an assignment to get a certain letter grade.
+            -For calculating grade requirements, you are going to be ouptuted a float. This is the score that the user needs to achieve on an assignment to get a certain letter grade.
         """
         return system_context
     
@@ -610,8 +677,9 @@ class ConversationHandler:
         function_mapping = {
             "find_events_and_assignments": self.find_events_and_assignments,
             "find_course_information": self.find_course_information,
-            "create_notes": self.create_notes,
-            "create_event": create_event
+            #"create_notes": self.create_notes
+            "create_event": create_event,
+            "calculate_grade": calculate_grade
         }
         print(f"Function mapping: {list(function_mapping.keys())}")
 
@@ -659,9 +727,12 @@ class ConversationHandler:
             print(f"Function call detected: {function_call.name}")
             try:
                 arguments = json.loads(function_call.arguments)
-                if function_name == "create_event":
+                if function_name == "create_event" or function_name == "calculate_grade":
                     arguments["canvas_base_url"] = self.canvas_api_url
                     arguments["access_token"] = self.canvas_api_token
+                    if function_name == "calculate_grade":
+                        arguments["hf_api_token"] = self.hf_api_token
+
             except json.JSONDecodeError as e:
                 print(f"ERROR decoding function arguments: {str(e)}")
                 print(f"Raw arguments: {function_call.arguments}")
