@@ -264,57 +264,34 @@ async def initate_user(domain: str):
 
     check on reload of page if user_id --IS NOT-- found in database, and if so, call this endpoint.
     """
-    #hardcode token until we have access to developer keys to run oauth2
-    #we will redirect to oauth page later
-    token = await oauthTokenGenerator()
+    try:
+        token = await oauthTokenGenerator()
 
-    #get user id from canvas api
-    async with aiohttp.ClientSession() as session:
-    
-        print(token)
-
-        async with session.get(f"https://{domain}/api/v1/users/self", headers={"Authorization": f"Bearer {token}"}) as response:
-            if response.status == 200:
+        # Get user info (async)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"https://{domain}/api/v1/users/self",
+                headers={"Authorization": f"Bearer {token}"}
+            ) as response:
+                response.raise_for_status()
                 user_info = await response.json()
                 user_id = user_info["id"]
-            else:
-                return {"message": "Error pulling user id from canvas api"}
 
-    #initialize a new data handler with the token
-    handler = DataHandler(user_id, domain)
-    
-    #if user has saved data, update the token
-    if handler.has_saved_data():
-        handler.update_token(token)
-    
-    #if user has no saved data, initiate user data
-    else:
         handler = DataHandler(user_id, domain, token)
-        handler.initiate_user_data()
 
-    return {'user_id': user_id}
+        if handler.has_saved_data():
+            handler.update_token(token)
+        else:
+            result = handler.initiate_user_data()  # Synchronous call
+            if "Error" in result:
+                return {"message": result}
 
-@app.put('/endpoints/deleteUserDataContext')
-async def deleteUserDataContext(user_id, domain):
-    """
-    This endpoint is used to delete the user data context.
+        return {'user_id': user_id}
 
-    ===============================================
-
-    inputs:
-    user_id: int
-    domain: str
-
-    outputs:
-    message: str
-
-    ===============================================
-
-    call this endpoint whenever the chat memory is cleared.
-    """
-    handler = DataHandler(user_id, domain)
-    handler.delete_chat_context()
-    return {'message': "User data context cleared"}
+    except aiohttp.ClientError as e:
+        return {"message": f"Canvas API error: {str(e)}"}
+    except Exception as e:
+        return {"message": f"Initialization failed: {str(e)}"}
 
 @app.put('/endpoints/checkAndUpdateUserData')
 async def checkAndUpdateUserData(user_id, domain):
@@ -432,3 +409,7 @@ async def pullPDF(domain, user_id):
 
 
 
+async def testendpoints():
+    return await initate_user("psu.instructure.com")
+
+asyncio.run(testendpoints())
