@@ -771,7 +771,9 @@ class ConversationHandler:
 
             if function_name == "create_notes":
                 return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
+                self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
+
             
             chat.append({
                 'role': "function",
@@ -815,6 +817,5 @@ class ConversationHandler:
             content = {"message": response_content , "function": [""]}
             self.chat_history.context[0].content[0] = content
        
-        print(self.chat_history)    
         return self.chat_history
             
