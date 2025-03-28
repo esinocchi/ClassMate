@@ -488,7 +488,7 @@ class ConversationHandler:
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
-            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above.
+            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above. The course_id for this funciton should always be a specific classes course id. Never imput "all courses" for this function. 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
