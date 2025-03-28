@@ -698,7 +698,7 @@ class ConversationHandler:
             # First API call to get function call or direct response
             print("About to make OpenAI API call with model: 'gpt-4o-mini'")
             chat_completion = client.chat.completions.create(
-                model='gpt-4o-mini',
+                model='gpt-4o',
                 messages=chat,
                 functions=functions,
                 function_call = "auto",
@@ -767,7 +767,7 @@ class ConversationHandler:
                 print(f"ERROR: Function '{function_name}' not found in function_mapping")
                 result = {"error": f"Function '{function_name}' not implemented."}
 
-            print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
+            print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
                 return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
@@ -789,7 +789,7 @@ class ConversationHandler:
                 chat[0]["content"] = system_context_for_function_output
                 print("About to make second OpenAI API call")
                 final_completion = client.chat.completions.create(
-                    model='gpt-4o-mini',
+                    model='gpt-4o',
                     messages=chat,
                     temperature=0.3,
                     max_tokens=1024
