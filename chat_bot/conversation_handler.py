@@ -623,7 +623,7 @@ class ConversationHandler:
         file_name = file_description[0]
         file_url = file_description[1]
 
-        return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return_value = lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
         return return_value
 
     
