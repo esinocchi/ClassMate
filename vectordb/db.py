@@ -463,6 +463,7 @@ class VectorDatabase:
                 continue
                 
             # Prepare for ChromaDB
+            print(f"Processing item: {item_id}")
             ids_to_add.append(item_id)
             texts_to_add.append(self._preprocess_text_for_embedding(item))
             
@@ -1342,7 +1343,7 @@ class VectorDatabase:
 
         # --- Keyword Handling ---
 
-        print(f"Search results: {search_results}")
+        print(f"Search results")
 
         courses = search_parameters.get("course_id", "all_courses")
 
