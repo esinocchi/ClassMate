@@ -251,7 +251,6 @@ class DataHandler:
         This function starts the update process and returns immediately, allowing the update to run in the background.
         """
         print(f"courses_selected: {self.courses_selected}")
-        print("not updating yet cuh")
         if self.is_updating:
             print("Update already in progress")
             return "Update already in progress"
