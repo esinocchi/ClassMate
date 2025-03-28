@@ -11,3 +11,4 @@ get-pip.py
 chroma_data/
 test.py
 evan_test.py
+vectordb/test_db.py
