@@ -1342,6 +1342,8 @@ class VectorDatabase:
 
         # --- Keyword Handling ---
 
+        print(f"Search results: {search_results}")
+
         courses = search_parameters.get("course_id", "all_courses")
 
         keywords = search_parameters.get("keywords", [])
