@@ -43,12 +43,12 @@ async def calculate_grade(
     vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
         
     print("Initializing VectorDatabase...")
-    
+    vector_db = VectorDatabase(vector_db_path, hf_api_token=hf_api_token)
+    await vector_db.process_data(force_reload=False)
         
     try:
         assignment = await vector_db.search(search_parameters) 
-        vector_db = VectorDatabase(vector_db_path, hf_api_token=hf_api_token)
-        await vector_db.process_data(force_reload=False)
+        
     except Exception as e:
         print(f"ERROR in vector_db.search: {str(e)}")
         print(f"Error type: {type(e)}")
