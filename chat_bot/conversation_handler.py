@@ -624,7 +624,9 @@ class ConversationHandler:
         file_name = file_description[0]
         file_url = file_description[1]
 
-        return_value = lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        
+        lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return_value = "lecture_file_to_notes_pdf called"
         return return_value
 
     
@@ -750,10 +752,8 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                    if function_name == "create_notes":
-                        result = asyncio.create_task(function_mapping[function_name](**arguments))
-                    else:
-                        result = await function_mapping[function_name](**arguments)
+                   
+                    result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
