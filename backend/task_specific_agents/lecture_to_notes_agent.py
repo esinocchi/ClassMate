@@ -68,6 +68,7 @@ async def lecture_file_to_notes_pdf(file_url: str, file_name: str, user_id, doma
         while i < 5:
             print(f"trying to make pdf {i}")
             prompt_to_pdf_status = await prompt_to_pdf(file_text, user_id, handler.domain)  # Added await
+            print("prompt should be given")
             if prompt_to_pdf_status == "PDF TO LATEX SUCESSFUL":
                 break
             i += 1
