@@ -679,7 +679,7 @@ class ConversationHandler:
         function_mapping = {
             "find_events_and_assignments": self.find_events_and_assignments,
             "find_course_information": self.find_course_information,
-            "create_notes": self.create_notes
+            "create_notes": self.create_notes,
             "create_event": create_event,
             "calculate_grade": calculate_grade
         }
