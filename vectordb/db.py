@@ -149,6 +149,8 @@ class VectorDatabase:
             doc_type = 'File'
         doc_id = doc.get('id', '')
         course_id = doc.get('course_id', '')
+
+        time_fields = ["created_at", "updated_at", "due_at", "posted_at", "start_at", "end_at"]
         
         # Build a rich text representation with all relevant fields
         priority_parts = []
@@ -161,7 +163,14 @@ class VectorDatabase:
             regular_parts.append(f"Type: {doc_type}")
         if course_id:
             regular_parts.append(f"Course ID: {course_id}")
-        
+
+        for field in time_fields:
+            if field in doc and doc[field] is not None:
+                # Convert UTC time to local time
+                utc_time = datetime.fromisoformat(doc[field].replace('Z', '+00:00'))
+                local_timezone = tzlocal.get_localzone()
+                value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
+                doc[field] = value
         # Handle different document types
         if doc_type == 'File':
             # For files, prioritize the display_name by placing it at the beginning
@@ -1278,7 +1287,7 @@ class VectorDatabase:
         return keyword_matches
     
 
-    async def search(self, search_parameters, include_related=False, minimum_score=0.3):
+    async def search(self, search_parameters, function_name='search', include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
@@ -1332,9 +1341,19 @@ class VectorDatabase:
             })
 
         # --- Keyword Handling ---
+
         courses = search_parameters.get("course_id", "all_courses")
+
         keywords = search_parameters.get("keywords", [])
-        item_types = search_parameters.get("item_types", [])
+
+        # assign item types for keyword search based on function name
+        if function_name == "calculate_grade":
+            item_types = ["assignment"]
+        elif function_name == "find_file":
+            item_types = ["file"]
+        elif function_name == "search":
+            item_types = search_parameters.get("item_types", [])
+
         if keywords:
             keyword_matches = self._handle_keywords(keywords, doc_ids, courses, item_types)
             print(f"Keyword matches: {keyword_matches}")

@@ -47,7 +47,7 @@ async def calculate_grade(
     await vector_db.process_data(force_reload=False)
         
     try:
-        assignment = await vector_db.search(search_parameters) 
+        assignment = await vector_db.search(search_parameters, function_name="calculate_grade") 
         
     except Exception as e:
         print(f"ERROR in vector_db.search: {str(e)}")

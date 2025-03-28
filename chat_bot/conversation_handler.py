@@ -427,7 +427,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -454,19 +454,25 @@ class ConversationHandler:
             [INSTRUCTIONS FOR FUNCTION CALLS]
             1. **When to Call a Function:**
             - If the user's query requires additional information or action (e.g., retrieving Canvas data or creating an event), you must call the appropriate function from the provided function list.
+            - Call the create_notes function if the user specifically asks to create notes from a file (Note: this is not the same as summarizing a lecture)
+            - Call the calculate_grade function if the user wants to know the grade required to achieve a certain letter grade on an assignment.
+            - Call the create_event function if the user wants to create an event.
+            - Call the find_course_information function if the user wants to know information about a course from the syllabus. (Note: this could be about office hours, grading scale, etc.)
+            - Call the find_events_and_assignments function if the user wants to know about any other information that would not be on the syllabus. (Note: this could be about finding an assignment, event, announcement, file, etc.)
 
-            2. **Keyword Extraction for Retrieval:**
-            - Extract a concise list of keywords from the user's prompt, ensuring the following elements are captured:
+
+            2. **Search Parameter Extraction for Retrieval:**
+            - Extract a concise search parameters from the user's prompt, ensuring the following elements are captured:
                 - **Course:** The course ID (from {self.courses}). If a course is not mentioned or if somebody mentions all courses, default to "all_courses".
                 - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
                 - **Item Types:** Choose from {self.valid_types}.
                 - **Specific Dates:** Use date mentioned by the user. Only ever include dates if the user mentions a specific date. Do no try and infer dates.
+                - **Keywords:** Extract a concise list of keywords from the user's prompt. Keywords should be specific and unique to the user's query.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
-                - The keyword list must contain a maximum of 10 items.
-                - Keywords must be specific and unique to the user's query.
-                - Do not duplicate the compulsory elements; include only additional relevant keywords.
+                - Search parameters must be specific and unique to the user's query.
+                - Do not duplicate the compulsory elements; include only additional relevant search parameters.
 
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
@@ -513,7 +519,7 @@ class ConversationHandler:
     
     def define_system_context_for_function_output(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -530,7 +536,8 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-            -For calculating grade requirements, you are going to be ouptuted a float. This is the score that the user needs to achieve on an assignment to get a certain letter grade.
+            -For calculating grade requirements, you are going to be ouptuted a required score. This is the score that the user needs to achieve on an assignment to get a certain letter grade. Output with a message like "You need this required score to maintain an A in the class."
+
         """
         return system_context
     
@@ -607,7 +614,7 @@ class ConversationHandler:
         await vector_db.process_data(force_reload=False)
         
         try:
-            file = await vector_db.search(search_parameters) 
+            file = await vector_db.search(search_parameters, function_name="find_file") 
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
@@ -623,7 +630,9 @@ class ConversationHandler:
         file_name = file_description[0]
         file_url = file_description[1]
 
-        return_value = lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        
+        lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return_value = "lecture_file_to_notes_pdf called"
         return return_value
 
     
@@ -695,9 +704,8 @@ class ConversationHandler:
         
         try:
             # First API call to get function call or direct response
-            print("About to make OpenAI API call with model: 'gpt-4o-mini'")
             chat_completion = client.chat.completions.create(
-                model='gpt-4o-mini',
+                model='gpt-4o',
                 messages=chat,
                 functions=functions,
                 function_call = "auto",
@@ -750,10 +758,8 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                    if function_name == "create_notes":
-                        asyncio.create_task(function_mapping[function_name](**arguments))
-                    else:
-                        result = await function_mapping[function_name](**arguments)
+                   
+                    result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
@@ -766,11 +772,13 @@ class ConversationHandler:
                 print(f"ERROR: Function '{function_name}' not found in function_mapping")
                 result = {"error": f"Function '{function_name}' not implemented."}
 
-            print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
+            print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
                 return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
+                self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
+
             
             chat.append({
                 'role': "function",
@@ -786,7 +794,7 @@ class ConversationHandler:
                 chat[0]["content"] = system_context_for_function_output
                 print("About to make second OpenAI API call")
                 final_completion = client.chat.completions.create(
-                    model='gpt-4o-mini',
+                    model='gpt-4o',
                     messages=chat,
                     temperature=0.3,
                     max_tokens=1024
@@ -814,6 +822,5 @@ class ConversationHandler:
             content = {"message": response_content , "function": [""]}
             self.chat_history.context[0].content[0] = content
        
-        print(self.chat_history)    
         return self.chat_history
             
