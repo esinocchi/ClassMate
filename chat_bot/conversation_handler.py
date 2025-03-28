@@ -563,7 +563,7 @@ class ConversationHandler:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             events_and_assignments = []
-        
+        print(f"Retrieval: {events_and_assignments}")
         return events_and_assignments
 
     async def find_course_information(self, search_parameters: dict):
