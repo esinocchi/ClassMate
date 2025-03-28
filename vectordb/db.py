@@ -150,7 +150,6 @@ class VectorDatabase:
         doc_id = doc.get('id', '')
         course_id = doc.get('course_id', '')
 
-        time_fields = ["created_at", "updated_at", "due_at", "posted_at", "start_at", "end_at"]
         
         # Build a rich text representation with all relevant fields
         priority_parts = []
@@ -815,7 +814,15 @@ class VectorDatabase:
             # No filtering needed, return empty list
             return []
         
-        # Return time range condition or empty list if no valid range
+        # At the end of the function
+        print("\n=== TIME RANGE FILTER DEBUG ===")
+        print(f"Time range: {time_range}")
+        print(f"Current timestamp: {current_timestamp} ({datetime.fromtimestamp(current_timestamp)})")
+        print(f"Fields being checked: {timestamp_fields}")
+        print(f"Generated conditions: {range_conditions}")
+        print(f"Final filter: {[{'$or': range_conditions}] if range_conditions else []}")
+        print("================================\n")
+        
         return [{"$or": range_conditions}] if range_conditions else []
 
     def _build_specific_dates_filter(self, search_parameters):
@@ -997,7 +1004,9 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            print(f"Executing ChromaDB query with query_text: {query_text}")
+            print(f"\n=== CHROMADB QUERY DEBUG ===")
+            print(f"Query text: {query_text}")
+            print(f"Full where clause: {query_where}")
             # Use asyncio to prevent blocking the event loop during the ChromaDB query
             results = await asyncio.to_thread(
                 self.collection.query,
