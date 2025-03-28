@@ -1278,7 +1278,7 @@ class VectorDatabase:
         return keyword_matches
     
 
-    async def search(self, search_parameters, include_related=False, minimum_score=0.3):
+    async def search(self, search_parameters, function_name='search', include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
         
@@ -1332,9 +1332,16 @@ class VectorDatabase:
             })
 
         # --- Keyword Handling ---
+
         courses = search_parameters.get("course_id", "all_courses")
+
         keywords = search_parameters.get("keywords", [])
-        item_types = search_parameters.get("item_types", [])
+
+        if function_name == "calculate_grade":
+            item_types = ["assignment"]
+        elif function_name == "search":
+            item_types = search_parameters.get("item_types", [])
+
         if keywords:
             keyword_matches = self._handle_keywords(keywords, doc_ids, courses, item_types)
             print(f"Keyword matches: {keyword_matches}")
