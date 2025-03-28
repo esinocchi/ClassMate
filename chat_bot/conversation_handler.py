@@ -1,3 +1,4 @@
+import asyncio
 import os 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -291,71 +292,71 @@ class ConversationHandler:
                     "required": ["search_parameters"]
                 }
             },
-            #{
-                #name": "create_notes",
-                #"description": "Create notes for a file found in the vector search function",
-                #"parameters": {
-                #    "type": "object",
-                #    "properties": {
-                #        "user_id": {
-                #            "type": "string",
-                #            "description": "The user's ID number"
-                #        },
-                #        "domain": {
-                #            "type": "string",
-                #            "description": "The user's canvas base url"
-                #        },
-                #           "search_parameters": {
-                #            "type": "object",
-                #            "properties": {
-                #                "course_id": {
-                #                    "type": "string",
-                #                    "description": "Specific Course ID"
-                #                },
-                #                "time_range": {
-                #                    "type": "string", 
-                #                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
-                #                    "description": "Temporal context for search"
-                #                },
-                #                "generality": {
-                #                    "type": "string", 
-                #                    "enum": ["LOW", "MEDIUM", "HIGH",],
-                #                    "description": "Context for how many items to retrieve"
-                #                },
-                #                "item_types": {
-                #                    "type": "array",
-                #                    "items": {
-                #                        "type": "string",
-                #                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
-                #                    },
-                #                    "description": "This should always be ['file']"
-                #                },
-                #                "specific_dates": {
-                #                    "type": "array",
-                #                    "items": {
-                #                        "type": "string",
-                #                        "format": "date"
-                #                    },
-                #                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
-                #                },
-                #                "keywords": {
-                #                    "type": "array",
-                #                    "items": {
-                #                        "type": "string" 
-                #                    },
-                #                    "description": "This should always be ['lecture','notes','slides']"
-                #                },
-                #                "query": {
-                #                    "type": "string",
-                #                    "description": "User's original query for semantic search"
-                #                }
-                #            },
-                #            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
-                #        }
-                #    },
-                #       "required": ["user_id", "domain", "search_parameters"]
-                #}
-           # },
+            {
+                "name": "create_notes",
+                "description": "Create notes for a file found in the vector search function",
+                "parameters": {
+                  "type": "object",
+                    "properties": {
+                       "user_id": {
+                       "type": "string",
+                            "description": "The user's ID number"
+                       },
+                       "domain": {
+                            "type": "string",
+                            "description": "The user's canvas base url"
+                        },
+                           "search_parameters": {
+                            "type": "object",
+                            "properties": {
+                            "course_id": {
+                                    "type": "string",
+                                    "description": "Specific Course ID"
+                                },
+                                "time_range": {
+                                    "type": "string", 
+                                    "enum": ["NEAR_FUTURE", "FUTURE", "RECENT_PAST", "PAST", "ALL_TIME"],
+                                    "description": "Temporal context for search"
+                                },
+                                "generality": {
+                                    "type": "string", 
+                                    "enum": ["LOW", "MEDIUM", "HIGH",],
+                                    "description": "Context for how many items to retrieve"
+                                },
+                            "item_types": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "enum": ["assignment", "file", "quiz", "announcement", "event", "syllabus"]
+                                    },
+                                    "description": "This should always be ['file']"
+                                },
+                                "specific_dates": {
+                                "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
+                                },
+                                "keywords": {
+                                "type": "array",
+                                    "items": {
+                                        "type": "string" 
+                                    },
+                                    "description": "This should always be ['lecture','notes','slides']"
+                                },
+                                "query": {
+                                    "type": "string",
+                                    "description": "User's original query for semantic search"
+                                }
+                            },
+                            "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
+                        }
+                    },
+                       "required": ["user_id", "domain", "search_parameters"]
+                }
+            },
             {
                 "name": "calculate_grade",
                 "description": "Calculate the grade required to achieve a certain letter grade on an assignment",
@@ -624,6 +625,7 @@ class ConversationHandler:
 
         return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
         return return_value
+
     
     def validate_search_parameters(self, search_parameters):
         """Validates search parameters and enables fail-safes"""
@@ -677,7 +679,7 @@ class ConversationHandler:
         function_mapping = {
             "find_events_and_assignments": self.find_events_and_assignments,
             "find_course_information": self.find_course_information,
-            #"create_notes": self.create_notes
+            "create_notes": self.create_notes,
             "create_event": create_event,
             "calculate_grade": calculate_grade
         }
@@ -748,7 +750,10 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                    result = await function_mapping[function_name](**arguments)
+                    if function_name == "create_notes":
+                        asyncio.create_task(function_mapping[function_name](**arguments))
+                    else:
+                        result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
@@ -764,8 +769,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
-                self.chat_history.context[0].content[0] = return_value
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
                 return self.chat_history
             
             chat.append({
@@ -773,6 +777,7 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
+
             
            
             try:

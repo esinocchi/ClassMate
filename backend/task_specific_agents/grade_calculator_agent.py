@@ -43,11 +43,12 @@ async def calculate_grade(
     vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
         
     print("Initializing VectorDatabase...")
-    vector_db = VectorDatabase(vector_db_path, hf_api_token=hf_api_token)
-    await vector_db.process_data(force_reload=False)
+    
         
     try:
         assignment = await vector_db.search(search_parameters) 
+        vector_db = VectorDatabase(vector_db_path, hf_api_token=hf_api_token)
+        await vector_db.process_data(force_reload=False)
     except Exception as e:
         print(f"ERROR in vector_db.search: {str(e)}")
         print(f"Error type: {type(e)}")
@@ -64,7 +65,6 @@ async def calculate_grade(
     grading_schema_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/grading_standards"
     
     # URL to retrieve the assignment details.
-    print
     assignment_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/assignments/{assignment_id}"
 
     should_close_session = False
@@ -176,7 +176,7 @@ async def calculate_grade(
 if __name__ == '__main__':
     # Replace with your actual course code, assignment id, and target grade.
     course_code = "2372294"
-    assignment_id = "16704242"  # update with your actual assignment ID
-    target_grade_letter = "A"   # example target grade
+    assignment_id = "17042107"  # update with your actual assignment ID
+    target_grade_letter = "A-"   # example target grade
     result = asyncio.run(calculate_grade(canvas_api_url, canvas_api_token, course_code, assignment_id, target_grade_letter))
     print(result)
