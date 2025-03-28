@@ -1,11 +1,22 @@
 import os
 import sys
 import shutil
+import logging
 from openai import AsyncOpenAI
 import threading
 from pdflatex import PDFLaTeX
 import asyncio
 import aiohttp
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
@@ -19,6 +30,7 @@ async def async_file_download(file_url, api_token):
     async with aiohttp.ClientSession() as session:
         async with session.get(file_url, headers={"Authorization": f"Bearer {api_token}"}) as response:
             if response.status != 200:
+                logger.error(f"Failed to download file. Status code: {response.status}")
                 raise Exception(f"Failed to download file. Status code: {response.status}")
             return await response.read()
 
@@ -47,42 +59,44 @@ async def prompt_to_pdf(prompt: str, user_id, domain: str):
         pdfl.create_pdf(keep_pdf_file=True, keep_log_file=False)
         if os.path.exists("latexoutput.pdf"):
             shutil.move("latexoutput.pdf", f"{CanvasAI_dir}/media_output/{domain}/{user_id}/output.pdf")
-    except:
+    except Exception as e:
+        logger.error(f"PDF creation failed: {str(e)}")
         return "ERROR: pdf couldn't be created"
     
     os.remove(latex_file_path)
+    logger.info("PDF to LaTeX conversion successful")
     return "PDF TO LATEX SUCCESSFUL"
 
 async def _real_processing(file_url, file_name, user_id, domain):
-    """Actual async processing with enhanced printing"""
+    """Actual async processing with enhanced logging"""
     handler = DataHandler(user_id, domain)
     os.makedirs(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}", exist_ok=True)
     clear_directory(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}")
 
-    print("\n=== STAGE 1: Downloading File ===")
+    logger.info("\n=== STAGE 1: Downloading File ===")
     API_TOKEN = handler.grab_user_data()["user_metadata"]["token"]
     file_bytes = await async_file_download(file_url, API_TOKEN)
     
-    print("\n=== STAGE 2: Extracting Text/Images ===")
+    logger.info("\n=== STAGE 2: Extracting Text/Images ===")
     try:
         file_text = extract_text_and_images(file_bytes, get_file_type(file_name))
     except Exception as e:
-        print(f"! Extraction failed: {str(e)}")
+        logger.error(f"Extraction failed: {str(e)}")
         return f"Error: File text could not be extracted. Details: {str(e)}"
     
-    print("\n=== STAGE 3: Generating PDF (5 attempts max) ===")
+    logger.info("\n=== STAGE 3: Generating PDF (5 attempts max) ===")
     for i in range(5):
-        print(f"\nAttempt {i+1}/5:")
+        logger.info(f"\nAttempt {i+1}/5:")
         try:
             status = await prompt_to_pdf(file_text, user_id, handler.domain)
             if status == "PDF TO LATEX SUCCESSFUL":
-                print("\n=== SUCCESS ===")
+                logger.info("\n=== SUCCESS ===")
                 return "Lecture file to notes pdf successful"
         except Exception as e:
-            print(f"! Attempt failed: {str(e)}")
+            logger.error(f"Attempt failed: {str(e)}")
             if i == 4:
                 clear_directory(f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}")
-                print("\n=== FAILED AFTER 5 ATTEMPTS ===")
+                logger.error("\n=== FAILED AFTER 5 ATTEMPTS ===")
                 return "ERROR: pdf couldn't be created"
     
     return "ERROR: pdf couldn't be created after 5 attempts"
@@ -99,5 +113,5 @@ def lecture_file_to_notes_pdf(file_url, file_name, user_id, domain):
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    print("\n=== BACKGROUND PROCESS STARTED ===")
+    logger.info("\n=== BACKGROUND PROCESS STARTED ===")
     return {"status": "started", "thread_id": thread.ident}
