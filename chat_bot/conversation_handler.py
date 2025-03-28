@@ -1,3 +1,4 @@
+import asyncio
 import os 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -295,20 +296,20 @@ class ConversationHandler:
                 "name": "create_notes",
                 "description": "Create notes for a file found in the vector search function",
                 "parameters": {
-                    "type": "object",
+                  "type": "object",
                     "properties": {
-                        "user_id": {
-                            "type": "string",
+                       "user_id": {
+                       "type": "string",
                             "description": "The user's ID number"
-                        },
-                        "domain": {
+                       },
+                       "domain": {
                             "type": "string",
                             "description": "The user's canvas base url"
                         },
-                        "search_parameters": {
+                           "search_parameters": {
                             "type": "object",
                             "properties": {
-                                "course_id": {
+                            "course_id": {
                                     "type": "string",
                                     "description": "Specific Course ID"
                                 },
@@ -322,7 +323,7 @@ class ConversationHandler:
                                     "enum": ["LOW", "MEDIUM", "HIGH",],
                                     "description": "Context for how many items to retrieve"
                                 },
-                                "item_types": {
+                            "item_types": {
                                     "type": "array",
                                     "items": {
                                         "type": "string",
@@ -331,7 +332,7 @@ class ConversationHandler:
                                     "description": "This should always be ['file']"
                                 },
                                 "specific_dates": {
-                                    "type": "array",
+                                "type": "array",
                                     "items": {
                                         "type": "string",
                                         "format": "date"
@@ -339,7 +340,7 @@ class ConversationHandler:
                                     "description": "ISO8601 format dates mentioned in query if a specific date is mentioned."
                                 },
                                 "keywords": {
-                                    "type": "array",
+                                "type": "array",
                                     "items": {
                                         "type": "string" 
                                     },
@@ -353,7 +354,7 @@ class ConversationHandler:
                             "required": ["course_id", "time_range", "item_types", "generality", "keywords", "query"]
                         }
                     },
-                    "required": ["user_id", "domain", "search_parameters"]
+                       "required": ["user_id", "domain", "search_parameters"]
                 }
             },
             {
@@ -484,10 +485,10 @@ class ConversationHandler:
                 }}
                 }}
                 ```
+            - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
-            - For note creation requests, generate arguments as defined in the function list.
-            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above.
+            - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above. The course_id for this funciton should always be a specific classes course id. Never imput "all courses" for this function. 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
             Respond directly to the user in plain language with a clear, concise message.
@@ -622,8 +623,9 @@ class ConversationHandler:
         file_name = file_description[0]
         file_url = file_description[1]
 
-        return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        return_value = lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
         return return_value
+
     
     def validate_search_parameters(self, search_parameters):
         """Validates search parameters and enables fail-safes"""
@@ -748,7 +750,10 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                    result = await function_mapping[function_name](**arguments)
+                    if function_name == "create_notes":
+                        asyncio.create_task(function_mapping[function_name](**arguments))
+                    else:
+                        result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
@@ -764,8 +769,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
-                self.chat_history.context[0].content[0] = return_value
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
                 return self.chat_history
             
             chat.append({
@@ -773,6 +777,7 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
+
             
            
             try:

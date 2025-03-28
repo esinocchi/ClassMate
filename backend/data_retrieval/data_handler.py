@@ -8,6 +8,7 @@ import threading
 from dotenv import load_dotenv
 import shutil
 from vectordb.db import VectorDatabase
+from concurrent.futures import ThreadPoolExecutor
 load_dotenv()
 
 
@@ -155,56 +156,68 @@ class DataHandler:
             return f"Error saving user data: {str(e)}"
     
     def initiate_user_data(self):
-        """
-        Initiates the user_data dictionary with basic structure
-        """
-
+        """Synchronous method that safely handles async operations without threading"""
         try:
-            # Define the async function for the API call
-            async def get_user_info():
-                async with aiohttp.ClientSession() as session:
-                    headers = {"Authorization": f"Bearer {self.API_TOKEN}"}
-                    async with session.get(f"{self.API_URL}/users/self", headers=headers) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            raise ValueError(f"Failed to get user info: {error_text}")
-                        
-                        return await response.json()
-            
-            # Run the async function in a new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Create directories first
+            os.makedirs(os.path.dirname(self._get_user_data_path()), exist_ok=True)
+
+            # Use nest_asyncio to allow nested event loops if needed
             try:
-                user_info = loop.run_until_complete(get_user_info())
-            finally:
-                loop.close()
-            
-            # Process the results synchronously
-            self.name = user_info["short_name"]
-            user_data = {
-                "user_metadata": {
-                    "id": self.id,
-                    "name": self.name,
-                    "token": self.API_TOKEN,
-                    "domain": self.domain,
-                    "updated_at": time.time(),
-                    "token_updated_at": time.time(),
-                    "courses_selected": self.courses_selected,
-                    "is_updating": self.is_updating
-                },
-                "courses": [],
-                "files": [],
-                "announcements": [],
-                "assignments": [],
-                "quizzes": [],
-                "calendar_events": [],
-                "current_chat_context": ""
-            }
-            
+                import nest_asyncio
+                nest_asyncio.apply()
+            except ImportError:
+                pass
+
+            async def _fetch_data():
+                async with aiohttp.ClientSession() as session:
+                    # Get user info
+                    async with session.get(
+                        f"{self.API_URL}/users/self",
+                        headers={"Authorization": f"Bearer {self.API_TOKEN}"}
+                    ) as response:
+                        response.raise_for_status()
+                        user_info = await response.json()
+
+                    # Build data structure
+                    self.name = user_info.get("short_name", "")
+                    return {
+                        "user_metadata": {
+                            "id": self.id,
+                            "name": self.name,
+                            "token": self.API_TOKEN,
+                            "domain": self.domain,
+                            "updated_at": time.time(),
+                            "token_updated_at": time.time(),
+                            "courses_selected": self.courses_selected,
+                            "is_updating": False
+                        },
+                        "courses": [],
+                        "files": [],
+                        "announcements": [],
+                        "assignments": [],
+                        "quizzes": [],
+                        "calendar_events": [],
+                        "current_chat_context": ""
+                    }
+
+            # Run in current or new event loop
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    # Create new loop if we're in async context
+                    with ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(asyncio.run, _fetch_data())
+                        user_data = future.result()
+                else:
+                    user_data = asyncio.run(_fetch_data())
+            except RuntimeError:
+                user_data = asyncio.run(_fetch_data())
+
             return self.save_user_data(user_data)
+
         except Exception as e:
-            print(f"Error details: {str(e)}")
-            return f"Error initiating user data: {str(e)}"
+            print(f"Error in initiate_user_data: {str(e)}")
+            return f"Error: {str(e)}"
 
     def grab_user_data(self):
         """
@@ -238,7 +251,6 @@ class DataHandler:
         This function starts the update process and returns immediately, allowing the update to run in the background.
         """
         print(f"courses_selected: {self.courses_selected}")
-        print("not updating yet cuh")
         if self.is_updating:
             print("Update already in progress")
             return "Update already in progress"
