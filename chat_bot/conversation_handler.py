@@ -477,8 +477,7 @@ class ConversationHandler:
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
                 ```
-                {{
-                "parameters": {{
+                {
                     "search_parameters": {{
                     "course_id": "<course_id>",
                     "time_range": "<FUTURE|RECENT_PAST|EXTENDED_PAST|ALL_TIME>",
@@ -488,9 +487,9 @@ class ConversationHandler:
                     "keywords": ["keyword1", "keyword2", ...],
                     "query": "<original user query>"
                     }}
-                }}
-                }}
-                ```
+                }
+                
+                ``
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
