@@ -1234,19 +1234,19 @@ class VectorDatabase:
 
             doc_type = doc.get('type')
             if not doc_type:
-                print(f"Warning: Document {doc_id} has no type.")
+                #print(f"Warning: Document {doc_id} has no type.")
                 continue  # Skip documents with no type
 
             if doc_type == 'syllabus':
                 continue
 
             if courses != "all_courses" and str(doc.get('course_id')) not in courses:
-                print(f"Skipping doc {doc_id} (course filter)")
+                #print(f"Skipping doc {doc_id} (course filter)")
                 continue
 
             doc_name_field = names.get(doc_type)  # Use .get() to handle unknown types
             if not doc_name_field:
-                print(f"Warning: Unknown document type '{doc_type}' for doc {doc_id}")
+                #print(f"Warning: Unknown document type '{doc_type}' for doc {doc_id}")
                 continue  # Skip documents with unknown types
 
             doc_name = doc.get(doc_name_field, '').lower()
