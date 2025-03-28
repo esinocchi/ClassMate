@@ -427,7 +427,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -454,19 +454,25 @@ class ConversationHandler:
             [INSTRUCTIONS FOR FUNCTION CALLS]
             1. **When to Call a Function:**
             - If the user's query requires additional information or action (e.g., retrieving Canvas data or creating an event), you must call the appropriate function from the provided function list.
+            - Call the create_notes function if the user specifically asks to create notes from a file (Note: this is not the same as summarizing a lecture)
+            - Call the calculate_grade function if the user wants to know the grade required to achieve a certain letter grade on an assignment.
+            - Call the create_event function if the user wants to create an event.
+            - Call the find_course_information function if the user wants to know information about a course from the syllabus. (Note: this could be about office hours, grading scale, etc.)
+            - Call the find_events_and_assignments function if the user wants to know about any other information that would not be on the syllabus. (Note: this could be about finding an assignment, event, announcement, file, etc.)
 
-            2. **Keyword Extraction for Retrieval:**
-            - Extract a concise list of keywords from the user's prompt, ensuring the following elements are captured:
+
+            2. **Search Parameter Extraction for Retrieval:**
+            - Extract a concise search parameters from the user's prompt, ensuring the following elements are captured:
                 - **Course:** The course ID (from {self.courses}). If a course is not mentioned or if somebody mentions all courses, default to "all_courses".
                 - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
                 - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
                 - **Item Types:** Choose from {self.valid_types}.
                 - **Specific Dates:** Use date mentioned by the user. Only ever include dates if the user mentions a specific date. Do no try and infer dates.
+                - **Keywords:** Extract a concise list of keywords from the user's prompt. Keywords should be specific and unique to the user's query.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
             - **Rules:**
-                - The keyword list must contain a maximum of 10 items.
-                - Keywords must be specific and unique to the user's query.
-                - Do not duplicate the compulsory elements; include only additional relevant keywords.
+                - Search parameters must be specific and unique to the user's query.
+                - Do not duplicate the compulsory elements; include only additional relevant search parameters.
 
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
@@ -513,7 +519,7 @@ class ConversationHandler:
     
     def define_system_context_for_function_output(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -608,7 +614,7 @@ class ConversationHandler:
         await vector_db.process_data(force_reload=False)
         
         try:
-            file = await vector_db.search(search_parameters) 
+            file = await vector_db.search(search_parameters, function_name="find_file") 
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
