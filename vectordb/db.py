@@ -164,13 +164,13 @@ class VectorDatabase:
         if course_id:
             regular_parts.append(f"Course ID: {course_id}")
 
-        for field in time_fields:
+        '''for field in time_fields:
             if field in doc and doc[field] is not None:
                 # Convert UTC time to local time
                 utc_time = datetime.fromisoformat(doc[field].replace('Z', '+00:00'))
                 local_timezone = tzlocal.get_localzone()
                 value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
-                doc[field] = value
+                doc[field] = value'''
         # Handle different document types
         if doc_type == 'File':
             # For files, prioritize the display_name by placing it at the beginning
