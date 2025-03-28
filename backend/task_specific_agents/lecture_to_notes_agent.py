@@ -56,6 +56,7 @@ async def prompt_to_pdf(prompt: str, user_id, domain: str):
 
     try:
         pdfl = PDFLaTeX.from_texfile(latex_file_path)
+        pdfl.pdflatex_path = '/usr/local/texlive/2025/bin/x86_64-linux/pdflatex'
         pdfl.create_pdf(keep_pdf_file=True, keep_log_file=False)
         if os.path.exists("latexoutput.pdf"):
             shutil.move("latexoutput.pdf", f"{CanvasAI_dir}/media_output/{domain}/{user_id}/output.pdf")
