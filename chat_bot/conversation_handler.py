@@ -1,3 +1,4 @@
+import asyncio
 import os 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -624,6 +625,7 @@ class ConversationHandler:
 
         return_value = await lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
         return return_value
+
     
     def validate_search_parameters(self, search_parameters):
         """Validates search parameters and enables fail-safes"""
@@ -748,7 +750,10 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                    result = await function_mapping[function_name](**arguments)
+                    if function_name == "create_notes":
+                        asyncio.create_task(function_mapping[function_name](**arguments))
+                    else:
+                        result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
@@ -764,8 +769,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Making second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": result, "function": [function_name, json.dumps(arguments)]}
-                self.chat_history.context[0].content[0] = return_value
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
                 return self.chat_history
             
             chat.append({
@@ -773,6 +777,7 @@ class ConversationHandler:
                 "name": function_name,
                 "content": json.dumps(result)
             })
+
             
            
             try:
