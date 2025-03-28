@@ -756,7 +756,8 @@ class VectorDatabase:
 
     def _build_time_range_filter(self, search_parameters):
         """
-        Build time range filter conditions for ChromaDB query.
+        Build time range filter conditions for ChromaDB query, working with
+        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
         
         Args:
             search_parameters: Dictionary containing search parameters
@@ -769,47 +770,53 @@ class VectorDatabase:
         
         time_range = search_parameters["time_range"]
 
-        # Get current time in local timezone, then convert to UTC for timestamp comparison
+        # Get current time in local timezone
         local_timezone = tzlocal.get_localzone()
         current_time = datetime.now(local_timezone)
-        current_timestamp = int(current_time.timestamp())
+        
+        # Format the timestamps as strings in the same format used in preprocessing
+        current_time_str = current_time.strftime("%Y-%m-%d %I:%M %p")
+        
+        future_10d = current_time + timedelta(days=10)
+        future_10d_str = future_10d.strftime("%Y-%m-%d %I:%M %p")
+        
+        past_10d = current_time - timedelta(days=10)
+        past_10d_str = past_10d.strftime("%Y-%m-%d %I:%M %p")
         
         # List of all possible timestamp fields across different document types
-        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        # Note: These should match the fields you're formatting in preprocessing
+        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
+        
+        # You may need to adjust these field names if you've renamed them during preprocessing
+        # For example, if original "due_timestamp" is now stored as "due_date" or similar
         
         range_conditions = []
-
-        future_10d = current_time + timedelta(days=10)
-        future_10d_timestamp = int(future_10d.timestamp())
-
-        past_10d = current_time - timedelta(days=10)
-        past_10d_timestamp = int(past_10d.timestamp())
         
         if time_range == "NEAR_FUTURE":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$gte": current_timestamp}},  # Now
-                        {field: {"$lte": future_10d_timestamp}}  # Now + 10 days
+                        {field: {"$gte": current_time_str}},  # Now (as string)
+                        {field: {"$lte": future_10d_str}}     # Now + 10 days (as string)
                     ]
                 })
         
         elif time_range == "FUTURE":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": future_10d_timestamp}})  # Future items only
+                range_conditions.append({field: {"$gte": future_10d_str}})  # Future items only
         
         elif time_range == "RECENT_PAST":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$gte": past_10d_timestamp}},  # Now - 10 days
-                        {field: {"$lte": current_timestamp}}  # Now
+                        {field: {"$gte": past_10d_str}},      # Now - 10 days (as string)
+                        {field: {"$lte": current_time_str}}   # Now (as string)
                     ]
                 })
         
         elif time_range == "PAST":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": past_10d_timestamp}})  # Past items only
+                range_conditions.append({field: {"$lte": past_10d_str}})  # Past items only
         
         elif time_range == "ALL_TIME":
             # No filtering needed, return empty list
@@ -820,7 +827,8 @@ class VectorDatabase:
 
     def _build_specific_dates_filter(self, search_parameters):
         """
-        Build specific dates filter conditions for ChromaDB query.
+        Build specific dates filter conditions for ChromaDB query, working with
+        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
         
         Args:
             search_parameters: Dictionary containing search parameters
@@ -840,7 +848,6 @@ class VectorDatabase:
                 naive_date = datetime.strptime(date_str, "%Y-%m-%d")
                 
                 # Make it timezone-aware by replacing the tzinfo
-                # This is the modern way that works with both pytz and zoneinfo
                 specific_date = naive_date.replace(tzinfo=local_timezone)
                 
                 specific_dates.append(specific_date)
@@ -850,20 +857,26 @@ class VectorDatabase:
         if not specific_dates:
             return []  # No valid specific dates to filter on
         
-        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        # Fields that contain formatted date strings
+        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
         date_conditions = []
         
         if len(specific_dates) == 1:
             # Single date = exact match (within day)
             specific_date = specific_dates[0]
-            start_timestamp = int(specific_date.replace(hour=0, minute=0, second=0).timestamp())
-            end_timestamp = int(specific_date.replace(hour=23, minute=59, second=59).timestamp())
+            
+            # Format the start and end times for the specific date
+            start_time = specific_date.replace(hour=0, minute=0, second=0)
+            end_time = specific_date.replace(hour=23, minute=59, second=59)
+            
+            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
+            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
             
             for field in timestamp_fields:
                 date_conditions.append({
                     "$and": [
-                        {field: {"$gte": start_timestamp}}, # $gte: >=
-                        {field: {"$lte": end_timestamp}} # $lte: <=
+                        {field: {"$gte": start_time_str}},  # Start of day (as string)
+                        {field: {"$lte": end_time_str}}     # End of day (as string)
                     ]
                 })
 
@@ -872,16 +885,29 @@ class VectorDatabase:
             start_date = min(specific_dates)
             end_date = max(specific_dates)
             
-            start_timestamp = int(start_date.replace(hour=0, minute=0, second=0).timestamp())
-            end_timestamp = int(end_date.replace(hour=23, minute=59, second=59).timestamp())
+            # Format the start and end times for the date range
+            start_time = start_date.replace(hour=0, minute=0, second=0)
+            end_time = end_date.replace(hour=23, minute=59, second=59)
+            
+            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
+            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
             
             for field in timestamp_fields:
                 date_conditions.append({
                     "$and": [
-                        {field: {"$gte": start_timestamp}}, # $gte: >=
-                        {field: {"$lte": end_timestamp}} # $lte: <=
+                        {field: {"$gte": start_time_str}},  # Start of first day (as string)
+                        {field: {"$lte": end_time_str}}     # End of last day (as string)
                     ]
                 })
+        
+        # Debug logging to verify string format
+        print(f"Filtering for specific dates: {[d.strftime('%Y-%m-%d') for d in specific_dates]}")
+        if len(specific_dates) == 1:
+            print(f"Start time string: {start_time_str}")
+            print(f"End time string: {end_time_str}")
+        elif len(specific_dates) >= 2:
+            print(f"Range start string: {start_time_str}")
+            print(f"Range end string: {end_time_str}")
         
         # Return date condition or empty list if no valid conditions
         return [{"$or": date_conditions}] if date_conditions else []
