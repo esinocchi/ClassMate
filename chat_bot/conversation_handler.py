@@ -519,7 +519,7 @@ class ConversationHandler:
     
     def define_system_context_for_function_output(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
