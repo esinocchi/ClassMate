@@ -756,8 +756,7 @@ class VectorDatabase:
 
     def _build_time_range_filter(self, search_parameters):
         """
-        Build time range filter conditions for ChromaDB query, working with
-        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
+        Build time range filter conditions for ChromaDB query.
         
         Args:
             search_parameters: Dictionary containing search parameters
@@ -770,53 +769,47 @@ class VectorDatabase:
         
         time_range = search_parameters["time_range"]
 
-        # Get current time in local timezone
+        # Get current time in local timezone, then convert to UTC for timestamp comparison
         local_timezone = tzlocal.get_localzone()
         current_time = datetime.now(local_timezone)
-        
-        # Format the timestamps as strings in the same format used in preprocessing
-        current_time_str = current_time.strftime("%Y-%m-%d %I:%M %p")
-        
-        future_10d = current_time + timedelta(days=10)
-        future_10d_str = future_10d.strftime("%Y-%m-%d %I:%M %p")
-        
-        past_10d = current_time - timedelta(days=10)
-        past_10d_str = past_10d.strftime("%Y-%m-%d %I:%M %p")
+        current_timestamp = int(current_time.timestamp())
         
         # List of all possible timestamp fields across different document types
-        # Note: These should match the fields you're formatting in preprocessing
-        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
-        
-        # You may need to adjust these field names if you've renamed them during preprocessing
-        # For example, if original "due_timestamp" is now stored as "due_date" or similar
+        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
         
         range_conditions = []
+
+        future_10d = current_time + timedelta(days=10)
+        future_10d_timestamp = int(future_10d.timestamp())
+
+        past_10d = current_time - timedelta(days=10)
+        past_10d_timestamp = int(past_10d.timestamp())
         
         if time_range == "NEAR_FUTURE":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$gte": current_time_str}},  # Now (as string)
-                        {field: {"$lte": future_10d_str}}     # Now + 10 days (as string)
+                        {field: {"$gte": current_timestamp}},  # Now
+                        {field: {"$lte": future_10d_timestamp}}  # Now + 10 days
                     ]
                 })
         
         elif time_range == "FUTURE":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": future_10d_str}})  # Future items only
+                range_conditions.append({field: {"$gte": future_10d_timestamp}})  # Future items only
         
         elif time_range == "RECENT_PAST":
             for field in timestamp_fields:
                 range_conditions.append({
                     "$and": [
-                        {field: {"$gte": past_10d_str}},      # Now - 10 days (as string)
-                        {field: {"$lte": current_time_str}}   # Now (as string)
+                        {field: {"$gte": past_10d_timestamp}},  # Now - 10 days
+                        {field: {"$lte": current_timestamp}}  # Now
                     ]
                 })
         
         elif time_range == "PAST":
             for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": past_10d_str}})  # Past items only
+                range_conditions.append({field: {"$lte": past_10d_timestamp}})  # Past items only
         
         elif time_range == "ALL_TIME":
             # No filtering needed, return empty list
