@@ -548,6 +548,7 @@ async function pushClasses(id, domain, classes){
                 domain: domain,
                 classes: classes
             };
+            console.log(requestBody);
             const response = await fetch(`https://canvasclassmate.me/endpoints/pushCourses`,{
                 method: 'POST',
                 headers: {
@@ -555,6 +556,7 @@ async function pushClasses(id, domain, classes){
                 },
                 body: JSON.stringify(requestBody),
             });
+            console.log(response);
             return true
         } catch (error) {
             return false;
