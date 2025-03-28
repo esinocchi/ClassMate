@@ -427,7 +427,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -608,7 +608,7 @@ class ConversationHandler:
         await vector_db.process_data(force_reload=False)
         
         try:
-            file = await vector_db.search(search_parameters) 
+            file = await vector_db.search(search_parameters, function_name="find_file") 
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
