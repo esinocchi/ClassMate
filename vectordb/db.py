@@ -1206,7 +1206,7 @@ class VectorDatabase:
         
         return search_results
     
-    def _handle_keywords(self, keywords, doc_ids, courses):
+    def _handle_keywords(self, keywords, doc_ids, courses, item_types):
         """
         Handle keyword search by checking if any keyword matches or is very similar to any document name.
 
@@ -1233,7 +1233,7 @@ class VectorDatabase:
                 continue
 
             doc_type = doc.get('type')
-            if not doc_type:
+            if not doc_type or doc_type not in item_types:
                 #print(f"Warning: Document {doc_id} has no type.")
                 continue  # Skip documents with no type
 
@@ -1334,8 +1334,9 @@ class VectorDatabase:
         # --- Keyword Handling ---
         courses = search_parameters.get("course_id", "all_courses")
         keywords = search_parameters.get("keywords", [])
+        item_types = search_parameters.get("item_types", [])
         if keywords:
-            keyword_matches = self._handle_keywords(keywords, doc_ids, courses)
+            keyword_matches = self._handle_keywords(keywords, doc_ids, courses, item_types)
             print(f"Keyword matches: {keyword_matches}")
 
             for match in keyword_matches:
