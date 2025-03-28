@@ -446,7 +446,7 @@ class VectorDatabase:
             
             # Skip if document already exists and not forcing reload
             if item_id in existing_ids and not force_reload:
-                print(f"Skipping existing document: {item_id}")
+                #print(f"Skipping existing document: {item_id}")
                 continue
             
             # Skip syllabi (already handled)
@@ -1322,7 +1322,7 @@ class VectorDatabase:
             similarity = 1.0 - distance  # Calculate similarity
 
             if similarity < minimum_score:
-                print(f"Skipping doc {doc_id} (semantic) - low similarity: {similarity}")
+                #print(f"Skipping doc {doc_id} (semantic) - low similarity: {similarity}")
                 continue
 
             search_results.append({
