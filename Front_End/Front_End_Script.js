@@ -82,14 +82,14 @@ saveClassesButton.addEventListener("click", () => {
         if (Context[1].user_id == "holder") {
             Context[1].user_id = await retrieveID(Context[1].domain);
         }
-
-        if(await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes)){
+        
         for (let i = Context[1].classes.length - 1; i >= 0; i--) {
             //update selected value for store checkboxes (store as string for json purposes)
             Context[1].classes[i].selected = states[`${Context[1].classes[i].name}`]
         }
+
+        await pushClasses(Context[1].user_id, Context[1].domain, Context[1].classes)
         chrome.storage.local.set({ Context_CanvasAI: Context}, function() {});
-    }
     }); 
 
 
@@ -418,6 +418,7 @@ async function rebuildPage() {
 
 //clear chat memory
 function clearMemory() {
+    resetAllMemory();
     //set memory == to 0
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         // Default to an empty structure if "Context_CanvasAI" doesn't exist
@@ -538,8 +539,10 @@ async function retrieveID(domain) {
 }
 
 async function pushClasses(id, domain, classes){
+    console.log("attempting class push");
     let boolean1 = await isUpdating(id, domain);
     console.log(boolean1);
+    console.log("classes", classes);
     if (boolean1 == false) {
         try {
             //add new pydantic model for pass
