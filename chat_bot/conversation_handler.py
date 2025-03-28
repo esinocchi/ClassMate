@@ -696,7 +696,6 @@ class ConversationHandler:
         
         try:
             # First API call to get function call or direct response
-            print("About to make OpenAI API call with model: 'gpt-4o-mini'")
             chat_completion = client.chat.completions.create(
                 model='gpt-4o',
                 messages=chat,
