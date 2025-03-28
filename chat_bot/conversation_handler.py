@@ -530,7 +530,8 @@ class ConversationHandler:
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
             - For course information requests, you are going to be given a string of text containing the course syllabus. Retrieve information from the text based on the user's query.
             - For assignment and event retrieval requests, you are going to be given a list of assignments and events. Retrieve the information from the list based on the user's query. 
-            -For calculating grade requirements, you are going to be ouptuted a float. This is the score that the user needs to achieve on an assignment to get a certain letter grade.
+            -For calculating grade requirements, you are going to be ouptuted a required score. This is the score that the user needs to achieve on an assignment to get a certain letter grade. Output with a message like "You need this required score to maintain an A in the class."
+
         """
         return system_context
     
@@ -751,7 +752,7 @@ class ConversationHandler:
                 try:
                     print(f"Arguments: {arguments}")
                     if function_name == "create_notes":
-                        asyncio.create_task(function_mapping[function_name](**arguments))
+                        result = asyncio.create_task(function_mapping[function_name](**arguments))
                     else:
                         result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
