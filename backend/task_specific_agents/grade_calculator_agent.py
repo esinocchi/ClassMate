@@ -65,8 +65,7 @@ async def calculate_grade(
     grading_schema_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/grading_standards"
     
     # URL to retrieve the assignment details.
-    print
-    assignment_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/assignments/{"17079660"}"
+    assignment_url = f"https://{canvas_base_url}/api/v1/courses/{course_code}/assignments/{assignment_id}"
 
     should_close_session = False
     if session is None:
