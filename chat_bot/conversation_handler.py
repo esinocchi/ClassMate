@@ -427,7 +427,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
+        current_time = datetime.now(local_tz).isoformat()
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -478,7 +478,6 @@ class ConversationHandler:
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
                 ```
                 {{
-                "parameters": {{
                     "search_parameters": {{
                     "course_id": "<course_id>",
                     "time_range": "<FUTURE|RECENT_PAST|EXTENDED_PAST|ALL_TIME>",
@@ -489,8 +488,8 @@ class ConversationHandler:
                     "query": "<original user query>"
                     }}
                 }}
-                }}
-                ```
+                
+                ``
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
@@ -558,12 +557,12 @@ class ConversationHandler:
         
         print("Calling vector_db.search...")
         try:
-            events_and_assignments = await vector_db.search(search_parameters)
+            events_and_assignments = await vector_db.search(search_parameters=search_parameters)
         except Exception as e:
             print(f"ERROR in vector_db.search: {str(e)}")
             print(f"Error type: {type(e)}")
             events_and_assignments = []
-        
+        print(f"Retrieval: {events_and_assignments}")
         return events_and_assignments
 
     async def find_course_information(self, search_parameters: dict):

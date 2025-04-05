@@ -140,6 +140,8 @@ async function handlePrompt() {
         return;
     }
     try {
+        
+        console.log("response", response);
 
         const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
         
@@ -310,26 +312,6 @@ function addMemoryBox(prompt, response, downloadlink) {
     memoryBox.appendChild(promptBox);
     memoryBox.appendChild(responseBox);
 
-    if (downloadlink == true) {
-        const downloadButton = document.createElement("button");
-        downloadButton.classList.add("toolbarChildButton")
-        downloadButton.style.width = "40%";
-        downloadButton.textContent = "download";
-        memoryBox.appendChild(downloadButton);
-
-        downloadButton.addEventListener("click", function(event) {
-            chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
-                let context = result.Context_CanvasAI || dataHolder;
-
-                if (context[1].user_id == "holder") {
-                    context[1].user_id = await retrieveID(context[1].domain);
-                }
-
-                pullPDF(context[1].user_id, context[1].domain);
-            });
-        });
-    }
-
     const dynamicBoxesContainer = document.getElementById("dynamicBoxesContainer");
 
     // Append memoryBox to dynamicBoxesContainer
@@ -351,6 +333,43 @@ const responseLength = response.length; // Length of the response text
 dynamicBoxesContainer.style.overflow = 'hidden'; // Hide overflow during typing to prevent scrolling
 dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Ensure the container is at the bottom when typing starts
 
+if (Array.isArray(response)) {
+// Create the interval for typing effect
+const interval = setInterval(() => {
+    if (index < responseLength) {
+        // Add the character at the current index to the innerHTML of the responseBox
+        // Use slice() to progressively add content up to the current index + 1
+        // REPLACEMENT: Replaced 'textContent' with 'innerHTML' to allow HTML formatting (e.g., <br> for line breaks)
+        responseBox.innerHTML = response[0].slice(0, index + 1).replace(/\n/g, '<br>'); // Convert newlines to <br> tags
+
+        // Scroll to the bottom of the container
+        dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Keeps the scroll position at the bottom
+
+        index++; // Increment index to type the next character
+    } else {
+        clearInterval(interval); // Stop the typing effect when done
+        dynamicBoxesContainer.style.overflow = 'auto'; // Allow overflow after typing is complete
+
+        const downloadButton = document.createElement("button");
+        downloadButton.classList.add("toolbarChildButton")
+        downloadButton.style.width = "40%";
+        downloadButton.textContent = "download";
+        memoryBox.appendChild(downloadButton);
+
+        downloadButton.addEventListener("click", function(event) {
+            chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
+                let context = result.Context_CanvasAI || dataHolder;
+
+                if (context[1].user_id == "holder") {
+                    context[1].user_id = await retrieveID(context[1].domain);
+                }
+
+                pullPDF(context[1].user_id, context[1].domain);
+            });
+        });
+    }
+}, typingSpeed); // Set typing speed (interval between each character typed)
+} else {
 // Create the interval for typing effect
 const interval = setInterval(() => {
     if (index < responseLength) {
@@ -370,6 +389,7 @@ const interval = setInterval(() => {
 }, typingSpeed); // Set typing speed (interval between each character typed)
 
     }
+}
 
 //rebuild class selections and past chats
 async function rebuildPage() {
