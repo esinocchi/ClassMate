@@ -13,7 +13,7 @@ backend_dir = os.path.dirname(current_dir)
 CanvasAI_dir = os.path.dirname(backend_dir)
 sys.path.append(backend_dir)
 
-from data_retrieval.data_handler import DataHandler, clear_directory
+from data_retrieval.data_handler import DataHandler
 from data_retrieval.get_all_user_data import extract_text_and_images, get_file_type
 
 # Configure logging
@@ -173,7 +173,7 @@ async def _real_processing(file_url, file_name, user_id, domain):
     handler = DataHandler(user_id, domain)
     output_dir = f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}"
     os.makedirs(output_dir, exist_ok=True)
-    clear_directory(output_dir)
+    handler.delete_chat_context()
 
     logger.info("\n=== STAGE 1: Downloading File ===")
     API_TOKEN = handler.grab_user_data()["user_metadata"]["token"]
@@ -197,7 +197,7 @@ async def _real_processing(file_url, file_name, user_id, domain):
         except Exception as e:
             logger.error(f"Attempt failed: {str(e)}")
             if i == 4:
-                clear_directory(output_dir)
+                handler.delete_chat_context()
                 logger.error("\n=== FAILED AFTER 5 ATTEMPTS ===")
                 return "ERROR: pdf couldn't be created"
 

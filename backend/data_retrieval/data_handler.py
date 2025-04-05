@@ -397,6 +397,10 @@ def clear_directory(directory_path):
     Args:
         directory_path: The path to the directory to clear.
     """
+    if not os.path.exists(directory_path):
+        
+        return "Path doesn't exist, nothing to clear"
+    
     for filename in os.listdir(directory_path):
         file_path = os.path.join(directory_path, filename)
         try:
@@ -406,8 +410,6 @@ def clear_directory(directory_path):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
-    return "Directory Cleared"
     
-
-
+    return "Directory Cleared"
 
