@@ -320,6 +320,14 @@ async def checkAndUpdateUserData(user_id, domain):
     
     else:
         return {"message": "User data not updated"}
+    
+@app.get('/endpoints/checkMediaOutputForFile')
+async def checkMediaOutputForFile(user_id: str, domain: str, file_name: str):
+    domain = domain.split(".")[0]
+    CanvasDir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(CanvasDir, "media_output", domain, user_id, file_name)
+
+    return {"exists": os.path.exists(file_path)}
 
 async def check_chat_requirements(contextArray: ContextObject):
     """
@@ -392,7 +400,8 @@ async def oauthTokenGenerator():
 
 #returns the stored pdf
 @app.get("/endpoints/pullNotes")
-async def pullPDF(domain, user_id):
+async def pullPDF(domain, user_id, pdf_title):
+    pdf_title = pdf_title + "_notes.pdf"
     handler = DataHandler(user_id, domain)
-    pdf_path = f"media_output/{handler.domain}/{user_id}/output.pdf"
+    pdf_path = f"media_output/{handler.domain}/{user_id}/{pdf_title}"
     return FileResponse(pdf_path, media_type='application/pdf', filename="your_file.pdf")
