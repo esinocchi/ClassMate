@@ -400,7 +400,8 @@ async def oauthTokenGenerator():
 
 #returns the stored pdf
 @app.get("/endpoints/pullNotes")
-async def pullPDF(domain, user_id):
+async def pullPDF(domain, user_id, pdf_title):
+    pdf_title = pdf_title + "_notes.pdf"
     handler = DataHandler(user_id, domain)
-    pdf_path = f"media_output/{handler.domain}/{user_id}/output.pdf"
+    pdf_path = f"media_output/{handler.domain}/{user_id}/{pdf_title}"
     return FileResponse(pdf_path, media_type='application/pdf', filename="your_file.pdf")

@@ -427,16 +427,16 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
-            You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
+            You are a highly professional, task-focused AI assistant for {self.student_name!s} (User ID: {self.student_id!s}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
 
             [STUDENT INFORMATION & RESOURCES]
-            - Courses: {self.courses} (Each key is the course name, each value is the corresponding course ID)
-            - The user's canvas base url: {self.domain}
-            - Valid Item Types: {self.valid_types}
-            - Time Range Definitions: {self.time_range_definitions}
+            - Courses: {self.courses!r} (Each key is the course name, each value is the corresponding course ID)
+            - The user's canvas base url: {self.domain!s}
+            - Valid Item Types: {self.valid_types!r}
+            - Time Range Definitions: {self.time_range_definitions!r}
 
             [GENERAL TASKS]
             You assist with:
@@ -447,7 +447,7 @@ class ConversationHandler:
             - Creating events when requested
 
             [DATE & TIME]
-            - Current Time: {current_time}
+            - Current Time: {current_time!s}
             - All dates and times must be in ISO8601 format.
             - Use the current time as your reference for "now."
 
@@ -463,10 +463,10 @@ class ConversationHandler:
 
             2. **Search Parameter Extraction for Retrieval:**
             - Extract a concise search parameters from the user's prompt, ensuring the following elements are captured:
-                - **Course:** The course ID (from {self.courses}). If a course is not mentioned or if somebody mentions all courses, default to "all_courses".
-                - **Time Range:** Select from {self.time_range_definitions} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
-                - **Generality:** Select from {self.generality_definitions} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
-                - **Item Types:** Choose from {self.valid_types}.
+                - **Course:** The course ID (from {self.courses!r}). If a course is not mentioned or if somebody mentions all courses, default to "all_courses".
+                - **Time Range:** Select from {self.time_range_definitions!r} (e.g., FUTURE, RECENT_PAST, EXTENDED_PAST, ALL_TIME).
+                - **Generality:** Select from {self.generality_definitions!r} (e.g., LOW, MEDIUM, HIGH, SPECIFIC).
+                - **Item Types:** Choose from {self.valid_types!r}.
                 - **Specific Dates:** Use date mentioned by the user. Only ever include dates if the user mentions a specific date. Do no try and infer dates.
                 - **Keywords:** Extract a concise list of keywords from the user's prompt. Keywords should be specific and unique to the user's query.
                 - **Synonyms/Related Terms:** Include relevant synonyms (e.g., for "exam", include "midterm" and "final").
@@ -476,7 +476,7 @@ class ConversationHandler:
 
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
-                ```
+                
                 {{
                     "search_parameters": {{
                     "course_id": "<course_id>",
@@ -489,18 +489,21 @@ class ConversationHandler:
                     }}
                 }}
                 
-                ``
+                
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
             - For grade calculation requests, the arguments should be student_id, target_grade_letter, and search_parameters. Make sure the search parameters are based on the format outlined above. The course_id for this funciton should always be a specific classes course id. Never imput "all courses" for this function.
 
             4. Specific Instructions for function calls:
-            
+
             **Create Notes Function:**
                 - In order to create notes, you must find the exact file that the user wants to create notes from
                 - Keywords for this function is very important. Look at the user's query and try to find any indicators of a file name. Include that file name as a keyword.
-            
+
+            **Calculate Grade Function:**
+                - In order to calculate the grade, you must find the exact assignment that the user wants to calculate the grade for.
+                - Keywords for this function is very important. Look at the user's query and try to find any indicators of an assignment name. Include that assignment name as a keyword.
 
             [RESPONSE GUIDELINES]
             - **If No Function Call Is Needed:**  
@@ -515,11 +518,7 @@ class ConversationHandler:
             - **Time Range Fail-Safe:** If unsure, default to "ALL_TIME".
             - **Course Fail-Safe:** If the course mentioned does not match exactly, select the closest course based on string similarity.
             - **Generality Fail-Safe:** If the user does not specify a generality, default to "MEDIUM".
-            - **Function Fail-Safe:** If unsure about which function to call, default to "find_assignments_and_events".
-
-            [RESPONSE GUIDELINES]
-            - **If No Function Call Is Needed:**  
-            Respond directly to the user in plain language with a clear, concise message.   
+            - **Function Fail-Safe:** If unsure about which function to call, default to "find_assignments_and_events".   
             """
         
         return system_context
@@ -633,15 +632,15 @@ class ConversationHandler:
     async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
         """Create notes for a file using the vector search function"""
         from backend.task_specific_agents.lecture_to_notes_agent import get_file_name_without_type
-        
         search_parameters["specific_dates"] = [""]
         file_description = await self.find_file(search_parameters)
         file_name = file_description[0]
         file_url = file_description[1]
+        return_value = get_file_name_without_type(file_name)
+
 
         
         lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
-        return_value = "lecture_file_to_notes_pdf called"
         return return_value
 
     
@@ -784,7 +783,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments), f"{result}"]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
 
@@ -832,4 +831,5 @@ class ConversationHandler:
             self.chat_history.context[0].content[0] = content
        
         return self.chat_history
+
             
