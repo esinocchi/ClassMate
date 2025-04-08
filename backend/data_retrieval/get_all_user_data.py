@@ -39,48 +39,51 @@ async def get_text_from_links(links: list, API_URL: str, API_TOKEN: str):
     
     """
     complete_text = ""
-    async with aiohttp.ClientSession() as session:
-        for link_dict in links:
-            for filename, fileurl in link_dict.items():
-                try:
-                    # Extract file ID and course ID from the Canvas URL
-                    # Example URL: https://psu.instructure.com/courses/123456/files/789012
-                    file_id = fileurl.split('/')[-1].split('?')[0]  # Get file ID (789012)
-                    course_id = fileurl.split('/courses/')[1].split('/')[0]  # Get course ID (123456)
-                    
-                    # Construct the Canvas API endpoint for file metadata
-                    api_url = f"{API_URL}/courses/{course_id}/files/{file_id}"
-
-                    # First request: Get file metadata including the actual download URL
-                    headers = {"Authorization": f"Bearer {API_TOKEN}"}
-                    async with session.get(api_url, headers=headers) as response:
-                        if response.status != 200:
-                            continue
-
-                        # Extract the actual download URL from the file metadata
-                        file_data = await response.json()
-                        download_url = file_data.get('url')
+    try:
+        async with aiohttp.ClientSession() as session:
+            for link_dict in links:
+                for filename, fileurl in link_dict.items():
+                    try:
+                        # Extract file ID and course ID from the Canvas URL
+                        # Example URL: https://psu.instructure.com/courses/123456/files/789012
+                        file_id = fileurl.split('/')[-1].split('?')[0]  # Get file ID (789012)
+                        course_id = fileurl.split('/courses/')[1].split('/')[0]  # Get course ID (123456)
                         
-                        if not download_url:
-                            continue
+                        # Construct the Canvas API endpoint for file metadata
+                        api_url = f"{API_URL}/courses/{course_id}/files/{file_id}"
 
-                        # Second request: Download the actual file content
-                        async with session.get(download_url, headers=headers) as file_response:
-                            if file_response.status != 200:
+                        # First request: Get file metadata including the actual download URL
+                        headers = {"Authorization": f"Bearer {API_TOKEN}"}
+                        async with session.get(api_url, headers=headers) as response:
+                            if response.status != 200:
                                 continue
 
-                            # Get the raw file content as bytes
-                            file_bytes = await file_response.read()
+                            # Extract the actual download URL from the file metadata
+                            file_data = await response.json()
+                            download_url = file_data.get('url')
+                            
+                            if not download_url:
+                                continue
 
-                            # Determine the file type from the filename extension
-                            file_type = get_file_type(filename)
+                            # Second request: Download the actual file content
+                            async with session.get(download_url, headers=headers) as file_response:
+                                if file_response.status != 200:
+                                    continue
 
-                            # Process the file based on its type and extract text
-                            extracted_text = extract_text_and_images(file_bytes, file_type)
-                            complete_text += f"\nText from {filename}:\n{extracted_text}\n\n"
-                except Exception as e:
-                    print(f"Error processing file {filename}: {str(e)}")
-                    continue
+                                # Get the raw file content as bytes
+                                file_bytes = await file_response.read()
+
+                                # Determine the file type from the filename extension
+                                file_type = get_file_type(filename)
+
+                                # Process the file based on its type and extract text
+                                extracted_text = extract_text_and_images(file_bytes, file_type)
+                                complete_text += f"\nText from {filename}:\n{extracted_text}\n\n"
+                    except Exception as e:
+                        print(f"Error processing file {filename}: {str(e)}")
+                        continue
+    except Exception as e:
+        print(f"text couldn't be extracted: {str(e)}")
     return complete_text
 
 def get_file_type(filename: str):

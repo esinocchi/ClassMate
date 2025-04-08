@@ -289,7 +289,7 @@ class DataHandler:
                     
                     # Save the updated data
                     self.save_user_data(updated_user_data)
-                    db = VectorDatabase(self._get_user_data_path(), hf_api_token=self.hf_api_token, cache_dir="chroma_data/")
+                    db = VectorDatabase(self._get_user_data_path(), hf_api_token=self.hf_api_token)
                     await db.process_data(force_reload=True)
                     self.set_is_updating(False)
                     
@@ -397,6 +397,10 @@ def clear_directory(directory_path):
     Args:
         directory_path: The path to the directory to clear.
     """
+    if not os.path.exists(directory_path):
+        
+        return "Path doesn't exist, nothing to clear"
+    
     for filename in os.listdir(directory_path):
         file_path = os.path.join(directory_path, filename)
         try:
@@ -406,8 +410,6 @@ def clear_directory(directory_path):
                 shutil.rmtree(file_path)
         except Exception as e:
             print(f"Failed to delete {file_path}. Reason: {e}")
-    return "Directory Cleared"
     
-
-
+    return "Directory Cleared"
 

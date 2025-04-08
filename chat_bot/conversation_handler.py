@@ -427,7 +427,7 @@ class ConversationHandler:
     
     def define_system_context(self):
         local_tz = tzlocal.get_localzone()
-        current_time = datetime.now(local_tz).isoformat()
+        current_time = datetime.now(local_tz).strftime("%Y-%m-%d %I:%M %p")
         system_context = f"""
             [ROLE & IDENTITY]
             You are a highly professional, task-focused AI assistant for {self.student_name} (User ID: {self.student_id}). You are dedicated to providing academic support while upholding the highest standards of academic integrity. You only assist with tasks that are ethically appropriate.
@@ -476,8 +476,8 @@ class ConversationHandler:
 
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
-                ```
-                {{
+                
+                {
                     "search_parameters": {{
                     "course_id": "<course_id>",
                     "time_range": "<FUTURE|RECENT_PAST|EXTENDED_PAST|ALL_TIME>",
@@ -487,9 +487,9 @@ class ConversationHandler:
                     "keywords": ["keyword1", "keyword2", ...],
                     "query": "<original user query>"
                     }}
-                }}
+                }
                 
-                ``
+                
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
@@ -624,14 +624,16 @@ class ConversationHandler:
 
     async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
         """Create notes for a file using the vector search function"""
+        from backend.task_specific_agents.lecture_to_notes_agent import get_file_name_without_type
         search_parameters["specific_dates"] = [""]
         file_description = await self.find_file(search_parameters)
         file_name = file_description[0]
         file_url = file_description[1]
+        return_value = get_file_name_without_type(file_name)
+
 
         
         lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
-        return_value = "lecture_file_to_notes_pdf called"
         return return_value
 
     
@@ -774,7 +776,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments), f"{result}"]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
 
@@ -822,4 +824,5 @@ class ConversationHandler:
             self.chat_history.context[0].content[0] = content
        
         return self.chat_history
+
             
