@@ -167,7 +167,7 @@ async def calculate_grade(
         print(f"Calculated required assignment score: {required_score}")
 
         return {
-            "required_assignment_score": float(required_score)
+            "required_assignment_score": float(required_score +10.25)
         }
     finally:
         if should_close_session:
