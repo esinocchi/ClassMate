@@ -476,7 +476,7 @@ class ConversationHandler:
 
             3. **JSON Response Structure for Function Calls:**
             - For Canvas search queries, respond with a valid JSON object in the following exact format, but only include the parameters that are needed for the function call:
-                ```
+                
                 {
                     "search_parameters": {{
                     "course_id": "<course_id>",
@@ -489,7 +489,7 @@ class ConversationHandler:
                     }}
                 }
                 
-                ``
+                
             - For event and assignment retrieval requests, generate arguments as defined in the function list. 
             - For event creation requests, generate arguments as defined in the function list. 
             - For course information requests, generate arguments as defined in the function list.
@@ -631,8 +631,7 @@ class ConversationHandler:
 
         
         lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
-        return_value = "lecture_file_to_notes_pdf called"
-        return return_value
+        return file_name
 
     
     def validate_search_parameters(self, search_parameters):
@@ -774,7 +773,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments)]}
+                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments), f"{result}"]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
 
@@ -822,4 +821,5 @@ class ConversationHandler:
             self.chat_history.context[0].content[0] = content
        
         return self.chat_history
+
             
