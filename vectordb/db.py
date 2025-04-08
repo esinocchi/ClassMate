@@ -175,6 +175,7 @@ class VectorDatabase:
                 local_timezone = tzlocal.get_localzone()
                 value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
                 doc[field] = value'''
+        
         # Handle different document types
         if doc_type == 'File':
             # For files, prioritize the display_name by placing it at the beginning
@@ -304,7 +305,12 @@ class VectorDatabase:
             if isinstance(module_name, str):
                 module_name = self.normalize_text(module_name)
             regular_parts.append(f"Module Name: {module_name}")
-        
+
+
+        # Add local time to doc
+        local_time = datetime.now().strftime('%Y-%m-%d %I:%M %p')
+        doc['local_time'] = local_time
+
         # Join all parts with newlines for better separation
         # After processing, the text_parts list for a singule assingment item will have the following format:
         # [

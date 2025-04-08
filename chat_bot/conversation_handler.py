@@ -535,8 +535,8 @@ class ConversationHandler:
             
             [DATE & TIME]
             - Current UTC Time: {current_time}
-            - All dates and times must be in ISO8601 format.
             - Use the current UTC time as your reference for "now."
+            - When reviewing the search results in the chat context, ensure to reference 'local time' for the timestamps of the documents. For example, a due date would be "Due Date: April 10, 2025, at 11:59 PM EST", when EST is the local time.
 
             [Instructions for Function Output]
             - For event creation requests, respond with a clear confirmation message such as "The event has been created."
