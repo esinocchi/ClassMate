@@ -37,7 +37,6 @@ chat.innerHTML = `
 </div>
 <div id="toolbar" class="footer">
     <button id="clearPromptButton" class="toolbarChildButton">New Chat</button>
-  </div>
 </div>
 `;
 
@@ -328,7 +327,13 @@ dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Keeps t
 // Simulate typing effect for response
 let index = 0; // Initialize index to keep track of which character we're typing
 const typingSpeed = 2; // Speed of typing effect
-const responseLength = response.length; // Length of the response text
+let responseLength;
+
+if (Array.isArray(response)) {
+    responseLength = response[0].length; // Length of the response text
+} else {
+    responseLength = response.length
+}
 
 dynamicBoxesContainer.style.overflow = 'hidden'; // Hide overflow during typing to prevent scrolling
 dynamicBoxesContainer.scrollTop = dynamicBoxesContainer.scrollHeight; // Ensure the container is at the bottom when typing starts
@@ -351,6 +356,7 @@ const interval = setInterval(() => {
         dynamicBoxesContainer.style.overflow = 'auto'; // Allow overflow after typing is complete
 
         const downloadButton = document.createElement("button");
+        downloadButton.id = response[2];
         downloadButton.classList.add("toolbarChildButton")
         downloadButton.style.width = "40%";
         downloadButton.textContent = "download";
@@ -364,7 +370,7 @@ const interval = setInterval(() => {
                     context[1].user_id = await retrieveID(context[1].domain);
                 }
 
-                pullPDF(context[1].user_id, context[1].domain);
+                pullPDF(context[1].user_id, context[1].domain, event.target.id);
             });
         });
     }
@@ -400,12 +406,11 @@ async function rebuildPage() {
                     //update domain each reload
                     let context = result.Context_CanvasAI || dataHolder;
 
+                    //reload stored URL
                     context[1].domain = getURL();
 
-                    //check for existing id
-                    if (context[1].user_id == "holder") {
-                        context[1].user_id = await retrieveID(context[1].domain);
-                    }
+                    //reloud stored ID
+                    context[1].user_id = await retrieveID(context[1].domain);
 
                     console.log(context)
 
@@ -413,9 +418,9 @@ async function rebuildPage() {
                         addMemoryBox(context[1].content[i], context[0].content[i].message, false); //reload chat history context based on storage
                     };
 
-                    if (context[1].classes[0].id == ""){
-                         context[1].classes = await retrieveClassList(context[1].user_id, context[1].domain);
-                    }
+                    //reload Classes
+                    context[1].classes = await retrieveClassList(context[1].user_id, context[1].domain);
+
                     for (let i = context[1].classes.length - 1; i >= 0; i--) {
                         addClassSetting(context[1].classes[i].name, context[1].classes[i].selected); //reload classes based on storage
                     };
@@ -438,7 +443,6 @@ async function rebuildPage() {
 
 //clear chat memory
 function clearMemory() {
-    resetAllMemory();
     //set memory == to 0
     chrome.storage.local.get(["Context_CanvasAI"], function(result) {
         // Default to an empty structure if "Context_CanvasAI" doesn't exist
@@ -601,9 +605,9 @@ async function isUpdating(user_id, domain){
     }
 }
 
-async function pullPDF(user_id, domain) {
+async function pullPDF(user_id, domain, pdfName) {
     try {
-        const response = await fetch(`https://canvasclassmate.me/endpoints/pullNotes?user_id=${user_id}&domain=${domain}`);
+        const response = await fetch(`https://canvasclassmate.me/endpoints/pullNotes?user_id=${user_id}&domain=${domain}&pdf_title${pdfName}`);
 
         if (!response.ok) {
             console.error('Failed to download document');
