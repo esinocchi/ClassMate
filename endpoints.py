@@ -323,7 +323,7 @@ async def checkAndUpdateUserData(user_id, domain):
     
 @app.get('/endpoints/checkMediaOutputForFile')
 async def checkMediaOutputForFile(user_id: str, domain: str, file_name: str):
-    domain = "psu" 
+    domain = domain.split(".")[0]
     CanvasDir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(CanvasDir, "media_output", domain, user_id, file_name)
 
