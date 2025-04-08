@@ -624,6 +624,8 @@ class ConversationHandler:
 
     async def create_notes(self, user_id: str, domain: str, search_parameters: dict):
         """Create notes for a file using the vector search function"""
+        from backend.task_specific_agents.lecture_to_notes_agent import get_file_name_without_type
+        
         search_parameters["specific_dates"] = [""]
         file_description = await self.find_file(search_parameters)
         file_name = file_description[0]
