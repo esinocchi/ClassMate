@@ -5,7 +5,7 @@ let closed = true;
 
 const box = document.createElement("div");
 box.id = "Box";
-const imageUrl = chrome.runtime.getURL('images/CanvasAILogo.png');
+const imageUrl = chrome.runtime.getURL('images/icon.png');
 // Add content to the box
 box.innerHTML = `
     <img src="${imageUrl}" alt="NotFound" />
@@ -366,9 +366,9 @@ const interval = setInterval(() => {
             chrome.storage.local.get(["Context_CanvasAI"], async function(result) {
                 let context = result.Context_CanvasAI || dataHolder;
 
-                if (context[1].user_id == "holder") {
-                    context[1].user_id = await retrieveID(context[1].domain);
-                }
+                context[1].user_id = await retrieveID(context[1].domain);
+
+
 
                 pullPDF(context[1].user_id, context[1].domain, event.target.id);
             });
