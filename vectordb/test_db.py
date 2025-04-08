@@ -45,7 +45,7 @@ def get_canvas_data():
             "2361957": "CMPSC 465",
             "2379517": "CMPSC 311",
             "2361815": "EARTH 103N",
-            "2361972": "CMPEN331",
+            "2361972": "CMPEN 331",
             "2364485": "ACCT 211"
         }
 
@@ -60,7 +60,7 @@ def get_canvas_data():
 
 async def search_db():
     hf_api_token = os.getenv("HUGGINGFACE_API_KEY")
-    db = VectorDatabase('user_data/psu/7210330/user_data.json', hf_api_token=hf_api_token)
+    db = VectorDatabase('user_data/psu/7214035/user_data.json', hf_api_token=hf_api_token)
     await db.process_data(force_reload=False)
     
     output = await db.search({
@@ -71,14 +71,13 @@ async def search_db():
         "keywords": [],
         "generality": "SPECIFIC",
         "specific_amount": 5,
-        "query": "What was my last assignment in EARTH 101?"
+        "query": "What was my last assignment in EARTH?"
     })
     
     return output
 
 # Run the async function using asyncio
 if __name__ == "__main__":
-    #get_canvas_data()
     results = asyncio.run(search_db())
     print(results)
     

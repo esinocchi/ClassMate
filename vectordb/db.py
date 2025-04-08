@@ -66,18 +66,23 @@ load_dotenv()
 
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir = "chroma_data/", collection_name: str = None, hf_api_token: str = None):
+    def __init__(self, json_file_path: str, cache_dir = None, collection_name: str = None, hf_api_token: str = None):
         """
         Initialize the vector database with ChromaDB.
         
         Args:
             json_file_path: Path to the JSON file containing the documents.
-            cache_dir: Directory to store ChromaDB data.
+            cache_dir: Directory to store ChromaDB data. If None, will use the directory of the JSON file.
             collection_name: Name of the ChromaDB collection. If None, will use user_id from the json file.
             hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
-        self.cache_dir = cache_dir
+        
+        # If cache_dir is not provided, use the directory of the JSON file
+        if cache_dir is None:
+            self.cache_dir = os.path.dirname(json_file_path)
+        else:
+            self.cache_dir = "chroma_data/"
         
         # Load JSON file to extract user_id if collection_name is not provided
         if collection_name is None:
@@ -93,7 +98,7 @@ class VectorDatabase:
             self.collection_name = collection_name
         
         # Initialize ChromaDB client to store files in disk in cache_dir
-        self.client = chromadb.PersistentClient(path=cache_dir)
+        self.client = chromadb.PersistentClient(path=self.cache_dir)
         
         # Use Hugging Face API for embeddings with multilingual-e5-large-instruct model
         self.hf_api_token = hf_api_token
@@ -150,7 +155,6 @@ class VectorDatabase:
         doc_id = doc.get('id', '')
         course_id = doc.get('course_id', '')
 
-        time_fields = ["created_at", "updated_at", "due_at", "posted_at", "start_at", "end_at"]
         
         # Build a rich text representation with all relevant fields
         priority_parts = []
@@ -164,13 +168,13 @@ class VectorDatabase:
         if course_id:
             regular_parts.append(f"Course ID: {course_id}")
 
-        for field in time_fields:
+        '''for field in time_fields:
             if field in doc and doc[field] is not None:
                 # Convert UTC time to local time
                 utc_time = datetime.fromisoformat(doc[field].replace('Z', '+00:00'))
                 local_timezone = tzlocal.get_localzone()
                 value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
-                doc[field] = value
+                doc[field] = value'''
         # Handle different document types
         if doc_type == 'File':
             # For files, prioritize the display_name by placing it at the beginning
@@ -463,6 +467,7 @@ class VectorDatabase:
                 continue
                 
             # Prepare for ChromaDB
+            print(f"Processing item: {item_id}")
             ids_to_add.append(item_id)
             texts_to_add.append(self._preprocess_text_for_embedding(item))
             
@@ -814,12 +819,21 @@ class VectorDatabase:
             # No filtering needed, return empty list
             return []
         
-        # Return time range condition or empty list if no valid range
+        # At the end of the function
+        print("\n=== TIME RANGE FILTER DEBUG ===")
+        print(f"Time range: {time_range}")
+        print(f"Current timestamp: {current_timestamp} ({datetime.fromtimestamp(current_timestamp)})")
+        print(f"Fields being checked: {timestamp_fields}")
+        print(f"Generated conditions: {range_conditions}")
+        print(f"Final filter: {[{'$or': range_conditions}] if range_conditions else []}")
+        print("================================\n")
+        
         return [{"$or": range_conditions}] if range_conditions else []
 
     def _build_specific_dates_filter(self, search_parameters):
         """
-        Build specific dates filter conditions for ChromaDB query.
+        Build specific dates filter conditions for ChromaDB query, working with
+        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
         
         Args:
             search_parameters: Dictionary containing search parameters
@@ -839,7 +853,6 @@ class VectorDatabase:
                 naive_date = datetime.strptime(date_str, "%Y-%m-%d")
                 
                 # Make it timezone-aware by replacing the tzinfo
-                # This is the modern way that works with both pytz and zoneinfo
                 specific_date = naive_date.replace(tzinfo=local_timezone)
                 
                 specific_dates.append(specific_date)
@@ -849,20 +862,26 @@ class VectorDatabase:
         if not specific_dates:
             return []  # No valid specific dates to filter on
         
-        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        # Fields that contain formatted date strings
+        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
         date_conditions = []
         
         if len(specific_dates) == 1:
             # Single date = exact match (within day)
             specific_date = specific_dates[0]
-            start_timestamp = int(specific_date.replace(hour=0, minute=0, second=0).timestamp())
-            end_timestamp = int(specific_date.replace(hour=23, minute=59, second=59).timestamp())
+            
+            # Format the start and end times for the specific date
+            start_time = specific_date.replace(hour=0, minute=0, second=0)
+            end_time = specific_date.replace(hour=23, minute=59, second=59)
+            
+            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
+            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
             
             for field in timestamp_fields:
                 date_conditions.append({
                     "$and": [
-                        {field: {"$gte": start_timestamp}}, # $gte: >=
-                        {field: {"$lte": end_timestamp}} # $lte: <=
+                        {field: {"$gte": start_time_str}},  # Start of day (as string)
+                        {field: {"$lte": end_time_str}}     # End of day (as string)
                     ]
                 })
 
@@ -871,16 +890,29 @@ class VectorDatabase:
             start_date = min(specific_dates)
             end_date = max(specific_dates)
             
-            start_timestamp = int(start_date.replace(hour=0, minute=0, second=0).timestamp())
-            end_timestamp = int(end_date.replace(hour=23, minute=59, second=59).timestamp())
+            # Format the start and end times for the date range
+            start_time = start_date.replace(hour=0, minute=0, second=0)
+            end_time = end_date.replace(hour=23, minute=59, second=59)
+            
+            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
+            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
             
             for field in timestamp_fields:
                 date_conditions.append({
                     "$and": [
-                        {field: {"$gte": start_timestamp}}, # $gte: >=
-                        {field: {"$lte": end_timestamp}} # $lte: <=
+                        {field: {"$gte": start_time_str}},  # Start of first day (as string)
+                        {field: {"$lte": end_time_str}}     # End of last day (as string)
                     ]
                 })
+        
+        # Debug logging to verify string format
+        print(f"Filtering for specific dates: {[d.strftime('%Y-%m-%d') for d in specific_dates]}")
+        if len(specific_dates) == 1:
+            print(f"Start time string: {start_time_str}")
+            print(f"End time string: {end_time_str}")
+        elif len(specific_dates) >= 2:
+            print(f"Range start string: {start_time_str}")
+            print(f"Range end string: {end_time_str}")
         
         # Return date condition or empty list if no valid conditions
         return [{"$or": date_conditions}] if date_conditions else []
@@ -977,7 +1009,9 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            print(f"Executing ChromaDB query with query_text: {query_text}")
+            print(f"\n=== CHROMADB QUERY DEBUG ===")
+            print(f"Query text: {query_text}")
+            print(f"Full where clause: {query_where}")
             # Use asyncio to prevent blocking the event loop during the ChromaDB query
             results = await asyncio.to_thread(
                 self.collection.query,
@@ -1342,7 +1376,7 @@ class VectorDatabase:
 
         # --- Keyword Handling ---
 
-        print(f"Search results: {search_results}")
+        print(f"Search results")
 
         courses = search_parameters.get("course_id", "all_courses")
 
