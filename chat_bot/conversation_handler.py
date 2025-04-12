@@ -454,7 +454,7 @@ class ConversationHandler:
             [INSTRUCTIONS FOR FUNCTION CALLS]
             1. **When to Call a Function:**
             - If the user's query requires additional information or action (e.g., retrieving Canvas data or creating an event), you must call the appropriate function from the provided function list.
-            - Call the create_notes function if the user specifically asks to create notes from a file (Note: this is not the same as summarizing a lecture)
+            - Call the create_notes function if the user specifically asks to create notes from a file
             - Call the calculate_grade function if the user wants to know the grade required to achieve a certain letter grade on an assignment.
             - Call the create_event function if the user wants to create an event.
             - Call the find_course_information function if the user wants to know information about a course from the syllabus. (Note: this could be about office hours, grading scale, etc.)
@@ -500,6 +500,7 @@ class ConversationHandler:
             **Create Notes Function:**
                 - In order to create notes, you must find the exact file that the user wants to create notes from
                 - Keywords for this function is very important. Look at the user's query and try to find any indicators of a file name. Include that file name as a keyword.
+                - Call this function only if the user specifically asks to create notes from a file
 
             **Calculate Grade Function:**
                 - In order to calculate the grade, you must find the exact assignment that the user wants to calculate the grade for.
