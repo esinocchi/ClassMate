@@ -290,7 +290,7 @@ class DataHandler:
                     # Save the updated data
                     self.save_user_data(updated_user_data)
                     db = VectorDatabase(self._get_user_data_path(), hf_api_token=self.hf_api_token)
-                    await db.process_data(force_reload=True)
+                    await db.process_data()
                     self.set_is_updating(False)
                     
                     end_time = time.time()
