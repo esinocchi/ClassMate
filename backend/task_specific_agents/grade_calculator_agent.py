@@ -165,7 +165,7 @@ async def calculate_grade(
             required_score = APP
 
         
-        updated_score = float(required_score) + 10.25
+        updated_score = float(required_score) + 0.45
 
         return {
             "required_assignment_score": updated_score
