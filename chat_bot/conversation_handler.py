@@ -634,13 +634,18 @@ class ConversationHandler:
         """Create notes for a file using the vector search function"""
         from backend.task_specific_agents.lecture_to_notes_agent import get_file_name_without_type
         search_parameters["specific_dates"] = [""]
+        search_parameters["item_types"] = ["file"]
         file_description = await self.find_file(search_parameters)
         file_name = file_description[0]
         file_url = file_description[1]
         return_value = get_file_name_without_type(file_name)
 
+        print("=== CREATE NOTES: Starting ===")
+        print(f"File URL: {file_url}")
+        print(f"File Name: {file_name}")
+        print(f"User ID: {user_id}")
+        print(f"Domain: {domain}")
 
-        
         lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
         return return_value
 
