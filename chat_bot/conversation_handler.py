@@ -560,7 +560,7 @@ class ConversationHandler:
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
-        await vector_db.process_data(force_reload=False)
+        await vector_db.load_local_data_from_json()
         
         print("Calling vector_db.search...")
         try:
@@ -592,7 +592,7 @@ class ConversationHandler:
         vector_db_path = f"user_data/psu/{user_id_number}/user_data.json"
         
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
-        await vector_db.process_data(force_reload=False)
+        await vector_db.load_local_data_from_json()
         
         print("Calling vector_db.search...")
 
@@ -617,7 +617,7 @@ class ConversationHandler:
         
         print("Initializing VectorDatabase...")
         vector_db = VectorDatabase(vector_db_path, hf_api_token=self.hf_api_token)
-        await vector_db.process_data(force_reload=False)
+        await vector_db.load_local_data_from_json()
         
         try:
             file = await vector_db.search(search_parameters, function_name="find_file") 
