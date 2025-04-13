@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
 """
-Vector Database Module for Canvas Data
---------------------------------------
-This module processes Canvas course data from a structured JSON file and creates vector embeddings
-using the Hugging Face Inference API with the all-MiniLM-L6-v2 model, leveraging ChromaDB for storage.
+Vector Database Module for Canvas Data Orchestration
+----------------------------------------------------
+This module defines the `VectorDatabase` class, which serves as the primary interface 
+for interacting with the ChromaDB vector store containing Canvas course data embeddings. 
+It manages the ChromaDB connection, orchestrates data processing and synchronization, 
+and handles search requests by utilizing helper modules for specific tasks.
 
 Key features:
-1. **Data Loading**: Loads Canvas course data from a structured JSON file (user_data2.json) containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
-2. **ChromaDB Integration**: Utilizes ChromaDB for efficient storage and retrieval of embeddings, ensuring persistence and avoiding recomputation.
-3. **Similarity Search**: Provides functionality to search for relevant course materials based on a query, with support for filtering by course ID and document type.
-4. **Document Relations**: Builds relationships between documents based on course and module IDs, allowing for contextual search results that include related documents.
-5. **Text Preprocessing**: Normalizes and preprocesses document text to enhance embedding quality and search relevance, handling various document types (files, assignments, announcements, quizzes, events).
-6. **Caching Mechanism**: Implements a caching mechanism to avoid reprocessing data if it has already been loaded, improving efficiency.
-7. **Logging**: Configures logging to provide insights into the processing steps and any errors encountered during execution.
-
-The module is designed to be resource-efficient (no local GPU/CPU needed for inference) while still providing good semantic search capabilities.
+1. **ChromaDB Connection**: Manages the connection to the persistent ChromaDB store.
+2. **Data Synchronization**: Handles loading data from the source JSON, updating internal 
+   data structures (`document_map`, `course_map`, etc.), and synchronizing the 
+   ChromaDB collection (upserting new/changed embeddings, deleting stale ones).
+3. **Search Orchestration**: Processes search queries, builds appropriate filters 
+   (via `vectordb.filters`), executes ChromaDB vector searches, handles keyword 
+   matching (via `vectordb.filters`), and processes/augments results 
+   (via `vectordb.result_processor`).
+4. **Text Preprocessing Integration**: Utilizes `vectordb.text_processor` to prepare 
+   document text for embedding during data processing.
+5. **Embedding Function**: Manages the Hugging Face embedding function via 
+   `vectordb.embedding_model`.
 
 Usage:
-1. Initialize the VectorDatabase with the path to your JSON data file.
-2. Call process_data() to create embeddings for all documents.
-3. Use search() to find relevant documents based on a query.
+1. Initialize `VectorDatabase` with the path to the user's JSON data file and HF token.
+2. Call `process_data()` during initial setup or data refresh to populate/sync the DB.
+3. Call `search()` to find relevant documents based on search parameters.
 
-Note: Ensure that the JSON data file is structured correctly, containing user metadata, courses, files, announcements, assignments, quizzes, and calendar events.
+Helper Modules:
+- `vectordb.text_processor`: Handles text normalization and formatting for embeddings.
+- `vectordb.filters`: Builds ChromaDB query filters and performs keyword matching.
+- `vectordb.result_processor`: Post-processes and augments search results.
+- `vectordb.embedding_model`: Creates the embedding function.
+- `vectordb.content_extraction`: Extracts text content from files/HTML (used during processing).
 
-
-
-
+Note: Ensure the source JSON data file is structured correctly.
 """
 
 import os
@@ -33,7 +41,7 @@ import json
 import sys
 import tzlocal
 import numpy as np
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
 import chromadb
@@ -49,19 +57,11 @@ sys.path.append(str(root_dir))
 
 from vectordb.embedding_model import create_hf_embedding_function
 from vectordb.content_extraction import parse_file_content, parse_html_content
-
+from vectordb.text_processing import preprocess_text_for_embedding
+from vectordb.filters import handle_keywords, build_chromadb_query
+from vectordb.post_process import post_process_results, augment_results
 # Load environment variables
 load_dotenv()
-
-# Configure logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     handlers=[
-#         logging.StreamHandler()
-#     ]
-# )
-# logger = logging.getLogger("canvas_vector_db")
 
 
 
@@ -136,234 +136,8 @@ class VectorDatabase:
             hnsw:search_ef: determines the size of the dynamic list (default: 100)
             hnsw:m: determines the number of neighbors (edges) each node in the graph can have (default: 16)
             '''
-
-    def _preprocess_text_for_embedding(self, doc: Dict[str, Any]) -> str:
-        """
-        Preprocess document text for embedding.
-        
-        Args:
-            doc: Singular Item dictionary from user_data
-            
-        Returns:
-            Preprocessed text string that is sent to chromadb for embedding
-        """
-        # Fields in each type
-        if doc.get('type'):
-            doc_type = doc.get('type', '').upper()
-        else:
-            doc_type = 'File'
-        doc_id = doc.get('id', '')
-        course_id = doc.get('course_id', '')
-
-        
-        # Build a rich text representation with all relevant fields
-        priority_parts = []
-        regular_parts = []
-        
-        # Basic identification
-        if doc_id:
-            regular_parts.append(f"ID: {doc_id}")
-        if doc_type:
-            regular_parts.append(f"Type: {doc_type}")
-        if course_id:
-            regular_parts.append(f"Course ID: {course_id}")
-
-        '''for field in time_fields:
-            if field in doc and doc[field] is not None:
-                # Convert UTC time to local time
-                utc_time = datetime.fromisoformat(doc[field].replace('Z', '+00:00'))
-                local_timezone = tzlocal.get_localzone()
-                value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
-                doc[field] = value'''
-        
-        # Handle different document types
-        if doc_type == 'File':
-            # For files, prioritize the display_name by placing it at the beginning
-            display_name = doc.get('display_name', '')
-            if display_name:
-                # Normalize the display name to improve matching
-                normalized_name = self.normalize_text(display_name)
-                # Add the name at the beginning for emphasis
-                priority_parts.insert(0, f"Filename: {normalized_name}")
-                # Also add it as a title for better matching
-                priority_parts.insert(0, f"Title: {normalized_name}")
-            
-            for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
-                            'updated_at', 'locked', 'lock_explanation']:
-                if field in doc and doc[field] is not None: # error prevention
-                    # Normalize any text fields to handle special characters
-                    if isinstance(doc[field], str):
-                        value = self.normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Assignment':
-            # For assignments, prioritize the name by placing it at the beginning
-            name = doc.get('name', '')
-            if name:
-                # Normalize the name to improve matching
-                normalized_name = self.normalize_text(name)
-                # Add the name at the beginning for emphasis
-                priority_parts.insert(0, f"Assignment: {normalized_name}")
-                priority_parts.insert(0, f"Title: {normalized_name}")
-            
-            for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
-                            'submission_types', 'can_submit', 'graded_submissions_exist']:
-                if field in doc and doc[field] is not None: # error prevention
-                    if field == 'submission_types' and isinstance(doc[field], list):
-                        # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
-                        regular_parts.append(f"Submission Types: {', '.join(doc[field])}")
-                    else:
-                        # Normalize any text fields
-                        if isinstance(doc[field], str):
-                            value = self.normalize_text(doc[field])
-                        else:
-                            value = doc[field]
-                        # e.g. HW2 (name) -> Name: HW2
-                        regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-            # Handle content field which might contain extracted links
-            content = doc.get('content', [])
-            if content and isinstance(content, list):
-                regular_parts.append("Content Link(s): \n")
-                for item in content:
-                    if isinstance(item, str):
-                        regular_parts.append(f'\t{item}\n')
-            
-        elif doc_type == 'Announcement':
-            # For announcements, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = self.normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Announcement: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'message', 'posted_at', 'course_id']:
-                if field in doc and doc[field] is not None: # error prevention
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = self.normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Quiz':
-            # For quizzes, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = self.normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Quiz: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
-                            'allowed_attempts', 'points_possible', 'due_at', 
-                            'locked_for_user', 'lock_explanation']:
-                if field == 'time_limit' and isinstance(doc[field], int):
-                    regular_parts.append(f"Time Limit: {doc[field]} minutes")
-                elif field in doc and doc[field] is not None:
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = self.normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Event':
-            # For events, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = self.normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Event: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
-                            'location_address', 'context_code', 'context_name', 
-                            'all_context_codes', 'url']:
-                if field in doc and doc[field] is not None:
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = self.normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-        
-        # Add module information
-        module_id = doc.get('module_id')
-        if module_id:
-            regular_parts.append(f"Module ID: {module_id}")
-        
-        module_name = doc.get('module_name')
-        if module_name:
-            # Normalize module name
-            if isinstance(module_name, str):
-                module_name = self.normalize_text(module_name)
-            regular_parts.append(f"Module Name: {module_name}")
-
-
-        # Add local time to doc
-        local_time = datetime.now().strftime('%Y-%m-%d %I:%M %p')
-        doc['local_time'] = local_time
-
-        # Join all parts with newlines for better separation
-        # After processing, the text_parts list for a singule assingment item will have the following format:
-        # [
-        #     "ID: 123",
-        #     "Type: Assignment",
-        #     "Course ID: 456",
-        #     "Name: HW2",
-        #     "Description: This is a description of the assignment",
-        #     "Created At: 2021-01-01",
-        #     "Updated At: 2021-01-02",
-        #     "Due At: 2021-01-03",
-        #     "Submission Types: Online Text Entry, Online Upload",
-        #     "Graded Submissions Exist: True",
-        #     "Module ID: 123",
-        #     "Module Name: Module 1",
-        #     "Content Link(s):
-        #       https://www.example.com
-        #       https://www.example.co 
-        #       https://www.example.com
-        #       https://www.example.com
-        #       https://www.example.com
-        #       https://www.example.com
-        # ]
-        # The priority parts are at the beginning of the list, and the regular parts are at the end
-        output = "\n".join(priority_parts) + "\n" + "\n".join(regular_parts)
-        return output
     
-    @staticmethod
-    def normalize_text(text: str) -> str:
-        """
-        Normalize text by handling special characters and standardizing formats.
-        
-        Args:
-            text: Text to normalize.
-            
-        Returns:
-            Normalized text.
-        """
-        if not isinstance(text, str):
-            return text
-            
-        # Replace various types of quotes and apostrophes with standard ones
-        normalized = text.replace('\u2019', "'").replace('\u2018', "'")
-        normalized = normalized.replace('\u201c', '"').replace('\u201d', '"')
-        
-        # Replace other common special characters
-        normalized = normalized.replace('\u2013', '-').replace('\u2014', '-')
-        
-        return normalized
-    
-    
-        
-    async def process_data(self, force_reload: bool = False) -> bool:
+    async def process_data(self) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
         
@@ -384,44 +158,26 @@ class VectorDatabase:
         user_metadata = data.get('user_metadata', {})
         print(f"Processing data for user ID: {user_metadata.get('id')}")
         
-        # Update local data structures regardless of force_reload
+        # Update local data structures
         await self._update_local_data_structures(data)
         
-        # If force_reload is True, clear the collection and add all documents
-        if force_reload:
-            await self.clear_collection()
-        else:
-            # Synchronize ChromaDB by removing stale documents
-            await self._synchronize_chromadb_with_local_data()
+        removed_count = await self._synchronize_chromadb_with_local_data()
+        print(f"Removed {removed_count} stale documents from ChromaDB.")
         
         # Get existing document IDs in the collection
-        existing_ids = set()
-        if not force_reload:
-            try:
-                # Get all IDs currently in the collection
-                results = await asyncio.to_thread(
-                    self.collection.get,
-                    include=["metadatas"]
-                )
-                # Extract IDs from metadatas
-                if 'metadatas' in results and results['metadatas']:
-                    existing_ids = set(meta.get('id') for meta in results['metadatas'] if meta and 'id' in meta)
-                print(f"Found {len(existing_ids)} existing documents in collection")
-            except Exception as e:
-                print(f"Error getting existing IDs: {e}")
+        existing_ids = await self._get_all_collection_ids()
         
         # Prepare lists for documents to add
         ids_to_add = []
         texts_to_add = []
         metadatas_to_add = []
         
-        # Add syllabi as documents if they don't exist or if force_reload
+        # Process syllabi
         for course_id, syllabus in self.syllabus_map.items():
             # Generate a unique ID for the syllabus
             syllabus_id = f"syllabus_{course_id}"
             
-            # Skip if syllabus already exists and not forcing reload
-            if syllabus_id in existing_ids and not force_reload:
+            if syllabus_id in existing_ids:
                 print(f"Syllabus for course {course_id} already exists. Skipping.")
                 continue
             
@@ -447,7 +203,7 @@ class VectorDatabase:
             
             # Prepare for ChromaDB
             ids_to_add.append(syllabus_id)
-            texts_to_add.append(self._preprocess_text_for_embedding(syllabus_doc))
+            texts_to_add.append(preprocess_text_for_embedding(syllabus_doc))
             
             # Create metadata
             metadata = {
@@ -463,8 +219,8 @@ class VectorDatabase:
         for item in self.documents:
             item_id = str(item.get('id'))
             
-            # Skip if document already exists and not forcing reload
-            if item_id in existing_ids and not force_reload:
+            # Skip if document already exists
+            if item_id in existing_ids:
                 #print(f"Skipping existing document: {item_id}")
                 continue
             
@@ -475,7 +231,7 @@ class VectorDatabase:
             # Prepare for ChromaDB
             print(f"Processing item: {item_id}")
             ids_to_add.append(item_id)
-            texts_to_add.append(self._preprocess_text_for_embedding(item))
+            texts_to_add.append(preprocess_text_for_embedding(item))
             
             # Create base metadata
             metadata = {
@@ -572,542 +328,6 @@ class VectorDatabase:
             print("No documents to process")
             return False
 
-    async def _synchronize_chromadb_with_local_data(self):
-        """
-        Synchronize ChromaDB collection with local data structures by:
-        1. Removing documents from ChromaDB that no longer exist in the JSON file
-        2. Keeping document embeddings that still exist
-
-        This ensures ChromaDB perfectly reflects current local data without
-        requiring a full recomputation of all embeddings.
-        """
-        try:
-            # Get all IDs currently in the collection
-            results = await asyncio.to_thread(
-                self.collection.get,
-                include=["metadatas"]
-            )
-            # Extract IDs from metadatas
-            chromadb_ids = set()
-            if 'metadatas' in results and results['metadatas']:
-                chromadb_ids = set(meta.get('id') for meta in results['metadatas'] if meta and 'id' in meta)
-            
-            # Get all IDs in local data
-            local_ids = set(self.document_map.keys())
-            ids_to_remove = []
-            for id in chromadb_ids:
-                if id not in local_ids:
-                    ids_to_remove.append(id)
-            
-            if ids_to_remove:
-                print(f"Found {len(ids_to_remove)} stale documents in ChromaDB. Removing...")
-                
-                # Remove stale documents from ChromaDB
-                await asyncio.to_thread(
-                    self.collection.delete,
-                    ids=list(ids_to_remove)
-                )
-                
-                print(f"Successfully removed {len(ids_to_remove)} stale documents from ChromaDB")
-            else:
-                print("No stale documents found in ChromaDB")
-            
-            return len(ids_to_remove)
-        except Exception as e:
-            print(f"Error synchronizing ChromaDB with local data: {e}")
-            return 0
-        
-    async def clear_collection(self) -> None:
-        """
-        Clear all documents from the ChromaDB collection without affecting local data.
-        """
-        try:
-            # Delete the collection and recreate it
-            await asyncio.to_thread(self.client.delete_collection, self.collection_name)
-            print(f"Deleted collection: {self.collection_name}")
-            
-            # Recreate the collection
-            self.collection = await asyncio.to_thread(
-                self.client.create_collection,
-                name=self.collection_name,
-                embedding_function=self.embedding_function,
-                metadata={"hnsw:space": "cosine"}
-            )
-            print(f"Created new collection: {self.collection_name}")
-            
-            # Don't reset in-memory data - we'll refill the collection from it
-            
-        except Exception as e:
-            print(f"Error clearing collection: {e}")
-            raise
-
-    async def _update_local_data_structures(self, data):
-        """
-        Update local data structures (documents, document_map, course_map, syllabus_map)
-        from the JSON data.
-        
-        Args:
-            data: Parsed JSON data from file
-        """
-        # Reset data structures
-        self.documents = []
-        self.document_map = {}
-        self.course_map = {}
-        self.syllabus_map = {}
-        
-        # Extract courses and build course and syllabus maps
-        courses = data.get('courses', [])
-        for course in courses:
-            course_id = str(course.get('id'))
-            syllabus = str(course.get('syllabus_body'))
-            if course_id:
-                self.course_map[course_id] = course
-            if syllabus and syllabus != "None":
-                self.syllabus_map[course_id] = syllabus
-        
-        # Process all document types
-        document_types = {
-            'files': 'file',
-            'announcements': 'announcement',
-            'assignments': 'assignment',
-            'quizzes': 'quiz',
-            'calendar_events': 'event'
-        }
-        
-        for collection_key, doc_type in document_types.items():
-            items = data.get(collection_key, [])
-            
-            for item in items:
-                item_id = item.get('id')
-                if not item_id:
-                    continue
-                
-                item['type'] = doc_type
-                    
-                # Store document in memory
-                self.documents.append(item)
-                self.document_map[str(item_id)] = item
-        
-        # Build document relations
-        self._build_document_relations(self.documents)
-        
-        print(f"Local data structures updated with {len(self.documents)} documents")
-    
-    def _build_document_relations(self, documents: List[Dict[str, Any]]) -> None:
-        """
-        Build relations between documents.
-        
-        Args:
-            documents: List of document dictionaries.
-        """
-        # Build relations based on course_id and module_id
-        # doc is a dictionary of a single document
-        for doc in documents:
-            doc_id = doc.get('id')
-            if not doc_id:
-                continue
-                
-            # Add related documents based on module_id and course_id
-            doc['related_docs'] = []
-            module_id = doc.get('module_id')
-            course_id = doc.get('course_id')
-            
-            if module_id and course_id:
-                for other_doc in documents:
-                    if (other_doc.get('module_id') == module_id and 
-                        other_doc.get('course_id') == course_id and 
-                        other_doc.get('id') != doc_id):
-                        doc['related_docs'].append(other_doc.get('id'))
-            
-            # Also relate items of the same type within the same course
-            doc_type = doc.get('type')
-            if doc_type and course_id:
-                for other_doc in documents:
-                    if (other_doc.get('type') == doc_type and 
-                        other_doc.get('course_id') == course_id and 
-                        other_doc.get('id') != doc_id and
-                        other_doc.get('id') not in doc['related_docs']):
-                        # Add with lower priority (we'll add these at the end of the list)
-                        doc['related_docs'].append(other_doc.get('id'))
-    
-    def _get_related_documents(self, doc_ids: List[str]) -> List[Dict[str, Any]]:
-        """
-        Get related documents for a list of document IDs.
-        
-        Args:
-            doc_ids: List of document IDs.
-            
-        Returns:
-            List of related document dictionaries.
-        """
-        related_docs = []
-        seen_ids = set(doc_ids)
-        
-        for doc_id in doc_ids:
-            doc = self.document_map.get(doc_id)
-            if not doc:
-                continue
-            
-            # Get related document IDs
-            doc_related_ids = doc.get('related_docs', [])
-            
-            for related_id in doc_related_ids:
-                # Avoid duplicates
-                if related_id in seen_ids:
-                    continue
-                
-                related_doc = self.document_map.get(str(related_id))
-                if related_doc:
-                    related_docs.append(related_doc)
-                    seen_ids.add(related_id)
-        
-        return related_docs
-
-
-    def _build_time_range_filter(self, search_parameters):
-        """
-        Build time range filter conditions for ChromaDB query.
-        
-        Args:
-            search_parameters: Dictionary containing search parameters
-            
-        Returns:
-            List of time range filter conditions to be added to the main where clause
-        """
-        if not search_parameters or "time_range" not in search_parameters or not search_parameters["time_range"]:
-            return []
-        
-        time_range = search_parameters["time_range"]
-
-        # Get current time in local timezone, then convert to UTC for timestamp comparison
-        local_timezone = tzlocal.get_localzone()
-        current_time = datetime.now(local_timezone)
-        current_timestamp = int(current_time.timestamp())
-        
-        # List of all possible timestamp fields across different document types
-        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
-        
-        range_conditions = []
-
-        future_10d = current_time + timedelta(days=10)
-        future_10d_timestamp = int(future_10d.timestamp())
-
-        past_10d = current_time - timedelta(days=10)
-        past_10d_timestamp = int(past_10d.timestamp())
-        
-        if time_range == "NEAR_FUTURE":
-            for field in timestamp_fields:
-                range_conditions.append({
-                    "$and": [
-                        {field: {"$gte": current_timestamp}},  # Now
-                        {field: {"$lte": future_10d_timestamp}}  # Now + 10 days
-                    ]
-                })
-        
-        elif time_range == "FUTURE":
-            for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": future_10d_timestamp}})  # Future items only
-        
-        elif time_range == "RECENT_PAST":
-            for field in timestamp_fields:
-                range_conditions.append({
-                    "$and": [
-                        {field: {"$gte": past_10d_timestamp}},  # Now - 10 days
-                        {field: {"$lte": current_timestamp}}  # Now
-                    ]
-                })
-        
-        elif time_range == "PAST":
-            for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": past_10d_timestamp}})  # Past items only
-        
-        elif time_range == "ALL_TIME":
-            # No filtering needed, return empty list
-            return []
-        
-        # At the end of the function
-        print("\n=== TIME RANGE FILTER DEBUG ===")
-        print(f"Time range: {time_range}")
-        print(f"Current timestamp: {current_timestamp} ({datetime.fromtimestamp(current_timestamp)})")
-        print(f"Fields being checked: {timestamp_fields}")
-        print(f"Generated conditions: {range_conditions}")
-        print(f"Final filter: {[{'$or': range_conditions}] if range_conditions else []}")
-        print("================================\n")
-        
-        return [{"$or": range_conditions}] if range_conditions else []
-
-    def _build_specific_dates_filter(self, search_parameters):
-        """
-        Build specific dates filter conditions for ChromaDB query, working with
-        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
-        
-        Args:
-            search_parameters: Dictionary containing search parameters
-            
-        Returns:
-            List of specific dates filter conditions to be added to the main where clause
-        """
-        if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
-            return []
-        
-        local_timezone = tzlocal.get_localzone()
-        specific_dates = []
-        
-        for date_str in search_parameters["specific_dates"]:
-            try:
-                # Parse naive date (without timezone)
-                naive_date = datetime.strptime(date_str, "%Y-%m-%d")
-                
-                # Make it timezone-aware by replacing the tzinfo
-                specific_date = naive_date.replace(tzinfo=local_timezone)
-                
-                specific_dates.append(specific_date)
-            except ValueError:
-                print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
-        
-        if not specific_dates:
-            return []  # No valid specific dates to filter on
-        
-        # Fields that contain formatted date strings
-        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
-        date_conditions = []
-        
-        if len(specific_dates) == 1:
-            # Single date = exact match (within day)
-            specific_date = specific_dates[0]
-            
-            # Format the start and end times for the specific date
-            start_time = specific_date.replace(hour=0, minute=0, second=0)
-            end_time = specific_date.replace(hour=23, minute=59, second=59)
-            
-            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
-            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
-            
-            for field in timestamp_fields:
-                date_conditions.append({
-                    "$and": [
-                        {field: {"$gte": start_time_str}},  # Start of day (as string)
-                        {field: {"$lte": end_time_str}}     # End of day (as string)
-                    ]
-                })
-
-        elif len(specific_dates) >= 2:
-            # Date range
-            start_date = min(specific_dates)
-            end_date = max(specific_dates)
-            
-            # Format the start and end times for the date range
-            start_time = start_date.replace(hour=0, minute=0, second=0)
-            end_time = end_date.replace(hour=23, minute=59, second=59)
-            
-            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
-            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
-            
-            for field in timestamp_fields:
-                date_conditions.append({
-                    "$and": [
-                        {field: {"$gte": start_time_str}},  # Start of first day (as string)
-                        {field: {"$lte": end_time_str}}     # End of last day (as string)
-                    ]
-                })
-        
-        # Debug logging to verify string format
-        print(f"Filtering for specific dates: {[d.strftime('%Y-%m-%d') for d in specific_dates]}")
-        if len(specific_dates) == 1:
-            print(f"Start time string: {start_time_str}")
-            print(f"End time string: {end_time_str}")
-        elif len(specific_dates) >= 2:
-            print(f"Range start string: {start_time_str}")
-            print(f"Range end string: {end_time_str}")
-        
-        # Return date condition or empty list if no valid conditions
-        return [{"$or": date_conditions}] if date_conditions else []
-
-    def _build_course_and_type_filter(self, search_parameters):
-        """
-        Build course and document type filter conditions for ChromaDB query.
-        
-        Args:
-            search_parameters: Dictionary containing search parameters
-            
-        Returns:
-            List of course and type filter conditions to be added to the main where clause
-        """
-        conditions = []
-        
-        # Add course filter
-        if "course_id" in search_parameters:
-            course_id = search_parameters["course_id"]
-            if course_id and course_id != "all_courses":
-                conditions.append({"course_id": {"$eq": str(course_id)}}) # $eq: ==
-                # filter: item.course_id == course_id
-                
-        # Add document type filter
-        if "item_types" in search_parameters:
-            item_types = search_parameters["item_types"]
-            if item_types and isinstance(item_types, list) and len(item_types) > 0:
-                # Map item types to our internal types
-                type_mapping = {
-                    "assignment": "assignment",
-                    "file": "file",
-                    "quiz": "quiz",
-                    "announcement": "announcement",
-                    "event": "event",
-                    "syllabus": "syllabus"
-                }
-                
-                normalized_types = [type_mapping[item_type] for item_type in item_types 
-                                    if item_type in type_mapping]
-                if normalized_types:
-                    conditions.append({"type": {"$in": normalized_types}}) # $in: in
-                    # filter: item.type in item_types
-
-        return conditions
-
-    def _build_chromadb_query(self, search_parameters):
-        """
-        Build a ChromaDB query from search parameters.
-        
-        Args:
-            search_parameters: Dictionary containing search parameters
-            
-        Returns:
-            Tuple of (query_where, query_text)
-        """
-        # Normalize the query
-        query = search_parameters["query"]
-        normalized_query = self.normalize_text(text=query)
-        
-        # Build ChromaDB where clause with proper operator
-        conditions = []
-        
-        # Add course and document type filters
-        course_type_conditions = self._build_course_and_type_filter(search_parameters)
-        conditions.extend(course_type_conditions)
-        
-        # Add time range filter
-        time_range_conditions = self._build_time_range_filter(search_parameters)
-        conditions.extend(time_range_conditions)
-        
-        # Add specific dates filter
-        specific_dates_conditions = self._build_specific_dates_filter(search_parameters)
-        conditions.extend(specific_dates_conditions)
-        
-        # Apply the where clause if there are conditions
-        query_where = None
-        if len(conditions) == 1:
-            query_where = conditions[0]  # Single condition
-        elif len(conditions) > 1:
-            query_where = {"$and": conditions}  # Multiple conditions combined with $and
-        
-        return query_where, normalized_query
-
-    async def _execute_chromadb_query(self, query_text, query_where, top_k):
-        """
-        Execute a query against ChromaDB.
-        
-        Args:
-            query_text: Normalized query text
-            query_where: Where clause for filtering
-            top_k: Number of results to return
-            
-        Returns:
-            Query results or empty dict on error
-        """
-        try:
-            print(f"\n=== CHROMADB QUERY DEBUG ===")
-            print(f"Query text: {query_text}")
-            print(f"Full where clause: {query_where}")
-            # Use asyncio to prevent blocking the event loop during the ChromaDB query
-            results = await asyncio.to_thread(
-                self.collection.query,
-                query_texts=[query_text],
-                n_results=top_k,
-                where=query_where,
-                include=["distances", "documents", "metadatas"]
-            )
-            return results
-        except Exception as e:
-            print(f"ChromaDB query error with filters: {e}")
-            print(f"Failed query where clause: {query_where}")
-            
-            # If the complex query fails, try with just the course_id filter
-            if isinstance(query_where, dict) and "type" in query_where and "course_id" in query_where:
-                try:
-                    print("Trying query with only course_id filter...")
-                    simplified_where = {"course_id": query_where["course_id"]}
-                    results = await asyncio.to_thread(
-                        self.collection.query,
-                        query_texts=[query_text],
-                        n_results=top_k,
-                        where=simplified_where,
-                        include=["distances", "documents", "metadatas"]
-                    )
-                    return results
-                except Exception as e2:
-                    print(f"Course-only filter failed: {e2}")
-            
-            # Last resort: try with no filters
-            try:
-                print("Trying query with no filters...")
-                results = await asyncio.to_thread(
-                    self.collection.query,
-                    query_texts=[query_text],
-                    n_results=top_k,
-                    include=["distances", "documents", "metadatas"]
-                )
-                return results
-            except Exception as e3:
-                print(f"No-filter query also failed: {e3}")
-                return {}
-
-    def _post_process_results(self, search_results, normalized_query):
-        """
-        Post-process search results to prioritize exact and partial matches.
-        
-        Args:
-            search_results: List of search result dictionaries
-            normalized_query: Normalized query text
-            
-        Returns:
-            Sorted list of search results
-        """
-        query_terms = normalized_query.lower().split()
-        exact_matches = []
-        partial_matches = []
-        other_results = []
-        
-        for result in search_results:
-            doc = result['document']
-            doc_type = doc.get('type', '')
-            
-            # Get document name based on type
-            if doc_type == 'file':
-                doc_name = doc.get('display_name', '').lower()
-            elif doc_type == 'assignment':
-                doc_name = doc.get('name', '').lower()
-            elif doc_type in ['announcement', 'quiz', 'event']:
-                doc_name = doc.get('title', '').lower()
-            else:
-                doc_name = ''
-            
-            # Check for exact match
-            if doc_name == normalized_query.lower():
-                result['similarity'] += 0.5  # Boost exact matches
-                exact_matches.append(result)
-            # Check for partial matches
-            elif any(term in doc_name for term in query_terms):
-                result['similarity'] += 0.2  # Boost partial matches
-                partial_matches.append(result)
-            else:
-                other_results.append(result)
-        
-        # Combine and sort results
-        combined_results = exact_matches + partial_matches + other_results
-        combined_results.sort(key=lambda x: x['similarity'], reverse=True)
-        
-        return combined_results
-
     def _include_related_documents(self, search_results, search_parameters, minimum_score):
         """
         Include related documents in search results.
@@ -1192,141 +412,65 @@ class VectorDatabase:
         # Ensure reasonable limits
         return max(1, min(top_k, 30))
     
-    def _augment_results(self, search_results):
+    async def _execute_chromadb_query(self, query_text, query_where, top_k):
         """
-        Augment search results with additional information.
+        Execute a query against ChromaDB.
         
         Args:
-            search_results: List of search result dictionaries
-        """
-        local_timezone = tzlocal.get_localzone()
-        
-        for result in search_results:
-            doc = result['document']
-            doc_type = doc.get('type', '')
+            query_text: Normalized query text
+            query_where: Where clause for filtering
+            top_k: Number of results to return
             
-            # Add course name
-            course_id = doc.get('course_id')
-            if course_id and course_id in self.course_map:
-                # Get course name and code
-                course = self.course_map[course_id]
-                course_name, course_code = course.get('name', ''), course.get('course_code', '')
-
-                doc['course_name'] = course_name
-                doc['course_code'] = course_code
-
-            # Add time context
-            for date_field in ['due_at', 'posted_at', 'start_at', 'updated_at']:
-                if date_field in doc and doc[date_field]:
-                    try:
-                        # Parse date from UTC and convert to local timezone
-                        date_obj = datetime.fromisoformat(doc[date_field].replace('Z', '+00:00'))
-                        local_date = date_obj.astimezone(local_timezone)
-                        
-                        # Add localized time string
-                        doc[f'local_{date_field}'] = local_date.strftime('%Y-%m-%d %H:%M:%S')
-                        
-                        # Now calculate relative time using local time
-                        now = datetime.now(local_timezone)
-                        
-                        # Add relative time
-                        delta = local_date - now
-                        days = delta.days
-                        
-                        if days > 0:
-                            if days == 0:
-                                doc['relative_time'] = "Today"
-                            elif days == 1:
-                                doc['relative_time'] = "Tomorrow"
-                            elif days < 7:
-                                doc['relative_time'] = f"In {days} days"
-                        else:
-                            days = abs(days)
-                            if days == 0:
-                                doc['relative_time'] = "Today"
-                            elif days == 1:
-                                doc['relative_time'] = "Yesterday"
-                            elif days < 7:
-                                doc['relative_time'] = f"{days} days ago"
-                        
-                        break  # Only process the first date field found
-                    except Exception as e:
-                        print(f"Error converting time: {e}")
-        
-        return search_results
-    
-    def _handle_keywords(self, keywords, doc_ids, courses, item_types):
+        Returns:
+            Query results or empty dict on error
         """
-        Handle keyword search by checking if any keyword matches or is very similar to any document name.
-
-        Args:
-            keywords: List of keywords to search for
-            doc_ids: List of doc_ids already found by semantic search (to avoid duplicates)
-            courses: List of courses to filter by
-        """
-
-        if isinstance(courses, str) or isinstance(courses, int):
-            courses = [courses]
-
-        keyword_matches = []
-        names = {
-            'file': 'display_name',
-            'assignment': 'name',
-            'announcement': 'title',
-            'quiz': 'title',
-            'event': 'title'
-        }
-
-        for doc_id, doc in self.document_map.items():
-            if doc_id in doc_ids:  # Skip documents already found by semantic search
-                continue
-
-            doc_type = doc.get('type')
-            if not doc_type or doc_type not in item_types:
-                #print(f"Warning: Document {doc_id} has no type.")
-                continue  # Skip documents with no type
-
-            if doc_type == 'syllabus':
-                continue
-
-            if courses != "all_courses" and str(doc.get('course_id')) not in courses:
-                #print(f"Skipping doc {doc_id} (course filter)")
-                continue
-
-            doc_name_field = names.get(doc_type)  # Use .get() to handle unknown types
-            if not doc_name_field:
-                #print(f"Warning: Unknown document type '{doc_type}' for doc {doc_id}")
-                continue  # Skip documents with unknown types
-
-            doc_name = doc.get(doc_name_field, '').lower()
-
-            for keyword in keywords:
-                keyword_lower = keyword.lower()
-
-                # Direct substring match
-                if keyword_lower in doc_name:
-                    keyword_matches.append({'document': doc})
-                    print(f"Added doc {doc_id} to keyword matches (direct match)")
-                    break  # Move to the next document after a match
-
-                # Removing file extensions
-                doc_name_no_ext = re.sub(r'\.\w+$', '', doc_name)
-                keyword_no_ext = re.sub(r'\.\w+$', '', keyword_lower)
-
-                # Removing special characters
-                doc_name_clean = re.sub(r'[_\-\s.]', '', doc_name_no_ext)
-                keyword_clean = re.sub(r'[_\-\s.]', '', keyword_no_ext)
-
-                # Check if any normalized version matches
-                if (keyword_no_ext in doc_name_no_ext or doc_name_no_ext in keyword_no_ext or
-                    keyword_clean in doc_name_clean or doc_name_clean in keyword_clean):
-                    keyword_matches.append({'document': doc})
-                    print(f"Added doc {doc_id} to keyword matches (normalized match)")
-                    break  # Move to the next document after a match
-
-        return keyword_matches
-    
-
+        try:
+            print(f"\n=== CHROMADB QUERY DEBUG ===")
+            print(f"Query text: {query_text}")
+            print(f"Full where clause: {query_where}")
+            # Use asyncio to prevent blocking the event loop during the ChromaDB query
+            results = await asyncio.to_thread(
+                self.collection.query,
+                query_texts=[query_text],
+                n_results=top_k,
+                where=query_where,
+                include=["distances", "documents", "metadatas"]
+            )
+            return results
+        except Exception as e:
+            print(f"ChromaDB query error with filters: {e}")
+            print(f"Failed query where clause: {query_where}")
+            
+            # If the complex query fails, try with just the course_id filter
+            if isinstance(query_where, dict) and "type" in query_where and "course_id" in query_where:
+                try:
+                    print("Trying query with only course_id filter...")
+                    simplified_where = {"course_id": query_where["course_id"]}
+                    results = await asyncio.to_thread(
+                        self.collection.query,
+                        query_texts=[query_text],
+                        n_results=top_k,
+                        where=simplified_where,
+                        include=["distances", "documents", "metadatas"]
+                    )
+                    return results
+                except Exception as e2:
+                    print(f"Course-only filter failed: {e2}")
+            
+            # Last resort: try with no filters
+            try:
+                print("Trying query with no filters...")
+                results = await asyncio.to_thread(
+                    self.collection.query,
+                    query_texts=[query_text],
+                    n_results=top_k,
+                    include=["distances", "documents", "metadatas"]
+                )
+                return results
+            except Exception as e3:
+                print(f"No-filter query also failed: {e3}")
+                return {}
+            
     async def search(self, search_parameters, function_name='search', include_related=False, minimum_score=0.3):
         """
         Search for documents similar to the query.
@@ -1339,7 +483,7 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        query_where, normalized_query = self._build_chromadb_query(search_parameters)
+        query_where, normalized_query = await build_chromadb_query(search_parameters)
         top_k = self._determine_top_k(search_parameters)
 
         print("\n\n--------------------------------")
@@ -1397,19 +541,17 @@ class VectorDatabase:
             item_types = search_parameters.get("item_types", [])
 
         if keywords:
-            keyword_matches = self._handle_keywords(keywords, doc_ids, courses, item_types)
+            keyword_matches = handle_keywords(self.document_map, keywords, doc_ids, courses, item_types)
             print(f"Keyword matches: {keyword_matches}")
 
             for match in keyword_matches:
-                match_doc_id = match['document']['id']  # Get ID from the match
-                # No need for duplicate check here, handled in _handle_keywords
-                # Assign a default similarity for keyword matches
-                keyword_similarity = 0.93  # Or whatever value you deem appropriate
+                keyword_similarity = 0.93
                 search_results.append({
                     'document': match['document'],
                     'similarity': keyword_similarity,
                     'type': match['document'].get('type')
                 })
+            
 
         # --- Sort by similarity (descending) ---
         search_results.sort(key=lambda x: x['similarity'], reverse=True)
@@ -1434,13 +576,233 @@ class VectorDatabase:
             self._include_related_documents(search_results, search_parameters, minimum_score)
 
         # Post-process to prioritize exact and partial matches
-        combined_results = self._post_process_results(search_results, normalized_query)
+        combined_results = post_process_results(search_results, normalized_query)
 
         # Augment results with additional information
-        combined_results = self._augment_results(combined_results)
+        combined_results = augment_results(self.course_map, combined_results)
 
         for result_item in combined_results:
             result_item.pop('similarity', None)  # Remove similarity
             result_item.pop('related_docs', None)  # Remove related docs
 
         return combined_results[:top_k]
+    
+    async def load_local_data_from_json(self):
+        """Loads data from the JSON file into memory (document_map, course_map, etc.)
+           without performing any database writes or synchronization. 
+           Intended for initializing read-only/search instances.
+        """
+        # --- Convert string path to Path object ---
+        try:
+             # If self.json_file_path is already a Path object from __init__, this is harmless.
+             # If it's a string, this converts it.
+             path_obj = Path(self.json_file_path) 
+        except TypeError as e:
+             print(f"Error creating Path object from json_file_path ('{self.json_file_path}'): {e}")
+             # Handle error state: ensure maps are empty
+             self.documents = []
+             self.document_map = {}
+             self.course_map = {}
+             self.syllabus_map = {}
+             return
+
+        print(f"Attempting to load local data structures from: {path_obj}")
+        
+        # --- Use the Path object for the check ---
+        if not path_obj.is_file():
+            print(f"Error: JSON file not found at {path_obj}. Cannot load local data.")
+            self.documents = []
+            self.document_map = {}
+            self.course_map = {}
+            self.syllabus_map = {}
+            return # Exit early if file not found
+
+        try:
+            # --- Use the Path object to open the file ---
+            with open(path_obj, 'r') as f:
+                data = json.load(f)
+            # Populate self.documents, self.document_map, etc. using the existing internal method
+            await self._update_local_data_structures(data) 
+            print(f"Successfully loaded local data structures ({len(self.document_map)} docs) from JSON.")
+        except FileNotFoundError:
+             # This case should be caught by the is_file() check above, but included for safety
+             print(f"Error: JSON file not found at {path_obj} during loading.")
+        except json.JSONDecodeError:
+            print(f"Error: Could not decode JSON from {path_obj}.")
+            # Consider resetting maps to empty state on decode error
+            self.documents = []
+            self.document_map = {}
+            self.course_map = {}
+            self.syllabus_map = {}
+        except Exception as e:
+            print(f"Error loading local data from JSON: {e}")
+            # Optionally re-raise or handle more gracefully
+
+    def _get_related_documents(self, doc_ids: List[str]) -> List[Dict[str, Any]]:
+        """Retrieves related document data based on IDs stored in 'related_docs' key."""
+        related_docs = []
+        seen_ids = set(doc_ids)
+        
+        for doc_id in doc_ids:
+            doc = self.document_map.get(str(doc_id)) 
+            if not doc or not isinstance(doc, dict): continue 
+            
+            doc_related_ids = doc.get('related_docs', [])
+            if not isinstance(doc_related_ids, list): continue 
+
+            for related_id in doc_related_ids:
+                 related_id_str = str(related_id) 
+                 if related_id_str not in seen_ids:
+                     related_doc_data = self.document_map.get(related_id_str)
+                     if related_doc_data:
+                         related_docs.append(related_doc_data.copy()) 
+                         seen_ids.add(related_id_str)
+        return related_docs
+
+    async def _update_local_data_structures(self, data: Dict[str, Any]):
+        """Updates in-memory maps (documents, document_map, course_map, syllabus_map)."""
+        self.documents = []
+        self.document_map = {}
+        self.course_map = {}
+        self.syllabus_map = {}
+        
+        # Process Courses
+        for course in data.get('courses', []):
+            course_id = str(course.get('id', ''))
+            if course_id and isinstance(course, dict):
+                self.course_map[course_id] = course
+                syllabus_body = str(course.get('syllabus_body', ''))
+                if syllabus_body and syllabus_body.lower() != 'none' and syllabus_body.strip():
+                    self.syllabus_map[course_id] = syllabus_body
+
+
+        # Process Syllabus
+        for course_id, syllabus in self.syllabus_map.items():
+            parsed_syllabus = parse_html_content(syllabus)
+            if parsed_syllabus:
+                syllabus_id = f"syllabus_{course_id}"
+                syllabus_doc = {
+                    'id': syllabus_id,
+                    'type': 'syllabus',
+                    'course_id': course_id,
+                    'title': f"Syllabus for {self.course_map[course_id].get('name', f'Course {course_id}')}",
+                    'content': parsed_syllabus
+                }
+                self.documents.append(syllabus_doc)
+                self.document_map[syllabus_id] = syllabus_doc
+            else:
+                print(f"Warning: Skipping invalid syllabus for course. parse_html_content failed for course {course_id}")
+
+        # Process Document Types
+        document_types_keys = {
+            'files': 'file', 'announcements': 'announcement', 'assignments': 'assignment',
+            'quizzes': 'quiz', 'calendar_events': 'event'
+        }
+        for collection_key, doc_type in document_types_keys.items():
+            for item in data.get(collection_key, []):
+                if isinstance(item, dict) and 'id' in item:
+                    item_id_str = str(item['id'])
+                    item['type'] = doc_type
+                    if 'course_id' in item:
+                        item['course_id'] = str(item['course_id'])
+                    elif doc_type == 'event' and item.get('context_code', '').startswith('course_'):
+                        item['course_id'] = item['context_code'].replace('course_', '')
+                    
+                    self.documents.append(item)
+                    self.document_map[item_id_str] = item
+                # else: print(f"Warning: Skipping invalid item in '{collection_key}': {item}") # Optional log
+        
+        self._build_document_relations() # Call internal method
+        print(f"Local data structures updated: {len(self.documents)} docs, {len(self.course_map)} courses.")
+
+    def _build_document_relations(self):
+        """Build relations between documents based on course/module."""
+        # Operates on self.documents
+        if not self.documents: return
+
+        for doc in self.documents:
+            if not isinstance(doc, dict): continue 
+            doc_id = doc.get('id')
+            if not doc_id: continue
+                
+            doc['related_docs'] = [] 
+            module_id = doc.get('module_id')
+            course_id = doc.get('course_id') # Assumed string from _update_local_data
+            
+            if module_id and course_id:
+                for other_doc in self.documents:
+                    if isinstance(other_doc, dict) and \
+                       other_doc.get('module_id') == module_id and \
+                       other_doc.get('course_id') == course_id and \
+                       other_doc.get('id') != doc_id:
+                        doc['related_docs'].append(other_doc.get('id'))
+            
+            doc_type = doc.get('type')
+            if doc_type and course_id:
+                for other_doc in self.documents:
+                     if isinstance(other_doc, dict) and \
+                        other_doc.get('type') == doc_type and \
+                        other_doc.get('course_id') == course_id and \
+                        other_doc.get('id') != doc_id and \
+                        other_doc.get('id') not in doc.get('related_docs', []):
+                         doc['related_docs'].append(other_doc.get('id'))
+
+    async def _synchronize_chromadb_with_local_data(self):
+        """Removes documents from ChromaDB that are no longer in local data."""
+        try:
+            chromadb_ids = await self._get_all_collection_ids()
+            if not chromadb_ids: return 0
+                 
+            local_ids = set(self.document_map.keys())
+            for course_id in self.course_map.keys(): # Add expected syllabus IDs
+                 local_ids.add(f"syllabus_{course_id}")
+
+            ids_to_remove = list(chromadb_ids - local_ids)
+            
+            if ids_to_remove:
+                print(f"Found {len(ids_to_remove)} stale documents in ChromaDB. Removing...")
+                try:
+                    await asyncio.to_thread(self.collection.delete, ids=ids_to_remove)
+                    print(f"Successfully removed {len(ids_to_remove)} stale documents.")
+                    return len(ids_to_remove)
+                except Exception as delete_error:
+                     print(f"Error during ChromaDB delete operation: {delete_error}")
+                     return 0 
+            else:
+                return 0
+        except Exception as e:
+            print(f"Error synchronizing ChromaDB with local data: {e}")
+            return 0
+        
+    async def clear_collection(self) -> None:
+        """Clears all documents from the ChromaDB collection."""
+        collection_name_to_clear = self.collection_name
+        print(f"Attempting to clear collection: {collection_name_to_clear}")
+        try:
+            await asyncio.to_thread(self.client.delete_collection, collection_name_to_clear)
+            print(f"Successfully deleted collection: {collection_name_to_clear}")
+        except Exception as e:
+            print(f"Warning: Could not delete collection '{collection_name_to_clear}' (might not exist): {e}")
+
+        try:
+            self.collection = await asyncio.to_thread(
+                self.client.create_collection,
+                name=collection_name_to_clear,
+                embedding_function=self.embedding_function,
+                metadata={"hnsw:space": "cosine"}
+            )
+            print(f"Successfully recreated collection: {collection_name_to_clear}")
+        except Exception as e:
+             print(f"FATAL: Failed to recreate collection '{collection_name_to_clear}': {e}")
+             raise
+
+    async def _get_all_collection_ids(self) -> set:
+        """Retrieves all document IDs currently in the ChromaDB collection."""
+        try:
+            count = await asyncio.to_thread(self.collection.count)
+            if count == 0: return set()
+            results = await asyncio.to_thread(self.collection.get, include=[])
+            return set(results['ids']) if results and isinstance(results.get('ids'), list) else set()
+        except Exception as e:
+            print(f"Error getting existing IDs from collection '{self.collection_name}': {e}")
+            return set()

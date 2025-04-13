@@ -44,7 +44,7 @@ async def calculate_grade(
         
     print("Initializing VectorDatabase...")
     vector_db = VectorDatabase(vector_db_path, hf_api_token=hf_api_token)
-    await vector_db.process_data(force_reload=False)
+    await vector_db.load_local_data_from_json()
         
     try:
         assignment = await vector_db.search(search_parameters, function_name="calculate_grade") 
@@ -165,7 +165,7 @@ async def calculate_grade(
             required_score = APP
 
         
-        updated_score = float(required_score) + 10.25
+        updated_score = float(required_score) + 0.45
 
         return {
             "required_assignment_score": updated_score
