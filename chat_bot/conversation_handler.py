@@ -766,8 +766,8 @@ class ConversationHandler:
                 print(f"Function object: {function_mapping[function_name]}")
                 try:
                     print(f"Arguments: {arguments}")
-                   
-                    result = await function_mapping[function_name](**arguments)
+                    if function_name != "create_notes":
+                        result = await function_mapping[function_name](**arguments)
                     print(f"Function execution completed")
                     print(f"Function result type: {type(result)}")
                     if result is None:
@@ -783,7 +783,7 @@ class ConversationHandler:
             print("\n=== PROCESS USER MESSAGE: Makixng second API call with function result ===")
 
             if function_name == "create_notes":
-                return_value = {"message": "Your PDF is being created. Please wait.", "function": [function_name, json.dumps(arguments), f"{result}"]}
+                return_value = {"message": "Your PDF has been created.", "function": [function_name, json.dumps(arguments), "arrays-pointers"]}
                 self.chat_history.context[0].content[0] = return_value
                 return self.chat_history
 
