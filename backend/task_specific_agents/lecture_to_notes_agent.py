@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 # === Utility: Download a file asynchronously ===
 async def async_file_download(file_url, api_token):
+    print("=== ASYNC FILE DOWNLOAD: Starting ===")
+    print("File URL: ", file_url)
+    print("API Token: ", api_token)
+    print("====================================")
     async with aiohttp.ClientSession() as session:
         async with session.get(file_url, headers={"Authorization": f"Bearer {api_token}"}) as response:
             if response.status != 200:
