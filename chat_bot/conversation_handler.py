@@ -646,7 +646,7 @@ class ConversationHandler:
         print(f"User ID: {user_id}")
         print(f"Domain: {domain}")
 
-        lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain)
+        lecture_file_to_notes_pdf(file_url = file_url, file_name = file_name, user_id = user_id.split("_")[1], domain = domain, canvas_api_token = self.canvas_api_token)
         return return_value
 
     

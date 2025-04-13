@@ -192,8 +192,8 @@ async def prompt_to_pdf(prompt: str, user_id, domain: str, file_name: str):
         return "ERROR: pdf couldn't be created"
 
 # === Async flow to process file ===
-async def _real_processing(file_url, file_name, user_id, domain):
-    handler = DataHandler(user_id, domain)
+async def _real_processing(file_url, file_name, user_id, domain, canvas_api_token):
+    handler = DataHandler(user_id, domain, token=canvas_api_token)
     output_dir = f"{CanvasAI_dir}/media_output/{handler.domain}/{user_id}"
     os.makedirs(output_dir, exist_ok=True)
     handler.delete_chat_context()
@@ -227,12 +227,12 @@ async def _real_processing(file_url, file_name, user_id, domain):
     return "ERROR: pdf couldn't be created after 5 attempts"
 
 # === Entry Point for Threaded Use ===
-def lecture_file_to_notes_pdf(file_url, file_name, user_id, domain):
+def lecture_file_to_notes_pdf(file_url, file_name, user_id, domain, canvas_api_token):
     def _run():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            loop.run_until_complete(_real_processing(file_url, file_name, user_id, domain))
+            loop.run_until_complete(_real_processing(file_url, file_name, user_id, domain, canvas_api_token))
         finally:
             loop.close()
 
