@@ -2,19 +2,19 @@
 """
 Vector Database Module for Canvas Data Orchestration
 ----------------------------------------------------
-This module defines the `VectorDatabase` class, which serves as the primary interface 
-for interacting with the ChromaDB vector store containing Canvas course data embeddings. 
-It manages the ChromaDB connection, orchestrates data processing and synchronization, 
+This module defines the `VectorDatabase` class, which serves as the primary interface
+for interacting with the Qdrant vector store containing Canvas course data embeddings.
+It manages the Qdrant connection, orchestrates data processing and synchronization,
 and handles search requests by utilizing helper modules for specific tasks.
 
 Key features:
-1. **ChromaDB Connection**: Manages the connection to the persistent ChromaDB store.
-2. **Data Synchronization**: Handles loading data from the source JSON, updating internal 
-   data structures (`document_map`, `course_map`, etc.), and synchronizing the 
-   ChromaDB collection (upserting new/changed embeddings, deleting stale ones).
-3. **Search Orchestration**: Processes search queries, builds appropriate filters 
-   (via `vectordb.filters`), executes ChromaDB vector searches, handles keyword 
-   matching (via `vectordb.filters`), and processes/augments results 
+1. **Qdrant Connection**: Manages the connection to the persistent Qdrant store.
+2. **Data Synchronization**: Handles loading data from the source JSON, updating internal
+   data structures (`document_map`, `course_map`, etc.), and synchronizing the
+   Qdrant collection (upserting new/changed embeddings, deleting stale ones).
+3. **Search Orchestration**: Processes search queries, builds appropriate filters
+   (via `vectordb.filters`), executes Qdrant vector searches, handles keyword
+   matching (via `vectordb.filters`), and processes/augments results
    (via `vectordb.result_processor`).
 4. **Text Preprocessing Integration**: Utilizes `vectordb.text_processor` to prepare 
    document text for embedding during data processing.
@@ -28,7 +28,7 @@ Usage:
 
 Helper Modules:
 - `vectordb.text_processor`: Handles text normalization and formatting for embeddings.
-- `vectordb.filters`: Builds ChromaDB query filters and performs keyword matching.
+- `vectordb.filters`: Builds Qdrant query filters and performs keyword matching.
 - `vectordb.result_processor`: Post-processes and augments search results.
 - `vectordb.embedding_model`: Creates the embedding function.
 - `vectordb.content_extraction`: Extracts text content from files/HTML (used during processing).
@@ -39,25 +39,21 @@ Note: Ensure the source JSON data file is structured correctly.
 import os
 import json
 import sys
-import tzlocal
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
-import chromadb
-import requests
+import qdrant_client
+from qdrant_client.http import models as qdrant_models
 from datetime import datetime, timedelta, timezone
-from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 import asyncio
-import aiohttp
-import re
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
-from vectordb.embedding_model import create_hf_embedding_function
+from vectordb.embedding_model import SentenceTransformerEmbeddingFunction
 from vectordb.content_extraction import parse_file_content, parse_html_content
-from vectordb.text_processing import preprocess_text_for_embedding
+from vectordb.text_processing import preprocess_text_for_embedding, get_course_dict
 from vectordb.filters import handle_keywords, build_chromadb_query
 from vectordb.post_process import post_process_results, augment_results
 # Load environment variables
@@ -68,22 +64,24 @@ load_dotenv()
 class VectorDatabase:
     def __init__(self, json_file_path: str, cache_dir = None, collection_name: str = None, hf_api_token: str = None):
         """
-        Initialize the vector database with ChromaDB.
-        
+        Initialize the vector database with Qdrant.
+
         Args:
             json_file_path: Path to the JSON file containing the documents.
-            cache_dir: Directory to store ChromaDB data. If None, will use the directory of the JSON file.
-            collection_name: Name of the ChromaDB collection. If None, will use user_id from the json file.
+            cache_dir: Directory to store Qdrant data. If None, will use the directory of the JSON file.
+            collection_name: Name of the Qdrant collection. If None, will use user_id from the json file.
             hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
-        
+
         # If cache_dir is not provided, use the directory of the JSON file
         if cache_dir is None:
             self.cache_dir = os.path.dirname(json_file_path)
         else:
-            self.cache_dir = "chroma_data/"
-        
+            # Ensure cache_dir exists for Qdrant persistence
+            self.cache_dir = Path(cache_dir)
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+
         # Load JSON file to extract user_id if collection_name is not provided
         if collection_name is None:
             try:
@@ -96,47 +94,44 @@ class VectorDatabase:
                 self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
-        
-        # Initialize ChromaDB client to store files in disk in cache_dir
-        self.client = chromadb.PersistentClient(path=self.cache_dir)
-        
-        # Use Hugging Face API for embeddings with multilingual-e5-large-instruct model
-        self.hf_api_token = hf_api_token
-        if not self.hf_api_token:
-            raise ValueError("Hugging Face API token is required. Provide it as a parameter or set HUGGINGFACE_API_TOKEN environment variable.")
+
+        # Initialize Qdrant client to store files in disk in cache_dir
+        # Using path enables persistent storage
+        self.client = qdrant_client.QdrantClient(path="https://2defb98f-e5e4-430a-b167-6144588cc5c2.us-east4-0.gcp.cloud.qdrant.io:6333/dashboard")
         
         # Custom embedding function using Hugging Face API
-        self.embedding_function = create_hf_embedding_function(self.hf_api_token)
-        
+        self.embedding_function = SentenceTransformerEmbeddingFunction()
+        self.embedding_size = self.embedding_function.embedding_dims
+
         self.documents = [] # stores documents
         self.document_map = {} # Allows O(1) lookup of documents by ID
         self.course_map = {} # information about courses
         self.syllabus_map = {} # information about syllabi
-        
-        try: # Attempts to retrieve existing collection
-            self.collection = self.client.get_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_function
-            )
-            print(f"Using existing collection: {self.collection_name}")
-        
-        except Exception: # If no existing collection, collection is created
-            print(f"Creating new collection: {self.collection_name}")
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                embedding_function=self.embedding_function,
-                # hnsw:space defined the distance function of the embedding space
-                # cosine is currently selected
-                metadata={"hnsw:space": "cosine"}
-            )
-            '''
-            Other hyperparameters to be changed in testing:
-            hnsw:space: euclidean, manhattan, cosine, dot
-            hnsw:ef_construction: determines the size of the candidate list (default: 100)
-            hnsw:search_ef: determines the size of the dynamic list (default: 100)
-            hnsw:m: determines the number of neighbors (edges) each node in the graph can have (default: 16)
-            '''
-    
+
+        # Check if collection exists and create if not
+        try:
+            collection_exists = asyncio.run(asyncio.to_thread(
+                self.client.collection_exists, collection_name=self.collection_name
+            ))
+            if collection_exists:
+                print(f"Using existing Qdrant collection: {self.collection_name}")
+                # Optionally verify vector params match if needed
+                # collection_info = self.client.get_collection(self.collection_name)
+                # assert collection_info.vectors_config.params.size == self.embedding_size
+                # assert collection_info.vectors_config.params.distance == qdrant_models.Distance.COSINE
+            else:
+                print(f"Creating new Qdrant collection: {self.collection_name}")
+                asyncio.run(asyncio.to_thread(
+                    self.client.recreate_collection, # Use recreate_collection for safety
+                    collection_name=self.collection_name,
+                    vectors_config=qdrant_models.VectorParams(size=self.embedding_size, distance=qdrant_models.Distance.COSINE),
+                    # Add other Qdrant specific configurations if needed (e.g., HNSW config)
+                    # hnsw_config=qdrant_models.HnswConfigDiff(...)
+                ))
+        except Exception as e:
+            print(f"Error checking or creating Qdrant collection: {e}")
+            raise
+
     async def process_data(self) -> bool:
         """
         Process data from JSON file and load into ChromaDB.
@@ -157,21 +152,28 @@ class VectorDatabase:
         # Extract user metadata
         user_metadata = data.get('user_metadata', {})
         print(f"Processing data for user ID: {user_metadata.get('id')}")
-        
+
+        # Get course dictionary
+        course_dict = get_course_dict(data)
+        print(course_dict)
+
+
         # Update local data structures
         await self._update_local_data_structures(data)
-        
-        removed_count = await self._synchronize_chromadb_with_local_data()
-        print(f"Removed {removed_count} stale documents from ChromaDB.")
-        
-        # Get existing document IDs in the collection
+
+        removed_count = await self._synchronize_qdrant_with_local_data() # Renamed function
+        print(f"Removed {removed_count} stale documents from Qdrant.")
+
+        # Get existing document IDs in the collection using scroll
         existing_ids = await self._get_all_collection_ids()
-        
+        print(f"Found {len(existing_ids)} existing IDs in Qdrant collection.")
+
         # Prepare lists for documents to add
-        ids_to_add = []
-        texts_to_add = []
-        metadatas_to_add = []
-        
+
+        ids_to_add = [] # list of document IDs to add
+        texts_to_embed = [] # list of texts to embed
+        payloads_to_add = [] # list of metadatas to add
+
         # Process syllabi
         for course_id, syllabus in self.syllabus_map.items():
             # Generate a unique ID for the syllabus
@@ -203,19 +205,18 @@ class VectorDatabase:
             
             # Prepare for ChromaDB
             ids_to_add.append(syllabus_id)
-            texts_to_add.append(preprocess_text_for_embedding(syllabus_doc))
-            
-            # Create metadata
-            metadata = {
+            texts_to_embed.append(preprocess_text_for_embedding(syllabus_doc, course_dict))
+
+            # Create payload for Qdrant (metadata)
+            payload = {
                 'id': str(syllabus_id),
                 'type': 'syllabus',
                 'course_id': course_id
             }
-            
-            metadatas_to_add.append(metadata)
-            print(f"Added syllabus for course {course_id}")
-        
-        # Process all document types
+            payloads_to_add.append(payload)
+            print(f"Prepared syllabus for course {course_id} for Qdrant")
+
+        # Process all other document types from self.documents
         for item in self.documents:
             item_id = str(item.get('id'))
             
@@ -229,9 +230,16 @@ class VectorDatabase:
                 continue
                 
             # Prepare for ChromaDB
-            print(f"Processing item: {item_id}")
             ids_to_add.append(item_id)
-            texts_to_add.append(preprocess_text_for_embedding(item))
+
+            texts_to_embed.append(preprocess_text_for_embedding(item, course_dict))
+
+
+            # Debugging to see Local Due Time
+            print("\n\n")
+            print("Processed text for embedding for item: ", item_id)
+            print(texts_to_embed[-1])
+            print("\n\n")
             
             # Create base metadata
             metadata = {
@@ -273,57 +281,46 @@ class VectorDatabase:
             if doc_type == 'file':
                 metadata['folder_id'] = str(item.get('folder_id', ''))
             
-            metadatas_to_add.append(metadata)
+            payloads_to_add.append(metadata)
         
         # If there are documents to add, generate embeddings and add to collection
         if ids_to_add:
             print(f"Processing {len(ids_to_add)} documents for collection")
             
             # Generate embeddings first
-            embeddings = self.embedding_function(texts_to_add)
+            embeddings = self.embedding_function(texts_to_embed)
             print(f"Generated embeddings with shape: {np.array(embeddings).shape}")
 
             # Use upsert instead of add to avoid duplicate ID errors
             try:
+                # Prepare points for Qdrant upsert
+                points_to_upsert = []
+                for i in range(len(ids_to_add)):
+                    point_id = ids_to_add[i]
+                    point_vector = embeddings[i]
+                    point_payload = payloads_to_add[i]
+                    point_payload['text_content'] = texts_to_embed[i]
+
+                    points_to_upsert.append(
+                        qdrant_models.PointStruct(
+                            id=point_id,
+                            vector=point_vector,
+                            payload=point_payload
+                        )
+                    )
+
+                # Perform the upsert operation using the Qdrant client
                 await asyncio.to_thread(
-                    self.collection.upsert,  # Changed from add to upsert
-                    ids=ids_to_add,
-                    embeddings=embeddings,
-                    documents=texts_to_add,
-                    metadatas=metadatas_to_add
+                    self.client.upsert,
+                    collection_name=self.collection_name,
+                    points=points_to_upsert,
+                    wait=True  # Wait for the operation to be indexed
                 )
-                
-                print(f"Successfully processed {len(ids_to_add)} documents in collection")
+
+                print(f"Successfully processed {len(ids_to_add)} documents in collection {self.collection_name}")
                 return True
             except Exception as e:
                 print(f"Error during upsert operation: {e}")
-                
-                # Try processing in smaller batches if the entire batch fails
-                batch_size = 50
-                success = False
-                
-                try:
-                    print(f"Retrying with smaller batches of {batch_size} documents")
-                    for i in range(0, len(ids_to_add), batch_size):
-                        batch_ids = ids_to_add[i:i+batch_size]
-                        batch_texts = texts_to_add[i:i+batch_size]
-                        batch_metadatas = metadatas_to_add[i:i+batch_size]
-                        batch_embeddings = embeddings[i:i+batch_size]
-                        
-                        await asyncio.to_thread(
-                            self.collection.upsert,
-                            ids=batch_ids,
-                            embeddings=batch_embeddings,
-                            documents=batch_texts,
-                            metadatas=batch_metadatas
-                        )
-                        print(f"Successfully processed batch {i//batch_size + 1} ({len(batch_ids)} documents)")
-                        success = True
-                    
-                    return success
-                except Exception as batch_error:
-                    print(f"Error during batch upsert: {batch_error}")
-                    return False
         else:
             print("No documents to process")
             return False
@@ -383,9 +380,9 @@ class VectorDatabase:
         """
         # Default mapping of generality levels to top_k values
         generality_mapping = { 
-            "LOW": 5,         # Focused search
-            "MEDIUM": 10,     # Balanced approach (default)
-            "HIGH": 20        # Comprehensive search
+            "LOW": 3,         # Focused search
+            "MEDIUM": 7,     # Balanced approach (default)
+            "HIGH": 15        # Comprehensive search
         }
         # Extract generality from parameters, default to MEDIUM
         generality = search_parameters.get("generality", "MEDIUM")
@@ -412,9 +409,11 @@ class VectorDatabase:
         # Ensure reasonable limits
         return max(1, min(top_k, 30))
     
-    async def _execute_chromadb_query(self, query_text, query_where, top_k):
+
+    ### STILL NEED TO IMPLEMENT QDRANT QUERY ###
+    async def _execute_qdrant_query(self, query_text, query_where, top_k):
         """
-        Execute a query against ChromaDB.
+        Execute a query against Qdrant.
         
         Args:
             query_text: Normalized query text
@@ -425,51 +424,19 @@ class VectorDatabase:
             Query results or empty dict on error
         """
         try:
-            print(f"\n=== CHROMADB QUERY DEBUG ===")
-            print(f"Query text: {query_text}")
-            print(f"Full where clause: {query_where}")
-            # Use asyncio to prevent blocking the event loop during the ChromaDB query
+            # Use asyncio to prevent blocking the event loop during the Qdrant query
             results = await asyncio.to_thread(
-                self.collection.query,
+                self.client.query,
+                collection_name=self.collection_name,
                 query_texts=[query_text],
                 n_results=top_k,
                 where=query_where,
-                include=["distances", "documents", "metadatas"]
+                include=["distances", "documents", "payloads"]
             )
             return results
         except Exception as e:
-            print(f"ChromaDB query error with filters: {e}")
+            print(f"Qdrant query error with filters: {e}")
             print(f"Failed query where clause: {query_where}")
-            
-            # If the complex query fails, try with just the course_id filter
-            if isinstance(query_where, dict) and "type" in query_where and "course_id" in query_where:
-                try:
-                    print("Trying query with only course_id filter...")
-                    simplified_where = {"course_id": query_where["course_id"]}
-                    results = await asyncio.to_thread(
-                        self.collection.query,
-                        query_texts=[query_text],
-                        n_results=top_k,
-                        where=simplified_where,
-                        include=["distances", "documents", "metadatas"]
-                    )
-                    return results
-                except Exception as e2:
-                    print(f"Course-only filter failed: {e2}")
-            
-            # Last resort: try with no filters
-            try:
-                print("Trying query with no filters...")
-                results = await asyncio.to_thread(
-                    self.collection.query,
-                    query_texts=[query_text],
-                    n_results=top_k,
-                    include=["distances", "documents", "metadatas"]
-                )
-                return results
-            except Exception as e3:
-                print(f"No-filter query also failed: {e3}")
-                return {}
             
     async def search(self, search_parameters, function_name='search', include_related=False, minimum_score=0.3):
         """
@@ -702,7 +669,7 @@ class VectorDatabase:
             for item in data.get(collection_key, []):
                 if isinstance(item, dict) and 'id' in item:
                     item_id_str = str(item['id'])
-                    item['type'] = doc_type
+                    item['type'] = doc_type # adds type to item
                     if 'course_id' in item:
                         item['course_id'] = str(item['course_id'])
                     elif doc_type == 'event' and item.get('context_code', '').startswith('course_'):

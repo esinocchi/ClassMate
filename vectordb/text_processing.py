@@ -1,208 +1,88 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 import tzlocal
+import re
 
 
-def preprocess_text_for_embedding(doc: Dict[str, Any]) -> str:
-        """
-        Preprocess document text for embedding.
-        
-        Args:
-            doc: Singular Item dictionary from user_data
-            
-        Returns:
-            Preprocessed text string that is sent to chromadb for embedding
-        """
-        # Fields in each type
-        if doc.get('type'):
-            doc_type = doc.get('type', '').upper()
-        else:
-            doc_type = 'File'
-        doc_id = doc.get('id', '')
-        course_id = doc.get('course_id', '')
+def get_course_dict(data):
+    '''
+    Get dictionary of course_id to course_name
+    '''
+    course_dict = {}
+    for course_id in data['user_metadata']['courses_selected']:
+        course_dict[course_id] = data['user_metadata']['courses_selected'][course_id]
+        print(course_dict[course_id])
+    return course_dict
 
-        
-        # Build a rich text representation with all relevant fields
-        priority_parts = []
-        regular_parts = []
-        
-        # Basic identification
-        if doc_id:
-            regular_parts.append(f"ID: {doc_id}")
-        if doc_type:
-            regular_parts.append(f"Type: {doc_type}")
-        if course_id:
-            regular_parts.append(f"Course ID: {course_id}")
+def add_local_times_to_doc(doc: Dict[str, Any]) -> None:
+    """
+    Adds formatted local time strings directly to the doc dictionary.
+    Modifies the input dictionary in-place.
+    """
+    time_mapping = {
+        'due_at': 'local_due_time',
+        'start_at': 'local_start_time',
+        'end_at': 'local_end_time',
+        'posted_at': 'local_posted_time', # Add other relevant fields
+        'updated_at': 'local_updated_time'
+    }
+    local_tz = tzlocal.get_localzone()
 
-        '''for field in time_fields:
-            if field in doc and doc[field] is not None:
-                # Convert UTC time to local time
-                utc_time = datetime.fromisoformat(doc[field].replace('Z', '+00:00'))
-                local_timezone = tzlocal.get_localzone()
-                value = utc_time.astimezone(local_timezone).strftime("%Y-%m-%d %I:%M %p")
-                doc[field] = value'''
-        
-        # Handle different document types
-        if doc_type == 'File':
-            # For files, prioritize the display_name by placing it at the beginning
-            display_name = doc.get('display_name', '')
-            if display_name:
-                # Normalize the display name to improve matching
-                normalized_name = normalize_text(display_name)
-                # Add the name at the beginning for emphasis
-                priority_parts.insert(0, f"Filename: {normalized_name}")
-                # Also add it as a title for better matching
-                priority_parts.insert(0, f"Title: {normalized_name}")
-            
-            for field in ['folder_id', 'display_name', 'filename', 'url', 'size', 
-                            'updated_at', 'locked', 'lock_explanation']:
-                if field in doc and doc[field] is not None: # error prevention
-                    # Normalize any text fields to handle special characters
-                    if isinstance(doc[field], str):
-                        value = normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Assignment':
-            # For assignments, prioritize the name by placing it at the beginning
-            name = doc.get('name', '')
-            if name:
-                # Normalize the name to improve matching
-                normalized_name = normalize_text(name)
-                # Add the name at the beginning for emphasis
-                priority_parts.insert(0, f"Assignment: {normalized_name}")
-                priority_parts.insert(0, f"Title: {normalized_name}")
-            
-            for field in ['name', 'description', 'created_at', 'updated_at', 'due_at', 
-                            'submission_types', 'can_submit', 'graded_submissions_exist']:
-                if field in doc and doc[field] is not None: # error prevention
-                    if field == 'submission_types' and isinstance(doc[field], list):
-                        # e.g. [online_text_entry, online_upload] -> Submission Types: Online Text Entry, Online Upload
-                        regular_parts.append(f"Submission Types: {', '.join(doc[field])}")
-                    else:
-                        # Normalize any text fields
-                        if isinstance(doc[field], str):
-                            value = normalize_text(doc[field])
-                        else:
-                            value = doc[field]
-                        # e.g. HW2 (name) -> Name: HW2
-                        regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-            # Handle content field which might contain extracted links
-            content = doc.get('content', [])
-            if content and isinstance(content, list):
-                regular_parts.append("Content Link(s): \n")
-                for item in content:
-                    if isinstance(item, str):
-                        regular_parts.append(f'\t{item}\n')
-            
-        elif doc_type == 'Announcement':
-            # For announcements, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Announcement: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'message', 'posted_at', 'course_id']:
-                if field in doc and doc[field] is not None: # error prevention
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Quiz':
-            # For quizzes, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Quiz: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'preview_url', 'description', 'quiz_type', 'time_limit', 
-                            'allowed_attempts', 'points_possible', 'due_at', 
-                            'locked_for_user', 'lock_explanation']:
-                if field == 'time_limit' and isinstance(doc[field], int):
-                    regular_parts.append(f"Time Limit: {doc[field]} minutes")
-                elif field in doc and doc[field] is not None:
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-            
-        elif doc_type == 'Event':
-            # For events, prioritize the title by placing it at the beginning
-            title = doc.get('title', '')
-            if title:
-                # Normalize the title to improve matching
-                normalized_title = normalize_text(title)
-                # Add the title at the beginning for emphasis
-                priority_parts.insert(0, f"Event: {normalized_title}")
-                priority_parts.insert(0, f"Title: {normalized_title}")
-            
-            for field in ['title', 'start_at', 'end_at', 'description', 'location_name', 
-                            'location_address', 'context_code', 'context_name', 
-                            'all_context_codes', 'url']:
-                if field in doc and doc[field] is not None:
-                    # Normalize any text fields
-                    if isinstance(doc[field], str):
-                        value = normalize_text(doc[field])
-                    else:
-                        value = doc[field]
-                    regular_parts.append(f"{field.replace('_', ' ').title()}: {value}")
-        
-        # Add module information
-        module_id = doc.get('module_id')
-        if module_id:
-            regular_parts.append(f"Module ID: {module_id}")
-        
-        module_name = doc.get('module_name')
-        if module_name:
-            # Normalize module name
-            if isinstance(module_name, str):
-                module_name = normalize_text(module_name)
-            regular_parts.append(f"Module Name: {module_name}")
+    for source_field, target_field in time_mapping.items():
+        if doc.get(source_field):
+            try:
+                # Assuming UTC 'Z' format - adjust if needed
+                utc_dt = datetime.fromisoformat(doc[source_field].replace('Z', '+00:00'))
+                local_dt = utc_dt.astimezone(local_tz)
+                # Store the formatted string in the doc
+                doc[target_field] = local_dt.strftime('%Y-%m-%d %I:%M %p %Z')
+            except (ValueError, TypeError, AttributeError) as e:
+                print(f"Warning: Could not parse or convert time for {source_field} in doc {doc.get('id')}: {e}")
+                doc[target_field] = None # Or keep original, or add error string
 
 
-        # Add local time to doc
-        local_time = datetime.now().strftime('%Y-%m-%d %I:%M %p')
-        doc['local_time'] = local_time
+def preprocess_text_for_embedding(doc: Dict[str, Any], course_dict: Dict[str, str]) -> str:
+    """
+    Prepares the document dictionary and converts it to natural language
+    using the to_natural_language function for embedding.
 
-        # Join all parts with newlines for better separation
-        # After processing, the text_parts list for a singule assingment item will have the following format:
-        # [
-        #     "ID: 123",
-        #     "Type: Assignment",
-        #     "Course ID: 456",
-        #     "Name: HW2",
-        #     "Description: This is a description of the assignment",
-        #     "Created At: 2021-01-01",
-        #     "Updated At: 2021-01-02",
-        #     "Due At: 2021-01-03",
-        #     "Submission Types: Online Text Entry, Online Upload",
-        #     "Graded Submissions Exist: True",
-        #     "Module ID: 123",
-        #     "Module Name: Module 1",
-        #     "Content Link(s):
-        #       https://www.example.com
-        #       https://www.example.co 
-        #       https://www.example.com
-        #       https://www.example.com
-        #       https://www.example.com
-        #       https://www.example.com
-        # ]
-        # The priority parts are at the beginning of the list, and the regular parts are at the end
-        output = "\n".join(priority_parts) + "\n" + "\n".join(regular_parts)
-        return output
+    Args:
+        doc: Singular Item dictionary from user_data.
+        course_dict: Dictionary mapping course_id to course_name.
+
+    Returns:
+        Natural language text string for embedding, or None if conversion fails.
+    """
+    if not isinstance(doc, dict):
+        print(f"Warning: Invalid document format received: {type(doc)}")
+        return None # Return None for invalid input
+
+    # Make a copy to avoid modifying the original dict if it's used elsewhere
+    modified_doc = doc.copy()
+
+    # 1. Inject Course Name
+    course_id = str(modified_doc.get('course_id', '')) # Ensure course_id is string
+    if course_id and course_id in course_dict:
+        modified_doc['course_name'] = course_dict[course_id]
+    else:
+        modified_doc['course_name'] = 'Unknown Course' # Default if not found
+
+    # 2. Inject Local Times (using the modified function)
+    add_local_times_to_doc(modified_doc)
+
+    # 3. Call the natural language conversion function
+    try:
+        natural_language_output = to_natural_language(modified_doc)
+        # Optional: Add a check if the output is empty or just "passage: "
+        if not natural_language_output or natural_language_output.strip() == "passage:":
+             print(f"Warning: to_natural_language produced empty output for doc ID: {modified_doc.get('id')}")
+             # Decide how to handle: return empty string, None, or a default message
+             return ""
+        return natural_language_output
+    except Exception as e:
+        print(f"Error during to_natural_language conversion for doc ID {modified_doc.get('id')}: {e}")
+        # Decide how to handle: return empty string, None, or a default message
+        return None # Return None on error to be caught in db.py
 
 def normalize_text(text: str) -> str:
         """
@@ -225,3 +105,77 @@ def normalize_text(text: str) -> str:
         normalized = normalized.replace('\u2013', '-').replace('\u2014', '-')
         
         return normalized
+
+def add_local_time(doc: Dict[str, Any]) -> Dict[str, Any]:
+    '''
+    Add local time to doc
+    '''
+    time_attributes = ['due_at', 'start_at', 'end_at']
+    time_attributes_str = {
+            'due_at': 'Local Due Time',
+            'start_at': 'Local Start Time',
+            'end_at': 'Local End Time'
+        }
+    
+    for attribute in time_attributes:
+        if doc.get(attribute):
+            # Convert due_at (assumed to be in UTC) to local time (e.g., US/Eastern)
+            try:
+                utc_dt = datetime.strptime(doc[attribute], "%Y-%m-%dT%H:%M:%SZ")
+                utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+                local_tz = tzlocal.get_localzone()
+                local_dt = utc_dt.astimezone(local_tz)
+                return f"{time_attributes_str[attribute]}: {local_dt.strftime('%Y-%m-%d %I:%M %p %Z')}"
+            except Exception as e:
+                return f"{time_attributes_str[attribute]}: Unable to convert ({e})"
+            
+    return ""
+            
+def to_natural_language(item):
+    """Convert a Canvas item to natural language for embedding."""
+    type = item.get("type", "").lower()
+    course = item.get("course_name", "")
+    title = item.get("title") or item.get("name") or ""
+    result = f"passage: {title} is a {type} for {course}."
+
+    templates = {
+        "quiz": [
+            ("points_possible",   "It is worth {} points"),
+            ("time_limit",        "The time limit is {} minutes"),
+            ("allowed_attempts",  lambda v: "There are unlimited attempts" if v == -1 else f"There are {v} attempts"),
+            ("local_due_time",    "It is due on {}"),
+            ("locked_for_user",   lambda v: "It is locked" if v else "It is available"),
+        ],
+        "assignment": [
+            ("local_due_time",    "It is due on {}"),
+            ("submission_types",  "The submission types are: {}"),
+            ("can_submit",        lambda v: "It can be submitted" if v else "It cannot be submitted"),
+        ],
+        "announcement": [
+            ("local_posted_time", "It was posted on {}"),
+        ],
+        "file": [
+            ("size",              "The size is {}"),
+            ("local_updated_time","It was last updated on {}"),
+            ("locked",            lambda v: "It is locked" if v else "It is available"),
+        ],
+        "event": [
+            ("local_start_time",  "It starts on {}"),
+            ("local_end_time",    "It ends on {}"),
+            ("location_name",     "The location is {}"),
+        ],
+    }
+
+    for field, tpl in templates.get(type, []):
+        val = item.get(field)
+        if val is None:
+            continue
+        part = tpl(val) if callable(tpl) else tpl.format(val)
+        result += " " + part + "."
+
+    desc = item.get("description", "")
+    if desc:
+        clean_desc = re.sub(r'<[^>]+>', '', desc)
+        result += f"The description is: {clean_desc}"
+
+    return result

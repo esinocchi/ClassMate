@@ -1,10 +1,11 @@
 import tzlocal
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import re
 from vectordb.text_processing import normalize_text
+from qdrant_client import models as qdrant_models
 
-def build_time_range_filter(search_parameters: Dict[str, Any]) -> List[Dict[str, Any]]:
+def build_time_range_filter(search_parameters: Dict[str, Any]) -> Optional[qdrant_models.Filter]:
         """
         Build time range filter conditions for ChromaDB query.
         
@@ -15,9 +16,11 @@ def build_time_range_filter(search_parameters: Dict[str, Any]) -> List[Dict[str,
             List of time range filter conditions to be added to the main where clause
         """
         if not search_parameters or "time_range" not in search_parameters or not search_parameters["time_range"]:
-            return []
+            return None
         
         time_range = search_parameters["time_range"]
+        if time_range == "ALL_TIME":
+            return None
 
         # Get current time in local timezone, then convert to UTC for timestamp comparison
         local_timezone = tzlocal.get_localzone()
@@ -27,7 +30,7 @@ def build_time_range_filter(search_parameters: Dict[str, Any]) -> List[Dict[str,
         # List of all possible timestamp fields across different document types
         timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
         
-        range_conditions = []
+        field_conditions = []
 
         future_10d = current_time + timedelta(days=10)
         future_10d_timestamp = int(future_10d.timestamp())
@@ -36,47 +39,42 @@ def build_time_range_filter(search_parameters: Dict[str, Any]) -> List[Dict[str,
         past_10d_timestamp = int(past_10d.timestamp())
         
         if time_range == "NEAR_FUTURE":
-            for field in timestamp_fields:
-                range_conditions.append({
-                    "$and": [
-                        {field: {"$gte": current_timestamp}},  # Now
-                        {field: {"$lte": future_10d_timestamp}}  # Now + 10 days
-                    ]
-                })
-        
+            target_range = qdrant_models.Range(
+                gte=current_timestamp,
+                lte=future_10d_timestamp
+            )
+                
         elif time_range == "FUTURE":
-            for field in timestamp_fields:
-                range_conditions.append({field: {"$gte": future_10d_timestamp}})  # Future items only
+            target_range = qdrant_models.Range(
+                 gte = future_10d_timestamp
+            )
         
         elif time_range == "RECENT_PAST":
-            for field in timestamp_fields:
-                range_conditions.append({
-                    "$and": [
-                        {field: {"$gte": past_10d_timestamp}},  # Now - 10 days
-                        {field: {"$lte": current_timestamp}}  # Now
-                    ]
-                })
+            target_range = qdrant_models.Range(
+                 lte = current_timestamp,
+                 gte = past_10d_timestamp
+            )
         
-        elif time_range == "PAST":
-            for field in timestamp_fields:
-                range_conditions.append({field: {"$lte": past_10d_timestamp}})  # Past items only
+        elif time_range == "PAST":  
+            target_range = qdrant_models.Range(
+                 lte = past_10d_timestamp
+            )
         
-        elif time_range == "ALL_TIME":
-            # No filtering needed, return empty list
-            return []
-        
-        # At the end of the function
-        print("\n=== TIME RANGE FILTER DEBUG ===")
-        print(f"Time range: {time_range}")
-        print(f"Current timestamp: {current_timestamp} ({datetime.fromtimestamp(current_timestamp)})")
-        print(f"Fields being checked: {timestamp_fields}")
-        print(f"Generated conditions: {range_conditions}")
-        print(f"Final filter: {[{'$or': range_conditions}] if range_conditions else []}")
-        print("================================\n")
-        
-        return [{"$or": range_conditions}] if range_conditions else []
+        if target_range:
+             for field in timestamp_fields:
+                  field_conditions.append(
+                       qdrant_models.FieldCondition(
+                            key = field,
+                            range = target_range
+                       )
+                  )
 
-def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> List[Dict[str, Any]]:
+        # field_conditions is a list of FieldCondition objects for each timestamp field (e.g. due_timestamp, posted_timestamp, etc.)
+        # each assignment type has a different timestamp field, so we need to check each one
+        # "should" instead of "must" because we want to include documents that match one of the conditions
+        return qdrant_models.Filter(should = field_conditions) if field_conditions else None
+
+def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> Optional[qdrant_models.Filter]:
         """
         Build specific dates filter conditions for ChromaDB query, working with
         formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
@@ -88,29 +86,24 @@ def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> List[Dict[
             List of specific dates filter conditions to be added to the main where clause
         """
         if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
-            return []
+            return None
         
         local_timezone = tzlocal.get_localzone()
         specific_dates = []
         
         for date_str in search_parameters["specific_dates"]:
             try:
-                # Parse naive date (without timezone)
                 naive_date = datetime.strptime(date_str, "%Y-%m-%d")
-                
-                # Make it timezone-aware by replacing the tzinfo
                 specific_date = naive_date.replace(tzinfo=local_timezone)
-                
                 specific_dates.append(specific_date)
             except ValueError:
                 print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
-        
         if not specific_dates:
-            return []  # No valid specific dates to filter on
+            return None
         
         # Fields that contain formatted date strings
-        timestamp_fields = ["due_date", "posted_date", "start_date", "updated_date"]
-        date_conditions = []
+        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
+        field_conditions = []
         
         if len(specific_dates) == 1:
             # Single date = exact match (within day)
@@ -119,49 +112,35 @@ def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> List[Dict[
             # Format the start and end times for the specific date
             start_time = specific_date.replace(hour=0, minute=0, second=0)
             end_time = specific_date.replace(hour=23, minute=59, second=59)
-            
-            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
-            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
-            
-            for field in timestamp_fields:
-                date_conditions.append({
-                    "$and": [
-                        {field: {"$gte": start_time_str}},  # Start of day (as string)
-                        {field: {"$lte": end_time_str}}     # End of day (as string)
-                    ]
-                })
+            start_timestamp = int(start_time.timestamp())
+            end_timestamp = int(end_time.timestamp())
 
         elif len(specific_dates) >= 2:
-            # Date range
+            # Date range = range match (within day)
             start_date = min(specific_dates)
             end_date = max(specific_dates)
-            
-            # Format the start and end times for the date range
+
             start_time = start_date.replace(hour=0, minute=0, second=0)
             end_time = end_date.replace(hour=23, minute=59, second=59)
             
-            start_time_str = start_time.strftime("%Y-%m-%d %I:%M %p")
-            end_time_str = end_time.strftime("%Y-%m-%d %I:%M %p")
+            start_timestamp = int(start_time.timestamp())
+            end_timestamp = int(end_time.timestamp())
             
-            for field in timestamp_fields:
-                date_conditions.append({
-                    "$and": [
-                        {field: {"$gte": start_time_str}},  # Start of first day (as string)
-                        {field: {"$lte": end_time_str}}     # End of last day (as string)
-                    ]
-                })
+
+        target_range = qdrant_models.Range(
+            gte = start_timestamp,
+            lte = end_timestamp
+        )
+
+        for field in timestamp_fields:
+            field_conditions.append(
+                qdrant_models.FieldCondition(
+                    key = field,
+                    range = target_range
+                )
+            )
         
-        # Debug logging to verify string format
-        print(f"Filtering for specific dates: {[d.strftime('%Y-%m-%d') for d in specific_dates]}")
-        if len(specific_dates) == 1:
-            print(f"Start time string: {start_time_str}")
-            print(f"End time string: {end_time_str}")
-        elif len(specific_dates) >= 2:
-            print(f"Range start string: {start_time_str}")
-            print(f"Range end string: {end_time_str}")
-        
-        # Return date condition or empty list if no valid conditions
-        return [{"$or": date_conditions}] if date_conditions else []
+        return qdrant_models.Filter(should = field_conditions) if field_conditions else None
 
 def build_course_and_type_filter(search_parameters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -173,36 +152,30 @@ def build_course_and_type_filter(search_parameters: Dict[str, Any]) -> List[Dict
         Returns:
             List of course and type filter conditions to be added to the main where clause
         """
-        conditions = []
         
+        conditions = []
         # Add course filter
         if "course_id" in search_parameters:
             course_id = search_parameters["course_id"]
             if course_id and course_id != "all_courses":
-                conditions.append({"course_id": {"$eq": str(course_id)}}) # $eq: ==
-                # filter: item.course_id == course_id
-                
+                course_condition = qdrant_models.FieldCondition(
+                    key = 'course_id',
+                    match = qdrant_models.MatchValue(value=str(course_id))
+                )
+                conditions.append(course_condition)
+
         # Add document type filter
         if "item_types" in search_parameters:
             item_types = search_parameters["item_types"]
             if item_types and isinstance(item_types, list) and len(item_types) > 0:
-                # Map item types to our internal types
-                type_mapping = {
-                    "assignment": "assignment",
-                    "file": "file",
-                    "quiz": "quiz",
-                    "announcement": "announcement",
-                    "event": "event",
-                    "syllabus": "syllabus"
-                }
-                
-                normalized_types = [type_mapping[item_type] for item_type in item_types 
-                                    if item_type in type_mapping]
-                if normalized_types:
-                    conditions.append({"type": {"$in": normalized_types}}) # $in: in
-                    # filter: item.type in item_types
+                type_condition = qdrant_models.FieldCondition(
+                     key='item_type',
+                     match = qdrant_models.MatchAny(any=item_types)
+                )
+                conditions.append(type_condition)
 
         return conditions
+
 
 def handle_keywords(document_map, keywords, doc_ids, courses, item_types):
         """
@@ -218,7 +191,7 @@ def handle_keywords(document_map, keywords, doc_ids, courses, item_types):
             courses = [courses]
 
         keyword_matches = []
-        names = {
+        title_field_mapping = {
             'file': 'display_name',
             'assignment': 'name',
             'announcement': 'title',
@@ -275,9 +248,9 @@ def handle_keywords(document_map, keywords, doc_ids, courses, item_types):
 
         return keyword_matches
 
-async def build_chromadb_query(search_parameters):
+async def build_qdrant_filters(search_parameters: Dict[str, Any]) -> Optional[qdrant_models.Filter]:
         """
-        Build a ChromaDB query from search parameters.
+        Build a Qdrant query from search parameters.
         
         Args:
             search_parameters: Dictionary containing search parameters
@@ -286,29 +259,41 @@ async def build_chromadb_query(search_parameters):
             Tuple of (query_where, query_text)
         """
         # Normalize the query
-        query = search_parameters["query"]
+        query = search_parameters.get["query", ""]
         normalized_query = normalize_text(text=query)
         
-        # Build ChromaDB where clause with proper operator
-        conditions = []
+        search_parameters["_normalized_query"] = normalized_query
         
+        must_conditions = []
+        should_conditions = []
         # Add course and document type filters
-        course_type_conditions = build_course_and_type_filter(search_parameters)   
-        conditions.extend(course_type_conditions)
+        course_type_conditions = build_course_and_type_filter(search_parameters)
+        must_conditions.extend(course_type_conditions)
+
+        specific_dates_filter = build_specific_dates_filter(search_parameters)
+        if specific_dates_filter:
+             must_conditions.append(specific_dates_filter)
+        else:
+             time_range_filter = build_time_range_filter(search_parameters)
+             if time_range_filter:
+                  must_conditions.append(time_range_filter)
+
+        keywords = search_parameters.get("keywords", [])
+        if keywords and isinstance(keywords, list) and len(keywords) > 0:
+             for keyword in keywords:
+                  if isinstance(keyword, str) and keyword.strip():
+                       keyword_condition = qdrant_models.FieldCondition(
+                            key="text_content",
+                            match = qdrant_models.MatchText(text=keyword)
+                       )
+                       should_conditions.append(keyword_condition)
+
+        if not must_conditions and not should_conditions:
+             return None
         
-        # Add time range filter
-        time_range_conditions = build_time_range_filter(search_parameters)
-        conditions.extend(time_range_conditions)
-        
-        # Add specific dates filter
-        specific_dates_conditions = build_specific_dates_filter(search_parameters)
-        conditions.extend(specific_dates_conditions)
-        
-        # Apply the where clause if there are conditions
-        query_where = None
-        if len(conditions) == 1:
-            query_where = conditions[0]  # Single condition
-        elif len(conditions) > 1:
-            query_where = {"$and": conditions}  # Multiple conditions combined with $and
-        
-        return query_where, normalized_query
+        final_filter = qdrant_models.Filter(
+            must = must_conditions if must_conditions else None,
+            should = should_conditions if should_conditions else None
+        )
+
+        return final_filter

@@ -1,172 +1,100 @@
 """
 Embedding Model Module for Vector Database
 ------------------------------------------
-This module provides embedding functions for ChromaDB using the Hugging Face API.
-It supports various embedding models including the multilingual-e5-large-instruct model.
+This module provides an embedding function using a local Sentence Transformer model.
+It currently uses 'intfloat/e5-small-v2'.
 
-The main class HFEmbeddingFunction implements the ChromaDB embedding function interface,
-ensuring proper formatting of input texts for specific models like E5 (which requires a "passage:" prefix).
+The main class SentenceTransformerEmbeddingFunction implements the interface
+expected by the vector database module.
 """
 
 import logging
 import numpy as np
-import aiohttp
-import requests  # Keep for backward compatibility
-import asyncio
-from typing import List, Optional, Union
+from typing import List
+# Import SentenceTransformer
+from sentence_transformers import SentenceTransformer
 
 # Configure logging
 logger = logging.getLogger("canvas_vector_db.embedding")
 
-class HFEmbeddingFunction:
+class SentenceTransformerEmbeddingFunction:
     """
-    Embedding function class for Hugging Face models that implements
-    the ChromaDB embedding function interface.
+    Embedding function class using a local Sentence Transformer model.
     """
-    
-    def __init__(self, api_token, model_id="intfloat/multilingual-e5-large-instruct"):
+
+    def __init__(self, model_id="intfloat/e5-small-v2"):
         """
-        Initialize the embedding function with the Hugging Face API token and model ID.
-        
+        Initialize the embedding function with a Sentence Transformer model ID.
+
         Args:
-            api_token: Hugging Face API token
-            model_id: Model ID to use for embeddings (default: "intfloat/multilingual-e5-large-instruct")
+            model_id: Model ID to load from sentence-transformers
+                      (default: "intfloat/e5-small-v2")
         """
-        self.model_id = model_id
-        self.api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-        self.headers = {"Authorization": f"Bearer {api_token}"}
-        
-        # Determine embedding dimensions based on model
-        if "large" in model_id.lower():
-            self.embedding_dims = 1024
-        elif "base" in model_id.lower():
-            self.embedding_dims = 768
-        elif "small" in model_id.lower():
-            self.embedding_dims = 384
-        else:
-            self.embedding_dims = 1024  # default to large model dimensions
-            
-        logger.info(f"Initialized HF embedding function with model: {model_id}")
-        
-    def __call__(self, input):
+        try:
+            # Load the Sentence Transformer model
+            self.model = SentenceTransformer(model_id)
+            self.model_id = model_id
+            # Get embedding dimensions from the loaded model
+            self.embedding_dims = self.model.get_sentence_embedding_dimension()
+            logger.info(f"Initialized Sentence Transformer embedding function with model: {model_id}")
+            logger.info(f"Embedding dimensions: {self.embedding_dims}")
+        except Exception as e:
+            logger.error(f"Failed to load Sentence Transformer model '{model_id}': {e}")
+            raise # Re-raise the exception as the function cannot operate without the model
+
+    def __call__(self, input_texts: List[str]) -> List[List[float]]:
         """
-        Generate embeddings for the input texts.
-        This signature matches what ChromaDB expects.
-        
+        Generate embeddings for the input texts using the local model.
+
         Args:
-            input: List of text strings to embed
-            
+            input_texts: List of text strings to embed.
+
         Returns:
-            Numpy array of embeddings
+            List of lists of floats representing the embeddings.
         """
-        # For ChromaDB compatibility, provide a synchronous interface
-        # but using requests instead of aiohttp
-        
-        # Handle empty input case
-        if not input:
+        if not input_texts:
+            logger.warning("Received empty list for embedding.")
             return []
-        
-        # Constants
-        max_chars = 2000  # Estimate for ~512 tokens
-        batch_size = 32   # Process in smaller batches
-        
-        result_embeddings = []
-        
-        # Process in batches
-        for i in range(0, len(input), batch_size):
-            batch = input[i:i+batch_size]
-            
-            # Truncate long texts and add prefix
-            formatted_texts = [f"passage: {text[:max_chars]}" for text in batch]
-            
-            try:
-                response = requests.post(
-                    self.api_url,
-                    headers=self.headers,
-                    json={"inputs": formatted_texts, "options": {"wait_for_model": True}}
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"API request failed with status code {response.status_code}: {response.text}")
-                    # Add placeholders for this batch
-                    for _ in batch:
-                        result_embeddings.append(np.zeros(self.embedding_dims, dtype=np.float32))
-                    continue
-                
-                batch_embeddings = response.json()
-                
-                if isinstance(batch_embeddings, list):
-                    result_embeddings.extend(batch_embeddings)
-                else:
-                    # Handle error by adding placeholder embeddings
-                    logger.error(f"Unexpected API response format: {batch_embeddings}")
-                    for _ in batch:
-                        result_embeddings.append(np.zeros(self.embedding_dims))
-                
-            except Exception as e:
-                logger.error(f"Error calling Hugging Face API for batch {i//batch_size}: {e}")
-                # Add placeholder embeddings for the entire batch
-                for _ in batch:
-                    result_embeddings.append(np.zeros(self.embedding_dims, dtype=np.float32))
-        
-        # Important: We must ensure we have exactly one embedding per input document
-        if len(result_embeddings) != len(input):
-            logger.error(f"Embedding count mismatch: {len(result_embeddings)} embeddings for {len(input)} inputs")
-            # Ensure we have the right number of embeddings
-            if len(result_embeddings) < len(input):
-                # Add missing embeddings
-                for _ in range(len(input) - len(result_embeddings)):
-                    result_embeddings.append(np.zeros(self.embedding_dims, dtype=np.float32))
-            else:
-                # Truncate extra embeddings
-                result_embeddings = result_embeddings[:len(input)]
-        
-        # Convert to numpy array with correct shape
-        final_embeddings = np.array(result_embeddings, dtype=np.float32)
-        logger.info(f"Generated embeddings with shape: {final_embeddings.shape}")
-        
-        # Final check to ensure non-empty output
-        if final_embeddings.size == 0:
-            logger.error("Generated empty embeddings array! Returning placeholder.")
-            return np.zeros((len(input), self.embedding_dims), dtype=np.float32)
-        
-        return final_embeddings.tolist()
-    
-    # For backward compatibility: synchronous method that calls the async one
-    def generate_embeddings_sync(self, input: List[str]) -> np.ndarray:
-        """
-        Synchronously generate embeddings for the input texts.
-        
-        Args:
-            input: List of text strings to embed
-            
-        Returns:
-            Numpy array of embeddings
-        """
-        return asyncio.run(self.generate_embeddings(input))
 
-async def create_async_hf_embedding_function(api_token, model_id="intfloat/multilingual-e5-large-instruct"):
-    """
-    Create and return an async Hugging Face embedding function.
-    
-    Args:
-        api_token: Hugging Face API token
-        model_id: Model ID to use for embeddings
-        
-    Returns:
-        HFEmbeddingFunction instance
-    """
-    return HFEmbeddingFunction(api_token, model_id)
+        try:
+            # Encode the texts using the loaded Sentence Transformer model
+            # The model handles batching internally.
+            # convert_to_numpy=True is default, but explicit for clarity.
+            # show_progress_bar can be helpful for large inputs.
+            embeddings_np = self.model.encode(
+                input_texts,
+                convert_to_numpy=True,
+                show_progress_bar=False # Set to True for debugging large batches
+            )
 
-def create_hf_embedding_function(api_token, model_id="intfloat/multilingual-e5-large-instruct"):
+            # Ensure the output shape is correct
+            if embeddings_np.shape[0] != len(input_texts) or embeddings_np.shape[1] != self.embedding_dims:
+                 logger.error(f"Embedding shape mismatch: Expected ({len(input_texts)}, {self.embedding_dims}), Got {embeddings_np.shape}")
+                 # Handle mismatch - potentially return placeholders or raise error
+                 # Returning placeholders for robustness, similar to previous logic
+                 return [np.zeros(self.embedding_dims, dtype=np.float32).tolist() for _ in input_texts]
+
+
+            logger.info(f"Generated embeddings with shape: {embeddings_np.shape}")
+
+            # Convert numpy array to list of lists (as expected by Qdrant client)
+            return embeddings_np.tolist()
+
+        except Exception as e:
+            logger.error(f"Error during Sentence Transformer encoding: {e}")
+            # Return placeholder embeddings on error
+            return [np.zeros(self.embedding_dims, dtype=np.float32).tolist() for _ in input_texts]
+
+# Update the factory function name and remove api_token parameter
+def create_embedding_function(model_id="intfloat/e5-small-v2"):
     """
-    Create and return a Hugging Face embedding function for ChromaDB.
-    
+    Create and return a Sentence Transformer embedding function.
+
     Args:
-        api_token: Hugging Face API token
         model_id: Model ID to use for embeddings
-        
+
     Returns:
-        HFEmbeddingFunction instance
+        SentenceTransformerEmbeddingFunction instance
     """
-    return HFEmbeddingFunction(api_token, model_id) 
+    # No API token needed now
+    return SentenceTransformerEmbeddingFunction(model_id)
