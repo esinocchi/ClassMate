@@ -54,15 +54,16 @@ sys.path.append(str(root_dir))
 from vectordb.embedding_model import SentenceTransformerEmbeddingFunction
 from vectordb.content_extraction import parse_file_content, parse_html_content
 from vectordb.text_processing import preprocess_text_for_embedding, get_course_dict
-from vectordb.filters import handle_keywords, build_chromadb_query
+from vectordb.filters import handle_keywords, build_qdrant_filters
 from vectordb.post_process import post_process_results, augment_results
+from vectordb.text_processing import normalize_text
 # Load environment variables
 load_dotenv()
 
 
 
 class VectorDatabase:
-    def __init__(self, json_file_path: str, cache_dir = None, collection_name: str = None, hf_api_token: str = None):
+    def __init__(self, json_file_path: str, cache_dir = None, collection_name: str = None):
         """
         Initialize the vector database with Qdrant.
 
@@ -70,7 +71,6 @@ class VectorDatabase:
             json_file_path: Path to the JSON file containing the documents.
             cache_dir: Directory to store Qdrant data. If None, will use the directory of the JSON file.
             collection_name: Name of the Qdrant collection. If None, will use user_id from the json file.
-            hf_api_token: Hugging Face API token for accessing the embedding model.
         """
         self.json_file_path = json_file_path
 
@@ -110,6 +110,7 @@ class VectorDatabase:
 
         # Check if collection exists and create if not
         try:
+            #FIXME: Error here
             collection_exists = asyncio.run(asyncio.to_thread(
                 self.client.collection_exists, collection_name=self.collection_name
             ))
@@ -409,9 +410,17 @@ class VectorDatabase:
         # Ensure reasonable limits
         return max(1, min(top_k, 30))
     
+    def build_qdrant_query(self, search_parameters):
+        """
+        Build a Qdrant query based on search parameters.
+        """
+        filters = build_qdrant_filters(search_parameters)
+        query_text = search_parameters.get("query", "")
+        normalized_query = normalize_text(query_text)
+        return filters, normalized_query
+    
 
-    ### STILL NEED TO IMPLEMENT QDRANT QUERY ###
-    async def _execute_qdrant_query(self, query_text, query_where, top_k):
+    async def _execute_qdrant_query(self, query_text, query_filter, top_k):
         """
         Execute a query against Qdrant.
         
@@ -423,20 +432,25 @@ class VectorDatabase:
         Returns:
             Query results or empty dict on error
         """
+        
         try:
-            # Use asyncio to prevent blocking the event loop during the Qdrant query
+            query_vector = self.embedding_function([query_text])[0]
             results = await asyncio.to_thread(
-                self.client.query,
+                self.client.query_points,
                 collection_name=self.collection_name,
-                query_texts=[query_text],
-                n_results=top_k,
-                where=query_where,
-                include=["distances", "documents", "payloads"]
+                query=query_vector,
+                query_filter=query_filter,
+                limit=top_k,
+                with_payload=True,
             )
             return results
+            
+
         except Exception as e:
-            print(f"Qdrant query error with filters: {e}")
-            print(f"Failed query where clause: {query_where}")
+            print(f"Qdrant query error {e}")
+            print(f"Query filter: {query_filter}")
+            print(f"Query text: {query_text}")
+            return []
             
     async def search(self, search_parameters, function_name='search', include_related=False, minimum_score=0.3):
         """
@@ -450,44 +464,50 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        query_where, normalized_query = await build_chromadb_query(search_parameters)
+        query_filter, normalized_query = self.build_qdrant_query(search_parameters)
         top_k = self._determine_top_k(search_parameters)
 
         print("\n\n--------------------------------")
         print(f"Top K: {top_k}")
         print(f"Search query: '{normalized_query}'")
         print(f"Search parameters: {search_parameters}")
-        print(f"Query where: {query_where}")
+        print(f"Query filter: {query_filter}")
         print("--------------------------------\n\n")
 
         task_description = "Given a student query about course materials, retrieve relevant Canvas resources that provide comprehensive information to answer the query."
         formatted_query = f"Instruct: {task_description}\nQuery: {normalized_query}"
 
         # Execute ChromaDB query
-        results = await self._execute_chromadb_query(formatted_query, query_where, top_k)
+        results = await self._execute_qdrant_query(formatted_query, query_filter, top_k)
 
-        # Initialize lists (handle empty results gracefully)
-        doc_ids = results.get('ids', [[]])[0] if results.get('ids') else []
-        distances = results.get('distances', [[]])[0] if results.get('distances') else []
         search_results = []
 
         # Process initial ChromaDB results
-        for i in range(len(doc_ids)):
-            doc_id = doc_ids[i]
-            distance = distances[i]
-            doc = self.document_map.get(doc_id)  # Get the document here
+        for result in results:
+            doc_id = result.id
+            score = result.score
+            # Get the document from the payload
+            doc_from_payload = result.payload
+            # Get the document from the document_map
+            doc = self.document_map.get(str(doc_id))
+
             if not doc:
+                print(f"Document found in Qdrant but not in document_map for ID: {doc_id}")
+                if doc_from_payload:
+                    doc = doc_from_payload
+            else:
+                print(f"Skipping doc {doc_id} becuase it is not in the payload or document map")
                 continue
 
-            similarity = 1.0 - distance  # Calculate similarity
 
-            if similarity < minimum_score:
+
+            if score < minimum_score:
                 #print(f"Skipping doc {doc_id} (semantic) - low similarity: {similarity}")
                 continue
 
             search_results.append({
                 'document': doc,
-                'similarity': similarity,
+                'similarity': score,
                 'type': 'semantic'  # Indicate source
             })
 
@@ -499,6 +519,9 @@ class VectorDatabase:
 
         keywords = search_parameters.get("keywords", [])
 
+        # Get doc_ids from semantic search to avoid 
+        semantic_doc_ids = [str(score_point.id) for score_point in results]
+
         # assign item types for keyword search based on function name
         if function_name == "calculate_grade":
             item_types = ["assignment"]
@@ -507,8 +530,9 @@ class VectorDatabase:
         elif function_name == "search":
             item_types = search_parameters.get("item_types", [])
 
+
         if keywords:
-            keyword_matches = handle_keywords(self.document_map, keywords, doc_ids, courses, item_types)
+            keyword_matches = handle_keywords(self.document_map, keywords, semantic_doc_ids, courses, item_types)
             print(f"Keyword matches: {keyword_matches}")
 
             for match in keyword_matches:
