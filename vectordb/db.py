@@ -47,6 +47,7 @@ import qdrant_client
 from qdrant_client.http import models as qdrant_models
 from datetime import datetime, timedelta, timezone
 import asyncio
+import uuid
 # Add the project root directory to Python path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
@@ -74,6 +75,10 @@ class VectorDatabase:
         """
         self.json_file_path = json_file_path
 
+        self.client = None
+
+        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
+
         # If cache_dir is not provided, use the directory of the JSON file
         if cache_dir is None:
             self.cache_dir = os.path.dirname(json_file_path)
@@ -94,11 +99,7 @@ class VectorDatabase:
                 self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
-
-        # Initialize Qdrant client to store files in disk in cache_dir
-        # Using path enables persistent storage
-        self.client = qdrant_client.QdrantClient(path="https://2defb98f-e5e4-430a-b167-6144588cc5c2.us-east4-0.gcp.cloud.qdrant.io:6333/dashboard")
-        
+      
         # Custom embedding function using Hugging Face API
         self.embedding_function = SentenceTransformerEmbeddingFunction()
         self.embedding_size = self.embedding_function.embedding_dims
@@ -108,29 +109,36 @@ class VectorDatabase:
         self.course_map = {} # information about courses
         self.syllabus_map = {} # information about syllabi
 
-        # Check if collection exists and create if not
+    async def connect_to_qdrant(self):
+        """
+        Connect to Qdrant.
+        """
+        self.client = qdrant_client.QdrantClient(
+            url="https://2defb98f-e5e4-430a-b167-6144588cc5c2.us-east4-0.gcp.cloud.qdrant.io:6333",
+            api_key=self.qdrant_api_key
+        )
         try:
-            #FIXME: Error here
-            collection_exists = asyncio.run(asyncio.to_thread(
-                self.client.collection_exists, collection_name=self.collection_name
-            ))
-            if collection_exists:
-                print(f"Using existing Qdrant collection: {self.collection_name}")
-                # Optionally verify vector params match if needed
-                # collection_info = self.client.get_collection(self.collection_name)
-                # assert collection_info.vectors_config.params.size == self.embedding_size
-                # assert collection_info.vectors_config.params.distance == qdrant_models.Distance.COSINE
-            else:
-                print(f"Creating new Qdrant collection: {self.collection_name}")
-                asyncio.run(asyncio.to_thread(
-                    self.client.recreate_collection, # Use recreate_collection for safety
+            await asyncio.to_thread(
+                self.client.get_collection, collection_name=self.collection_name
+            )
+            print(f"Using existing Qdrant collection: {self.collection_name}")
+        except qdrant_client.http.exceptions.UnexpectedResponse as e:
+            if e.status_code == 404:
+                await asyncio.to_thread(
+                    self.client.create_collection,
                     collection_name=self.collection_name,
                     vectors_config=qdrant_models.VectorParams(size=self.embedding_size, distance=qdrant_models.Distance.COSINE),
-                    # Add other Qdrant specific configurations if needed (e.g., HNSW config)
-                    # hnsw_config=qdrant_models.HnswConfigDiff(...)
-                ))
+                )
+                print(f"Created new Qdrant collection: {self.collection_name}")
+            elif e.status_code == 403:
+                print(f"API Key error: {e}")
+                raise
+            else:
+                print(f"Unexpected HTTP error: {e.status_code}")
+                raise
+
         except Exception as e:
-            print(f"Error checking or creating Qdrant collection: {e}")
+            print(f"Error connecting to Qdrant: {e}")
             raise
 
     async def process_data(self) -> bool:
@@ -143,6 +151,10 @@ class VectorDatabase:
         Returns:
             True if data was processed, False if using cached data.
         """
+        if not self.client:
+            print("Error: Qdrant client not initialized. Call connect_to_qdrant first.")
+            return False
+        
         try:
             with open(self.json_file_path, 'r') as f:
                 data = json.load(f)
@@ -158,12 +170,9 @@ class VectorDatabase:
         course_dict = get_course_dict(data)
         print(course_dict)
 
-
-        # Update local data structures
         await self._update_local_data_structures(data)
 
-        removed_count = await self._synchronize_qdrant_with_local_data() # Renamed function
-        print(f"Removed {removed_count} stale documents from Qdrant.")
+        #TODO: Determine if this is necessary
 
         # Get existing document IDs in the collection using scroll
         existing_ids = await self._get_all_collection_ids()
@@ -179,9 +188,10 @@ class VectorDatabase:
         for course_id, syllabus in self.syllabus_map.items():
             # Generate a unique ID for the syllabus
             syllabus_id = f"syllabus_{course_id}"
+            syllabus_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, syllabus_id))
             
             if syllabus_id in existing_ids:
-                print(f"Syllabus for course {course_id} already exists. Skipping.")
+                print(f"Syllabus for course {course_id} (UUID: {syllabus_uuid}) already exists. Skipping.")
                 continue
             
             # Parse the HTML content to extract plain text
@@ -206,13 +216,16 @@ class VectorDatabase:
             
             # Prepare for ChromaDB
             ids_to_add.append(syllabus_id)
-            texts_to_embed.append(preprocess_text_for_embedding(syllabus_doc, course_dict))
+
+            #TODO: Verify that the text is being properly processed, Cursor reccommends setting the output of preprocess_text_for_embedding to a variable, was appending to a list before
+            text_to_embed = preprocess_text_for_embedding(syllabus_doc, course_dict)
 
             # Create payload for Qdrant (metadata)
             payload = {
                 'id': str(syllabus_id),
                 'type': 'syllabus',
-                'course_id': course_id
+                'course_id': course_id,
+                'text_content': text_to_embed
             }
             payloads_to_add.append(payload)
             print(f"Prepared syllabus for course {course_id} for Qdrant")
@@ -289,6 +302,8 @@ class VectorDatabase:
             print(f"Processing {len(ids_to_add)} documents for collection")
             
             # Generate embeddings first
+            #TODO: Verify that the embeddings are being properly executed
+            # Currently the embedding function is being called to a list, make sure that is correct
             embeddings = self.embedding_function(texts_to_embed)
             print(f"Generated embeddings with shape: {np.array(embeddings).shape}")
 
@@ -738,6 +753,7 @@ class VectorDatabase:
                         other_doc.get('id') not in doc.get('related_docs', []):
                          doc['related_docs'].append(other_doc.get('id'))
 
+    '''
     async def _synchronize_chromadb_with_local_data(self):
         """Removes documents from ChromaDB that are no longer in local data."""
         try:
@@ -764,6 +780,7 @@ class VectorDatabase:
         except Exception as e:
             print(f"Error synchronizing ChromaDB with local data: {e}")
             return 0
+    '''
         
     async def clear_collection(self) -> None:
         """Clears all documents from the ChromaDB collection."""
@@ -788,12 +805,33 @@ class VectorDatabase:
              raise
 
     async def _get_all_collection_ids(self) -> set:
-        """Retrieves all document IDs currently in the ChromaDB collection."""
+        """Retrieves all document IDs currently in the Qdrant collection."""
         try:
-            count = await asyncio.to_thread(self.collection.count)
-            if count == 0: return set()
-            results = await asyncio.to_thread(self.collection.get, include=[])
-            return set(results['ids']) if results and isinstance(results.get('ids'), list) else set()
+            # First, check if the collection is empty or get its size.
+            # The qdrant_client.count() method returns a CountResult object.
+            count_result = await asyncio.to_thread(
+                self.client.count,
+                collection_name=self.collection_name
+            )
+            if count_result.count == 0:
+                return set()
+
+            all_ids = set()
+
+            scroll_response = await asyncio.to_thread(
+                self.client.scroll,
+                collection_name=self.collection_name,
+                with_payload=False, 
+                with_vectors=False  
+            )
+
+            for point in scroll_response['result']['points']:
+                if point['id']:
+                    all_ids.add(point['id'])
+                
+            return all_ids
+        
         except Exception as e:
-            print(f"Error getting existing IDs from collection '{self.collection_name}': {e}")
+            # This will catch errors like collection not found, network issues, etc.
+            print(f"Error getting existing IDs from Qdrant collection '{self.collection_name}': {e}")
             return set()

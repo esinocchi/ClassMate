@@ -229,6 +229,8 @@ async def db_instance(manage_test_environment):
         json_file_path=str(TEST_JSON_FILE_PATH),
         collection_name=unique_collection_name
     )
+
+    await db.connect_to_qdrant()
     
     # __init__ already attempts to create collection.
     # Wait for any async operations in init if necessary, though Qdrant client calls are threaded.
