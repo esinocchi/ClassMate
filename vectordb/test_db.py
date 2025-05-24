@@ -278,8 +278,8 @@ async def test_process_data_and_upload(db_instance: VectorDatabase):
     success = await db.process_data()
     assert success is True, "process_data should return True on successful data processing and upload."
 
-    # Expected documents: 2 syllabi + 1 assignment + 1 announcement + 1 file = 5
-    expected_doc_count = 5 
+    # Expected documents: 2 syllabi + 2 assignment + 1 announcement + 1 file + 1 event + 1 quiz = 8
+    expected_doc_count = 8
     
     await asyncio.sleep(0.5) # Give Qdrant a moment to ensure indexing if upsert wait=True isn't enough
 

@@ -135,42 +135,42 @@ def to_natural_language(item):
     """Convert a Canvas item to natural language for embedding."""
     type = item.get("type", "").lower()
     course = item.get("course_name", "")
-    title = item.get("title") or item.get("name") or ""
+    title = get_title(item)
     result = f"passage: {title} is a {type} for {course}."
 
     templates = {
         "quiz": [
-            ("points_possible",   "It is worth {} points"),
-            ("time_limit",        "The time limit is {} minutes"),
-            ("allowed_attempts",  lambda v: "There are unlimited attempts" if v == -1 else f"There are {v} attempts"),
-            ("local_due_time",    "It is due on {}"),
-            ("locked_for_user",   lambda v: "It is locked" if v else "It is available"),
+            ("points_possible",   f"{title} is worth {{}} points"),
+            ("time_limit",        f"{title} has a time limit of {{}} minutes"),
+            ("allowed_attempts",  lambda v, t=title: f"{t} allows unlimited attempts" if v == -1 else f"{t} allows {v} attempts"),
+            ("local_due_time",    f"{title} is due on {{}}"),
+            ("locked_for_user",   lambda v, t=title: f"{t} is locked" if v else f"{t} is available"),
         ],
         "assignment": [
-            ("local_due_time",    "It is due on {}"),
-            ("submission_types",  "The submission types are: {}"),
-            ("can_submit",        lambda v: "It can be submitted" if v else "It cannot be submitted"),
+            ("local_due_time",    f"{title} is due on {{}}"),
+            ("submission_types",  lambda v, t=title: f"{t} accepts submission types: {{', '.join(v)}}" if isinstance(v, list) else f"{t} accepts submission types: {v}"),
+            ("can_submit",        lambda v, t=title: f"{t} can be submitted" if v else f"{t} cannot be submitted"),
         ],
         "announcement": [
-            ("local_posted_time", "It was posted on {}"),
+            ("local_posted_time", f"{title} was posted on {{}}"),
         ],
         "file": [
-            ("size",              "The size is {}"),
-            ("local_updated_time","It was last updated on {}"),
-            ("locked",            lambda v: "It is locked" if v else "It is available"),
+            ("size",              f"{title} has a size of {{}}"),
+            ("local_updated_time", f"{title} was last updated on {{}}"),
+            ("locked",            lambda v, t=title: f"{t} is locked" if v else f"{t} is available"),
         ],
         "event": [
-            ("local_start_time",  "It starts on {}"),
-            ("local_end_time",    "It ends on {}"),
-            ("location_name",     "The location is {}"),
+            ("local_start_time",  f"{title} starts on {{}}"),
+            ("local_end_time",    f"{title} ends on {{}}"),
+            ("location_name",     f"{title} takes place at {{}}"),
         ],
     }
 
-    for field, tpl in templates.get(type, []):
+    for field, template in templates.get(type, []):
         val = item.get(field)
         if val is None:
             continue
-        part = tpl(val) if callable(tpl) else tpl.format(val)
+        part = template(val) if callable(template) else template.format(val)
         result += " " + part + "."
 
     desc = item.get("description", "")
@@ -179,3 +179,33 @@ def to_natural_language(item):
         result += f"The description is: {clean_desc}"
 
     return result
+
+def get_title(item):
+    title = item.get("title") or item.get("name") or item.get("display_name") or ""
+    return title
+
+def add_date_metadata(item: Dict[str, Any], metadata: Dict[str, Any]) -> None:
+    """
+    Add date fields to metadata based on document type.
+    
+    Args:
+        item: Document item dictionary
+        metadata: Metadata dictionary to update with date fields
+    """
+    date_field_mapping = {
+        'assignment': ('due_at', 'due_timestamp'),
+        'announcement': ('posted_at', 'posted_timestamp'),
+        'quiz': ('due_at', 'due_timestamp'),
+        'event': ('start_at', 'start_timestamp'),
+        'file': ('updated_at', 'updated_timestamp')
+    }
+    
+    doc_type = item.get('type')
+    if doc_type in date_field_mapping:
+        source_field, target_field = date_field_mapping[doc_type]
+        if item.get(source_field):
+            try:
+                date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
+                metadata[target_field] = int(date_obj.timestamp())
+            except (ValueError, AttributeError):
+                pass

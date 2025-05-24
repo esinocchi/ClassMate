@@ -169,7 +169,7 @@ def build_course_and_type_filter(search_parameters: Dict[str, Any]) -> List[Dict
             item_types = search_parameters["item_types"]
             if item_types and isinstance(item_types, list) and len(item_types) > 0:
                 type_condition = qdrant_models.FieldCondition(
-                     key='item_type',
+                     key='type',
                      match = qdrant_models.MatchAny(any=item_types)
                 )
                 conditions.append(type_condition)
@@ -259,7 +259,7 @@ async def build_qdrant_filters(search_parameters: Dict[str, Any]) -> Optional[qd
             Tuple of (query_where, query_text)
         """
         # Normalize the query
-        query = search_parameters.get["query", ""]
+        query = search_parameters.get("query", "")
         normalized_query = normalize_text(text=query)
         
         search_parameters["_normalized_query"] = normalized_query

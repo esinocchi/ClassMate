@@ -54,9 +54,9 @@ sys.path.append(str(root_dir))
 
 from vectordb.embedding_model import SentenceTransformerEmbeddingFunction
 from vectordb.content_extraction import parse_file_content, parse_html_content
-from vectordb.text_processing import preprocess_text_for_embedding, get_course_dict
+from vectordb.text_processing import preprocess_text_for_embedding, get_course_dict, add_date_metadata
 from vectordb.filters import handle_keywords, build_qdrant_filters
-from vectordb.post_process import post_process_results, augment_results
+from vectordb.post_process import post_process_results, augment_results, verify_doc
 from vectordb.text_processing import normalize_text
 # Load environment variables
 load_dotenv()
@@ -219,10 +219,11 @@ class VectorDatabase:
 
             #TODO: Verify that the text is being properly processed, Cursor reccommends setting the output of preprocess_text_for_embedding to a variable, was appending to a list before
             text_to_embed = preprocess_text_for_embedding(syllabus_doc, course_dict)
+            texts_to_embed.append(text_to_embed)
 
             # Create payload for Qdrant (metadata)
             payload = {
-                'id': str(syllabus_id),
+                'id': str(syllabus_uuid),
                 'type': 'syllabus',
                 'course_id': course_id,
                 'text_content': text_to_embed
@@ -273,26 +274,10 @@ class VectorDatabase:
                 metadata['course_id'] = str(course_id)
             
             # Add date fields to metadata based on document type
-            date_field_mapping = {
-                'assignment': ('due_at', 'due_timestamp'),
-                'announcement': ('posted_at', 'posted_timestamp'),
-                'quiz': ('due_at', 'due_timestamp'),
-                'event': ('start_at', 'start_timestamp'),
-                'file': ('updated_at', 'updated_timestamp')
-            }
-            
-            doc_type = item.get('type')
-            if doc_type in date_field_mapping:
-                source_field, target_field = date_field_mapping[doc_type]
-                if item.get(source_field):
-                    try:
-                        date_obj = datetime.fromisoformat(item[source_field].replace('Z', '+00:00'))
-                        metadata[target_field] = int(date_obj.timestamp())
-                    except (ValueError, AttributeError):
-                        pass
+            add_date_metadata(item, metadata)
             
             # Add file-specific metadata
-            if doc_type == 'file':
+            if item.get('type') == 'file':
                 metadata['folder_id'] = str(item.get('folder_id', ''))
             
             payloads_to_add.append(metadata)
@@ -312,10 +297,13 @@ class VectorDatabase:
                 # Prepare points for Qdrant upsert
                 points_to_upsert = []
                 for i in range(len(ids_to_add)):
-                    point_id = ids_to_add[i]
+                    point_id_str = ids_to_add[i]
+                    point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, point_id_str))
                     point_vector = embeddings[i]
                     point_payload = payloads_to_add[i]
+
                     point_payload['text_content'] = texts_to_embed[i]
+                    point_payload['canvas_id'] = point_id_str
 
                     points_to_upsert.append(
                         qdrant_models.PointStruct(
@@ -337,6 +325,7 @@ class VectorDatabase:
                 return True
             except Exception as e:
                 print(f"Error during upsert operation: {e}")
+                return False
         else:
             print("No documents to process")
             return False
@@ -425,11 +414,11 @@ class VectorDatabase:
         # Ensure reasonable limits
         return max(1, min(top_k, 30))
     
-    def build_qdrant_query(self, search_parameters):
+    async def build_qdrant_query(self, search_parameters):
         """
         Build a Qdrant query based on search parameters.
         """
-        filters = build_qdrant_filters(search_parameters)
+        filters = await build_qdrant_filters(search_parameters)
         query_text = search_parameters.get("query", "")
         normalized_query = normalize_text(query_text)
         return filters, normalized_query
@@ -459,6 +448,31 @@ class VectorDatabase:
                 with_payload=True,
             )
             return results
+        
+            """
+            Returns a JSON object that contains:
+           {
+                "usage": { ... },
+                "time": 0.002,
+                "status": "ok",
+                "result": {
+                    "points": [
+                    {
+                        "id": 42,
+                        "version": 3,
+                        "score": 0.75,
+                        "payload": {
+                        "city": "London",
+                        "color": "green"
+                        },
+                        "vector": [...],
+                        "shard_key": "region_1",
+                        "order_value": 42
+                    }
+                ]
+                }
+            }
+            """
             
 
         except Exception as e:
@@ -479,7 +493,7 @@ class VectorDatabase:
         Returns:
             List of search results.
         """
-        query_filter, normalized_query = self.build_qdrant_query(search_parameters)
+        query_filter, normalized_query = await self.build_qdrant_query(search_parameters)
         top_k = self._determine_top_k(search_parameters)
 
         print("\n\n--------------------------------")
@@ -497,23 +511,17 @@ class VectorDatabase:
 
         search_results = []
 
-        # Process initial ChromaDB results
-        for result in results:
+        # Process initial Qdrant results
+        for result in results.points:
             doc_id = result.id
             score = result.score
-            # Get the document from the payload
             doc_from_payload = result.payload
-            # Get the document from the document_map
-            doc = self.document_map.get(str(doc_id))
 
-            if not doc:
-                print(f"Document found in Qdrant but not in document_map for ID: {doc_id}")
-                if doc_from_payload:
-                    doc = doc_from_payload
-            else:
-                print(f"Skipping doc {doc_id} becuase it is not in the payload or document map")
+            canvas_id = doc_from_payload.get('canvas_id')
+            doc = self.document_map.get(canvas_id)
+
+            if not verify_doc(doc, doc_from_payload, doc_id):
                 continue
-
 
 
             if score < minimum_score:
@@ -535,7 +543,7 @@ class VectorDatabase:
         keywords = search_parameters.get("keywords", [])
 
         # Get doc_ids from semantic search to avoid 
-        semantic_doc_ids = [str(score_point.id) for score_point in results]
+        semantic_doc_ids = [str(score_point.id) for score_point in results.points]
 
         # assign item types for keyword search based on function name
         if function_name == "calculate_grade":
@@ -805,7 +813,7 @@ class VectorDatabase:
              raise
 
     async def _get_all_collection_ids(self) -> set:
-        """Retrieves all document IDs currently in the Qdrant collection."""
+        """Retrieves all Canvas document IDs currently in the Qdrant collection."""
         try:
             # First, check if the collection is empty or get its size.
             # The qdrant_client.count() method returns a CountResult object.
@@ -816,20 +824,27 @@ class VectorDatabase:
             if count_result.count == 0:
                 return set()
 
-            all_ids = set()
+            all_canvas_ids = set()
 
+            # Qdrant scroll returns a tuple: (points, next_offset)
             scroll_response = await asyncio.to_thread(
                 self.client.scroll,
                 collection_name=self.collection_name,
-                with_payload=False, 
+                with_payload=True,  # Need payload to get canvas_id
                 with_vectors=False  
             )
 
-            for point in scroll_response['result']['points']:
-                if point['id']:
-                    all_ids.add(point['id'])
+            # Extract points from the response tuple
+            points, next_offset = scroll_response
+            
+            for point in points:
+                # Get the original Canvas ID from payload
+                if hasattr(point, 'payload') and point.payload:
+                    canvas_id = point.payload.get('canvas_id')
+                    if canvas_id:
+                        all_canvas_ids.add(canvas_id)
                 
-            return all_ids
+            return all_canvas_ids
         
         except Exception as e:
             # This will catch errors like collection not found, network issues, etc.

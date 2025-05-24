@@ -128,3 +128,21 @@ def bm25_score(doc, search_parameters, k1=1.5, b=0.75):
         'title'
     }
     pass
+
+def verify_doc(doc, doc_from_payload, doc_id) -> bool:
+    """
+    Verify that a document exists in the document_map and Qdrant.
+    """
+    if not doc and not doc_from_payload:
+        print(f"Document not found in Qdrant or document_map for ID: {doc_id}")
+        return False
+
+    if not doc:
+        print(f"Document not found in document_map for ID: {doc_id}")
+        return False
+
+    if not doc_from_payload:
+        print(f"Document not found in Qdrant for ID: {doc_id}")
+        return False
+
+    return True
