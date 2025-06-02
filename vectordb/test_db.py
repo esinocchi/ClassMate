@@ -21,23 +21,16 @@ import sys
 import shutil
 from datetime import datetime
 
-# Add the project root directory to Python path
-# Adjust this if your test file is located elsewhere relative to the project root
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
 from vectordb.db import VectorDatabase
+from vectordb.bm25_scorer import CanvasBM25
 
-# --- Test Configuration ---
-# Isolated test data directory and file paths
 TEST_DATA_DIR = root_dir / "test_data_temp" # temporary directory to store test data files
 TEST_JSON_FILENAME = "test_user_data.json" # name of test data file
 TEST_JSON_FILE_PATH = TEST_DATA_DIR / TEST_JSON_FILENAME # full path to test data file
 TEST_COLLECTION_NAME_PREFIX = "test_canvas_embeddings_" # prefix for Qdrant collection names created during testing
-
-# This is the directory Qdrant client creates when path="URL..." is used.
-# It's typically created in the current working directory of the test runner.
-# We'll attempt to clean it up.
 QDRANT_LOCAL_STORAGE_URL_DIRNAME = "https://2defb98f-e5e4-430a-b167-6144588cc5c2.us-east4-0.gcp.cloud.qdrant.io:6333" # Removed /dashboard from dir name
 
 def create_dummy_test_json(file_path: Path, user_id="test_user_123"):
@@ -303,7 +296,7 @@ async def test_search_vectors_basic(db_instance: VectorDatabase):
     """
     db = db_instance
     
-    await db.process_data() # Ensure data is loaded
+    await db.process_data() 
     await asyncio.sleep(0.5) # Allow for indexing
 
     search_params = {
@@ -333,8 +326,84 @@ async def test_search_vectors_basic(db_instance: VectorDatabase):
         assert found_expected_item, "Expected document 'syllabus_2500000' not found in search results."
 
     except Exception as e:
-        # Heuristic to detect if it's failing due to ChromaDB remnants
         if "chroma" in str(e).lower() or "AttributeError" in str(e) and "collection" in str(e).lower():
             pytest.skip(f"Skipping search test as it appears to be using ChromaDB components or failed due to it: {e}")
         pytest.fail(f"Search method encountered an unexpected error: {e}")
+
+@pytest.mark.asyncio
+async def test_bm25_keyword_search(db_instance: VectorDatabase):
+    """Test BM25 keyword search functionality."""
+    db = db_instance
+    await db.process_data()
+    await asyncio.sleep(0.5)
+
+    # Test with keywords that should trigger BM25
+    search_params = {
+        "course_id": "2500000",
+        "time_range": "ALL_TIME",
+        "generality": "MEDIUM",
+        "item_types": ["assignment"],
+        "specific_dates": [],
+        "keywords": ["lab", "0.5"],
+        "query": "Tell me about lab assignment 0.5"
+    }
     
+    results = await db.search(search_parameters=search_params)
+    
+    assert results is not None
+    assert len(results) > 0
+    
+    # Check that BM25 results are included (look for 'hybrid' or 'bm25' type)
+
+@pytest.mark.asyncio 
+async def test_bm25_scorer_directly():
+    """Test BM25 scorer independently."""
+
+    test_docs = [
+        {
+            "id": "16000000",
+            "type": "assignment",
+            "name": "Lab Assignment 0.5",
+            "description": "<p>Complete the setup for your testing environment.</p>",
+            "course_id": "2500000",
+            "content": "Complete the setup for your testing environment."
+        },
+        {
+            "id": "16000001", 
+            "type": "assignment",
+            "name": "Lab Assignment 1",
+            "description": "A short quiz on testing basics.",
+            "course_id": "2500000",
+            "content": "A short quiz on testing basics."
+        },
+        {
+            "id": "16000002",
+            "type": "announcement", 
+            "title": "Welcome to Intro to Testing!",
+            "message": "<p>Welcome to the course! Please read the syllabus.</p>",
+            "course_id": "2500000",
+            "content": "Welcome to the course! Please read the syllabus."
+        },
+        {
+            "id": "syllabus_2500000",
+            "type": "syllabus",
+            "name": "Intro to Testing",
+            "syllabus_body": "<p>This is the syllabus for <strong>Intro to Testing</strong>.</p><p>We will learn all about testing.</p>",
+            "course_id": "2500000",
+            "content": "This is the syllabus for Intro to Testing. We will learn all about testing."
+        }
+    ]
+    
+    # Initialize BM25 scorer
+    bm25 = CanvasBM25(test_docs)
+    
+    # Test search
+    results = bm25.search("Tell me about lab assignment 0.5", limit=5)
+    
+    assert len(results) > 0
+    assert all('similarity' in r for r in results)
+    assert all('document' in r for r in results)
+    assert all(r['type'] == 'bm25' for r in results)
+    
+    similarities = [r['similarity'] for r in results]
+    assert similarities == sorted(similarities, reverse=True) 

@@ -106,17 +106,14 @@ def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> Optional[q
         field_conditions = []
         
         if len(specific_dates) == 1:
-            # Single date = exact match (within day)
             specific_date = specific_dates[0]
             
-            # Format the start and end times for the specific date
             start_time = specific_date.replace(hour=0, minute=0, second=0)
             end_time = specific_date.replace(hour=23, minute=59, second=59)
             start_timestamp = int(start_time.timestamp())
             end_timestamp = int(end_time.timestamp())
 
         elif len(specific_dates) >= 2:
-            # Date range = range match (within day)
             start_date = min(specific_dates)
             end_date = max(specific_dates)
 

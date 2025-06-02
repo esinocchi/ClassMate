@@ -111,24 +111,6 @@ def augment_results(course_map, search_results):
         
         return search_results
 
-def bm25_score(doc, search_parameters, k1=1.5, b=0.75):
-    """
-    Calculate educational BM25 score for a document.
-    
-    Args:
-        doc: Dictionary containing document information
-        search_parameters: Dictionary containing search parameters
-        k1: Term frequency saturation parameter
-        b: Document length normalization parameter
-
-    Returns:
-        BM25 score
-    """
-    field_weights = {
-        'title'
-    }
-    pass
-
 def verify_doc(doc, doc_from_payload, doc_id) -> bool:
     """
     Verify that a document exists in the document_map and Qdrant.

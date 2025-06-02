@@ -48,7 +48,7 @@ from qdrant_client.http import models as qdrant_models
 from datetime import datetime, timedelta, timezone
 import asyncio
 import uuid
-# Add the project root directory to Python path
+
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
@@ -58,7 +58,7 @@ from vectordb.text_processing import preprocess_text_for_embedding, get_course_d
 from vectordb.filters import handle_keywords, build_qdrant_filters
 from vectordb.post_process import post_process_results, augment_results, verify_doc
 from vectordb.text_processing import normalize_text
-# Load environment variables
+from vectordb.bm25_scorer import CanvasBM25, fuse_results
 load_dotenv()
 
 
@@ -74,11 +74,10 @@ class VectorDatabase:
             collection_name: Name of the Qdrant collection. If None, will use user_id from the json file.
         """
         self.json_file_path = json_file_path
-
         self.client = None
-
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
-
+        self.bm25_scorer = None
+    
         # If cache_dir is not provided, use the directory of the JSON file
         if cache_dir is None:
             self.cache_dir = os.path.dirname(json_file_path)
@@ -100,14 +99,13 @@ class VectorDatabase:
         else:
             self.collection_name = collection_name
       
-        # Custom embedding function using Hugging Face API
         self.embedding_function = SentenceTransformerEmbeddingFunction()
         self.embedding_size = self.embedding_function.embedding_dims
 
-        self.documents = [] # stores documents
-        self.document_map = {} # Allows O(1) lookup of documents by ID
-        self.course_map = {} # information about courses
-        self.syllabus_map = {} # information about syllabi
+        self.documents = []
+        self.document_map = {}
+        self.course_map = {}
+        self.syllabus_map = {}
 
     async def connect_to_qdrant(self):
         """
@@ -171,6 +169,7 @@ class VectorDatabase:
         print(course_dict)
 
         await self._update_local_data_structures(data)
+        self.bm25_scorer = CanvasBM25(self.documents)
 
         #TODO: Determine if this is necessary
 
@@ -330,15 +329,14 @@ class VectorDatabase:
             print("No documents to process")
             return False
 
-    def _include_related_documents(self, search_results, search_parameters, minimum_score):
-        """
+    """def _include_related_documents(self, search_results, search_parameters, minimum_score):
+        
         Include related documents in search results.
         
         Args:
             search_results: List of search result dictionaries
             search_parameters: Dictionary containing search parameters
             minimum_score: Minimum similarity score to include in results
-        """
         related_docs = self._get_related_documents([r['document'].get('id') for r in search_results])
         
         # Map item types to internal types for filtering
@@ -370,7 +368,7 @@ class VectorDatabase:
                     'document': doc,
                     'similarity': minimum_score,
                     'is_related': True
-                })
+                })"""
 
     def _determine_top_k(self, search_parameters):
         """
@@ -539,45 +537,39 @@ class VectorDatabase:
         print(f"Search results")
 
         courses = search_parameters.get("course_id", "all_courses")
-
         keywords = search_parameters.get("keywords", [])
 
-        # Get doc_ids from semantic search to avoid 
-        semantic_doc_ids = [str(score_point.id) for score_point in results.points]
+        function_type_mapping = {
+            "calculate_grade": ["assignment"],
+            "find_file": ["file"],
+            "search": ["assignment", "file", "quiz", "announcement", "event"]
+        }
+        item_types = function_type_mapping.get(function_name, [])
 
-        # assign item types for keyword search based on function name
-        if function_name == "calculate_grade":
-            item_types = ["assignment"]
-        elif function_name == "find_file":
-            item_types = ["file"]
-        elif function_name == "search":
-            item_types = search_parameters.get("item_types", [])
+        if keywords and self.bm25_scorer:
+            keywords = ' '.join(keywords)
+            filtered_docs = []
+            for doc in self.documents:
+                doc_course_id = str(doc.get('course_id'))
+                if courses != "all_courses" and doc_course_id not in courses:
+                    continue
+                if item_types and doc.get('type') not in item_types:
+                    continue
+                filtered_docs.append(doc)
 
+            bm25_results = self.bm25_scorer.search(keywords, filtered_docs, limit=10)
+            search_results = fuse_results(search_results, bm25_results, alpha=0.7)
 
-        if keywords:
-            keyword_matches = handle_keywords(self.document_map, keywords, semantic_doc_ids, courses, item_types)
-            print(f"Keyword matches: {keyword_matches}")
-
-            for match in keyword_matches:
-                keyword_similarity = 0.93
-                search_results.append({
-                    'document': match['document'],
-                    'similarity': keyword_similarity,
-                    'type': match['document'].get('type')
-                })
             
 
-        # --- Sort by similarity (descending) ---
         search_results.sort(key=lambda x: x['similarity'], reverse=True)
 
-        # --- Process each document (including file content extraction) ---
         for result in search_results:
             doc = result['document']
             doc_id = doc['id']
 
             print(f"Processing document: {doc_id}, Type: {result.get('type')}")
 
-            # Check if it's a file and extract content
             if doc.get('type') == 'file':
                 try:
                     doc['content'] = await parse_file_content(doc.get('url'))
@@ -585,19 +577,13 @@ class VectorDatabase:
                 except Exception as e:
                     print(f"Failed to extract content for file {doc.get('display_name', '')}: {e}")
 
-        # Include related documents if requested
-        if include_related and search_results:
-            self._include_related_documents(search_results, search_parameters, minimum_score)
 
-        # Post-process to prioritize exact and partial matches
         combined_results = post_process_results(search_results, normalized_query)
-
-        # Augment results with additional information
         combined_results = augment_results(self.course_map, combined_results)
 
         for result_item in combined_results:
-            result_item.pop('similarity', None)  # Remove similarity
-            result_item.pop('related_docs', None)  # Remove related docs
+            result_item.pop('similarity', None)
+            result_item.pop('related_docs', None)
 
         return combined_results[:top_k]
     
