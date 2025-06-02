@@ -1,39 +1,31 @@
-#!/usr/bin/env python3
 """
-Vector Database Module for Canvas Data Orchestration
-----------------------------------------------------
-This module defines the `VectorDatabase` class, which serves as the primary interface
+Vector database module for Canvas data orchestration.
+
+This module defines the VectorDatabase class, which serves as the primary interface
 for interacting with the Qdrant vector store containing Canvas course data embeddings.
 It manages the Qdrant connection, orchestrates data processing and synchronization,
 and handles search requests by utilizing helper modules for specific tasks.
 
-Key features:
-1. **Qdrant Connection**: Manages the connection to the persistent Qdrant store.
-2. **Data Synchronization**: Handles loading data from the source JSON, updating internal
-   data structures (`document_map`, `course_map`, etc.), and synchronizing the
-   Qdrant collection (upserting new/changed embeddings, deleting stale ones).
-3. **Search Orchestration**: Processes search queries, builds appropriate filters
-   (via `vectordb.filters`), executes Qdrant vector searches, handles keyword
-   matching (via `vectordb.filters`), and processes/augments results
-   (via `vectordb.result_processor`).
-4. **Text Preprocessing Integration**: Utilizes `vectordb.text_processor` to prepare
-   document text for embedding during data processing.
-5. **Embedding Function**: Manages the Hugging Face embedding function via
-   `vectordb.embedding_model`.
+The module provides functionality for:
+- Qdrant connection management and persistent storage
+- Data synchronization from JSON sources to vector embeddings
+- Search orchestration with filtering and result processing
+- Text preprocessing integration for embedding preparation
+- Embedding function management via Hugging Face models
 
-Usage:
-1. Initialize `VectorDatabase` with the path to the user's JSON data file and HF token.
-2. Call `process_data()` during initial setup or data refresh to populate/sync the DB.
-3. Call `search()` to find relevant documents based on search parameters.
+Helper modules used:
+- vectordb.text_processor: Handles text normalization and formatting for embeddings
+- vectordb.filters: Builds Qdrant query filters and performs keyword matching
+- vectordb.result_processor: Post-processes and augments search results
+- vectordb.embedding_model: Creates the embedding function
+- vectordb.content_extraction: Extracts text content from files/HTML
 
-Helper Modules:
-- `vectordb.text_processor`: Handles text normalization and formatting for embeddings.
-- `vectordb.filters`: Builds Qdrant query filters and performs keyword matching.
-- `vectordb.result_processor`: Post-processes and augments search results.
-- `vectordb.embedding_model`: Creates the embedding function.
-- `vectordb.content_extraction`: Extracts text content from files/HTML (used during processing).
+Typical usage example:
 
-Note: Ensure the source JSON data file is structured correctly.
+  db = VectorDatabase('/path/to/data.json')
+  await db.connect_to_qdrant()
+  await db.process_data()
+  results = await db.search(search_parameters)
 """
 
 import os
