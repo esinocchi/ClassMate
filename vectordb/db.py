@@ -49,10 +49,6 @@ from datetime import datetime, timedelta, timezone
 import asyncio
 import uuid
 
-<<<<<<< HEAD
-=======
-# Add the project root directory to Python path
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
@@ -66,12 +62,8 @@ from vectordb.text_processing import (
 from vectordb.filters import handle_keywords, build_qdrant_filters
 from vectordb.post_process import post_process_results, augment_results, verify_doc
 from vectordb.text_processing import normalize_text
-<<<<<<< HEAD
 from vectordb.bm25_scorer import CanvasBM25, fuse_results
-=======
 
-# Load environment variables
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 load_dotenv()
 
 
@@ -91,7 +83,7 @@ class VectorDatabase:
         self.client = None
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         self.bm25_scorer = None
-    
+
         # If cache_dir is not provided, use the directory of the JSON file
         if cache_dir is None:
             self.cache_dir = os.path.dirname(json_file_path)
@@ -112,8 +104,7 @@ class VectorDatabase:
                 self.collection_name = "canvas_embeddings"
         else:
             self.collection_name = collection_name
-<<<<<<< HEAD
-      
+
         self.embedding_function = SentenceTransformerEmbeddingFunction()
         self.embedding_size = self.embedding_function.embedding_dims
 
@@ -121,17 +112,6 @@ class VectorDatabase:
         self.document_map = {}
         self.course_map = {}
         self.syllabus_map = {}
-=======
-
-        # Custom embedding function using Hugging Face API
-        self.embedding_function = SentenceTransformerEmbeddingFunction()
-        self.embedding_size = self.embedding_function.embedding_dims
-
-        self.documents = []  # stores documents
-        self.document_map = {}  # Allows O(1) lookup of documents by ID
-        self.course_map = {}  # information about courses
-        self.syllabus_map = {}  # information about syllabi
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 
     async def connect_to_qdrant(self):
         """
@@ -362,31 +342,16 @@ class VectorDatabase:
             print("No documents to process")
             return False
 
-<<<<<<< HEAD
     """def _include_related_documents(self, search_results, search_parameters, minimum_score):
         
-=======
-    def _include_related_documents(
-        self, search_results, search_parameters, minimum_score
-    ):
-        """
->>>>>>> d8c15a0 (made code pretty with ruff linter)
         Include related documents in search results.
 
         Args:
             search_results: List of search result dictionaries
             search_parameters: Dictionary containing search parameters
             minimum_score: Minimum similarity score to include in results
-<<<<<<< HEAD
         related_docs = self._get_related_documents([r['document'].get('id') for r in search_results])
         
-=======
-        """
-        related_docs = self._get_related_documents(
-            [r["document"].get("id") for r in search_results]
-        )
-
->>>>>>> d8c15a0 (made code pretty with ruff linter)
         # Map item types to internal types for filtering
         type_mapping = {
             "assignment": "assignment",
@@ -418,21 +383,12 @@ class VectorDatabase:
                     continue
 
             # Only add if not already in results
-<<<<<<< HEAD
             if not any(r['document'].get('id') == doc.get('id') for r in search_results):
                 search_results.append({
                     'document': doc,
                     'similarity': minimum_score,
                     'is_related': True
                 })"""
-=======
-            if not any(
-                r["document"].get("id") == doc.get("id") for r in search_results
-            ):
-                search_results.append(
-                    {"document": doc, "similarity": minimum_score, "is_related": True}
-                )
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 
     def _determine_top_k(self, search_parameters):
         """
@@ -610,56 +566,28 @@ class VectorDatabase:
         courses = search_parameters.get("course_id", "all_courses")
         keywords = search_parameters.get("keywords", [])
 
-<<<<<<< HEAD
         function_type_mapping = {
             "calculate_grade": ["assignment"],
             "find_file": ["file"],
-            "search": ["assignment", "file", "quiz", "announcement", "event"]
+            "search": ["assignment", "file", "quiz", "announcement", "event"],
         }
         item_types = function_type_mapping.get(function_name, [])
-=======
-        # Get doc_ids from semantic search to avoid
-        semantic_doc_ids = [str(score_point.id) for score_point in results.points]
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 
         if keywords and self.bm25_scorer:
-            keywords = ' '.join(keywords)
+            keywords = " ".join(keywords)
             filtered_docs = []
             for doc in self.documents:
-                doc_course_id = str(doc.get('course_id'))
+                doc_course_id = str(doc.get("course_id"))
                 if courses != "all_courses" and doc_course_id not in courses:
                     continue
-                if item_types and doc.get('type') not in item_types:
+                if item_types and doc.get("type") not in item_types:
                     continue
                 filtered_docs.append(doc)
 
-<<<<<<< HEAD
             bm25_results = self.bm25_scorer.search(keywords, filtered_docs, limit=10)
             search_results = fuse_results(search_results, bm25_results, alpha=0.7)
 
-            
-
-        search_results.sort(key=lambda x: x['similarity'], reverse=True)
-=======
-        if keywords:
-            keyword_matches = handle_keywords(
-                self.document_map, keywords, semantic_doc_ids, courses, item_types
-            )
-            print(f"Keyword matches: {keyword_matches}")
-
-            for match in keyword_matches:
-                keyword_similarity = 0.93
-                search_results.append(
-                    {
-                        "document": match["document"],
-                        "similarity": keyword_similarity,
-                        "type": match["document"].get("type"),
-                    }
-                )
-
-        # --- Sort by similarity (descending) ---
         search_results.sort(key=lambda x: x["similarity"], reverse=True)
->>>>>>> d8c15a0 (made code pretty with ruff linter)
 
         for result in search_results:
             doc = result["document"]
@@ -667,12 +595,7 @@ class VectorDatabase:
 
             print(f"Processing document: {doc_id}, Type: {result.get('type')}")
 
-<<<<<<< HEAD
-            if doc.get('type') == 'file':
-=======
-            # Check if it's a file and extract content
             if doc.get("type") == "file":
->>>>>>> d8c15a0 (made code pretty with ruff linter)
                 try:
                     doc["content"] = await parse_file_content(doc.get("url"))
                     print(f"Extracted content for file {doc.get('display_name', '')}")
@@ -681,26 +604,12 @@ class VectorDatabase:
                         f"Failed to extract content for file {doc.get('display_name', '')}: {e}"
                     )
 
-<<<<<<< HEAD
-=======
-        # Include related documents if requested
-        if include_related and search_results:
-            self._include_related_documents(
-                search_results, search_parameters, minimum_score
-            )
->>>>>>> d8c15a0 (made code pretty with ruff linter)
-
         combined_results = post_process_results(search_results, normalized_query)
         combined_results = augment_results(self.course_map, combined_results)
 
         for result_item in combined_results:
-<<<<<<< HEAD
-            result_item.pop('similarity', None)
-            result_item.pop('related_docs', None)
-=======
-            result_item.pop("similarity", None)  # Remove similarity
-            result_item.pop("related_docs", None)  # Remove related docs
->>>>>>> d8c15a0 (made code pretty with ruff linter)
+            result_item.pop("similarity", None)
+            result_item.pop("related_docs", None)
 
         return combined_results[:top_k]
 

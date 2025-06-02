@@ -29,63 +29,60 @@ def build_time_range_filter(
     if time_range == "ALL_TIME":
         return None
 
-<<<<<<< HEAD
-def build_specific_dates_filter(search_parameters: Dict[str, Any]) -> Optional[qdrant_models.Filter]:
-        """
-        Build specific dates filter conditions for ChromaDB query, working with
-        formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
-        
-        Args:
-            search_parameters: Dictionary containing search parameters
-            
-        Returns:
-            List of specific dates filter conditions to be added to the main where clause
-        """
-        if not search_parameters or "specific_dates" not in search_parameters or not search_parameters["specific_dates"]:
-            return None
-        
-        local_timezone = tzlocal.get_localzone()
-        specific_dates = []
-        
-        for date_str in search_parameters["specific_dates"]:
-            try:
-                naive_date = datetime.strptime(date_str, "%Y-%m-%d")
-                specific_date = naive_date.replace(tzinfo=local_timezone)
-                specific_dates.append(specific_date)
-            except ValueError:
-                print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
-        if not specific_dates:
-            return None
-        
-        # Fields that contain formatted date strings
-        timestamp_fields = ["due_timestamp", "posted_timestamp", "start_timestamp", "updated_timestamp"]
-        field_conditions = []
-        
-        if len(specific_dates) == 1:
-            specific_date = specific_dates[0]
-            
-            start_time = specific_date.replace(hour=0, minute=0, second=0)
-            end_time = specific_date.replace(hour=23, minute=59, second=59)
-            start_timestamp = int(start_time.timestamp())
-            end_timestamp = int(end_time.timestamp())
 
-        elif len(specific_dates) >= 2:
-            start_date = min(specific_dates)
-            end_date = max(specific_dates)
-=======
-    # Get current time in local timezone, then convert to UTC for timestamp comparison
+def build_specific_dates_filter(
+    search_parameters: Dict[str, Any],
+) -> Optional[qdrant_models.Filter]:
+    """
+    Build specific dates filter conditions for ChromaDB query, working with
+    formatted date strings in the format "YYYY-MM-DD hh:mm AM/PM".
+
+    Args:
+        search_parameters: Dictionary containing search parameters
+
+    Returns:
+        List of specific dates filter conditions to be added to the main where clause
+    """
+    if (
+        not search_parameters
+        or "specific_dates" not in search_parameters
+        or not search_parameters["specific_dates"]
+    ):
+        return None
+
     local_timezone = tzlocal.get_localzone()
-    current_time = datetime.now(local_timezone)
-    current_timestamp = int(current_time.timestamp())
+    specific_dates = []
 
-    # List of all possible timestamp fields across different document types
+    for date_str in search_parameters["specific_dates"]:
+        try:
+            naive_date = datetime.strptime(date_str, "%Y-%m-%d")
+            specific_date = naive_date.replace(tzinfo=local_timezone)
+            specific_dates.append(specific_date)
+        except ValueError:
+            print(f"Invalid date format: {date_str}, expected YYYY-MM-DD")
+    if not specific_dates:
+        return None
+
+    # Fields that contain formatted date strings
     timestamp_fields = [
         "due_timestamp",
         "posted_timestamp",
         "start_timestamp",
         "updated_timestamp",
     ]
->>>>>>> d8c15a0 (made code pretty with ruff linter)
+    field_conditions = []
+
+    if len(specific_dates) == 1:
+        specific_date = specific_dates[0]
+
+        start_time = specific_date.replace(hour=0, minute=0, second=0)
+        end_time = specific_date.replace(hour=23, minute=59, second=59)
+        start_timestamp = int(start_time.timestamp())
+        end_timestamp = int(end_time.timestamp())
+
+    elif len(specific_dates) >= 2:
+        start_date = min(specific_dates)
+        end_date = max(specific_dates)
 
     field_conditions = []
 
