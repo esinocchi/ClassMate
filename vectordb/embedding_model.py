@@ -11,11 +11,13 @@ expected by the vector database module.
 import logging
 import numpy as np
 from typing import List
+
 # Import SentenceTransformer
 from sentence_transformers import SentenceTransformer
 
 # Configure logging
 logger = logging.getLogger("canvas_vector_db.embedding")
+
 
 class SentenceTransformerEmbeddingFunction:
     """
@@ -36,11 +38,13 @@ class SentenceTransformerEmbeddingFunction:
             self.model_id = model_id
             # Get embedding dimensions from the loaded model
             self.embedding_dims = self.model.get_sentence_embedding_dimension()
-            logger.info(f"Initialized Sentence Transformer embedding function with model: {model_id}")
+            logger.info(
+                f"Initialized Sentence Transformer embedding function with model: {model_id}"
+            )
             logger.info(f"Embedding dimensions: {self.embedding_dims}")
         except Exception as e:
             logger.error(f"Failed to load Sentence Transformer model '{model_id}': {e}")
-            raise # Re-raise the exception as the function cannot operate without the model
+            raise  # Re-raise the exception as the function cannot operate without the model
 
     def __call__(self, input_texts: List[str]) -> List[List[float]]:
         """
@@ -64,16 +68,23 @@ class SentenceTransformerEmbeddingFunction:
             embeddings_np = self.model.encode(
                 input_texts,
                 convert_to_numpy=True,
-                show_progress_bar=False # Set to True for debugging large batches
+                show_progress_bar=False,  # Set to True for debugging large batches
             )
 
             # Ensure the output shape is correct
-            if embeddings_np.shape[0] != len(input_texts) or embeddings_np.shape[1] != self.embedding_dims:
-                 logger.error(f"Embedding shape mismatch: Expected ({len(input_texts)}, {self.embedding_dims}), Got {embeddings_np.shape}")
-                 # Handle mismatch - potentially return placeholders or raise error
-                 # Returning placeholders for robustness, similar to previous logic
-                 return [np.zeros(self.embedding_dims, dtype=np.float32).tolist() for _ in input_texts]
-
+            if (
+                embeddings_np.shape[0] != len(input_texts)
+                or embeddings_np.shape[1] != self.embedding_dims
+            ):
+                logger.error(
+                    f"Embedding shape mismatch: Expected ({len(input_texts)}, {self.embedding_dims}), Got {embeddings_np.shape}"
+                )
+                # Handle mismatch - potentially return placeholders or raise error
+                # Returning placeholders for robustness, similar to previous logic
+                return [
+                    np.zeros(self.embedding_dims, dtype=np.float32).tolist()
+                    for _ in input_texts
+                ]
 
             logger.info(f"Generated embeddings with shape: {embeddings_np.shape}")
 
@@ -83,7 +94,11 @@ class SentenceTransformerEmbeddingFunction:
         except Exception as e:
             logger.error(f"Error during Sentence Transformer encoding: {e}")
             # Return placeholder embeddings on error
-            return [np.zeros(self.embedding_dims, dtype=np.float32).tolist() for _ in input_texts]
+            return [
+                np.zeros(self.embedding_dims, dtype=np.float32).tolist()
+                for _ in input_texts
+            ]
+
 
 # Update the factory function name and remove api_token parameter
 def create_embedding_function(model_id="intfloat/e5-small-v2"):
