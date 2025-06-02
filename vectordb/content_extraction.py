@@ -1,7 +1,5 @@
 import io
 import aiohttp
-from urllib.parse import urlparse
-import os
 import fitz  # PyMuPDF
 from docx import Document
 from pptx import Presentation

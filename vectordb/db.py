@@ -40,12 +40,11 @@ import os
 import json
 import sys
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from pathlib import Path
 from dotenv import load_dotenv
 import qdrant_client
 from qdrant_client.http import models as qdrant_models
-from datetime import datetime, timedelta, timezone
 import asyncio
 import uuid
 
@@ -59,7 +58,7 @@ from vectordb.text_processing import (
     get_course_dict,
     add_date_metadata,
 )
-from vectordb.filters import handle_keywords, build_qdrant_filters
+from vectordb.filters import build_qdrant_filters
 from vectordb.post_process import post_process_results, augment_results, verify_doc
 from vectordb.text_processing import normalize_text
 from vectordb.bm25_scorer import CanvasBM25, fuse_results
@@ -561,7 +560,7 @@ class VectorDatabase:
 
         # --- Keyword Handling ---
 
-        print(f"Search results")
+        print("Search results")
 
         courses = search_parameters.get("course_id", "all_courses")
         keywords = search_parameters.get("keywords", [])
