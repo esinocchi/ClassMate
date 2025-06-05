@@ -28,39 +28,44 @@ Typical usage example:
   results = await db.search(search_parameters)
 """
 
-import os
-import json
-import sys
-import numpy as np
-from typing import List, Dict, Any
-from pathlib import Path
-from dotenv import load_dotenv
-import qdrant_client
-from qdrant_client.http import models as qdrant_models
+
 import asyncio
+import json
+import os
+import sys
 import uuid
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+import numpy as np
+import qdrant_client
+from dotenv import load_dotenv
+from qdrant_client.http import models as qdrant_models
 
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
-from vectordb.embedding_model import SentenceTransformerEmbeddingFunction
+from vectordb.bm25_scorer import CanvasBM25, fuse_results
 from vectordb.content_extraction import parse_file_content, parse_html_content
+from vectordb.embedding_model import SentenceTransformerEmbeddingFunction
+from vectordb.filters import build_qdrant_filters
+from vectordb.post_process import post_process_results, augment_results, verify_doc
 from vectordb.text_processing import (
     preprocess_text_for_embedding,
     get_course_dict,
     add_date_metadata,
+    normalize_text,
 )
-from vectordb.filters import build_qdrant_filters
-from vectordb.post_process import post_process_results, augment_results, verify_doc
-from vectordb.text_processing import normalize_text
-from vectordb.bm25_scorer import CanvasBM25, fuse_results
 
 load_dotenv()
 
 
 class VectorDatabase:
     def __init__(
-        self, json_file_path: str, cache_dir=None, collection_name: str = None
+        self,
+        json_file_path: str,
+        cache_dir: Optional[str] = None,
+        collection_name: Optional[str] = None,
     ):
         """
         Initialize the vector database with Qdrant.
@@ -75,11 +80,9 @@ class VectorDatabase:
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         self.bm25_scorer = None
 
-        # If cache_dir is not provided, use the directory of the JSON file
         if cache_dir is None:
-            self.cache_dir = os.path.dirname(json_file_path)
+            self.cache_dir: Path = Path(os.path.dirname(json_file_path))
         else:
-            # Ensure cache_dir exists for Qdrant persistence
             self.cache_dir = Path(cache_dir)
             self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,14 +100,14 @@ class VectorDatabase:
             self.collection_name = collection_name
 
         self.embedding_function = SentenceTransformerEmbeddingFunction()
-        self.embedding_size = self.embedding_function.embedding_dims
+        self.embedding_size: int = self.embedding_function.embedding_dimension
 
-        self.documents = []
-        self.document_map = {}
-        self.course_map = {}
-        self.syllabus_map = {}
+        self.documents: List[Dict[str, Any]] = []
+        self.document_map: Dict[str, Dict[str, Any]] = {}
+        self.course_map: Dict[str, Dict[str, Any]] = {}
+        self.syllabus_map: Dict[str, str] = {}
 
-    async def connect_to_qdrant(self):
+    async def connect_to_qdrant(self) -> None:
         """
         Connect to Qdrant.
         """
@@ -846,7 +849,7 @@ class VectorDatabase:
             )
             raise
 
-    async def _get_all_collection_ids(self) -> set:
+    async def _get_all_collection_ids(self) -> set[str]:
         """Retrieves all Canvas document IDs currently in the Qdrant collection."""
         try:
             # First, check if the collection is empty or get its size.

@@ -3,7 +3,7 @@
 import math
 import re
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Optional, Any
 
 
 class CanvasBM25:
@@ -21,7 +21,7 @@ class CanvasBM25:
         avg_doc_length: Average document length across the collection.
     """
 
-    def __init__(self, documents: List[Dict], k1: float = 1.5, b: float = 0.75):
+    def __init__(self, documents: List[Dict[str, Any]], k1: float = 1.5, b: float = 0.75):
         """Initialize the BM25 scorer with documents and parameters.
 
         Args:
@@ -34,7 +34,7 @@ class CanvasBM25:
         self.documents = documents
         self.k1 = k1
         self.b = b
-        self.doc_frequency = defaultdict(int)
+        self.doc_frequency: Dict[str, int] = defaultdict(int)
         self.avg_doc_length = 0
         self._precompute()
 
@@ -116,7 +116,7 @@ class CanvasBM25:
         for term, docs in documents_with_term.items():
             self.doc_frequency[term] = len(docs)
 
-    def score(self, doc: Dict, keywords: List[str]) -> float:
+    def score(self, doc: Dict[str, Any], keywords: List[str]) -> float:
         """Calculate BM25 relevance score for a document given query terms.
 
         Args:
@@ -134,8 +134,7 @@ class CanvasBM25:
         if doc_length == 0:
             return 0.0
 
-        # Count term frequencies
-        term_frequency = defaultdict(int)
+        term_frequency: Dict[str, int] = defaultdict(int)
         for term in doc_terms:
             term_frequency[term] += 1
 
@@ -183,8 +182,8 @@ class CanvasBM25:
         )
 
     def search(
-        self, query: str, docs: List[Dict] = None, limit: int = 10
-    ) -> List[Dict]:
+        self, query: str, docs: Optional[List[Dict[str, Any]]] = None, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Search documents using BM25 scoring and return ranked results.
 
         Args:
@@ -215,8 +214,8 @@ class CanvasBM25:
 
 
 def fuse_results(
-    semantic_results: List[Dict], bm25_results: List[Dict], alpha: float = 0.7
-) -> List[Dict]:
+    semantic_results: List[Dict[str, Any]], bm25_results: List[Dict[str, Any]], alpha: float = 0.7
+) -> List[Dict[str, Any]]:
     """
     Combine semantic and BM25 search results using weighted score fusion.
 
@@ -239,7 +238,7 @@ def fuse_results(
     """
 
     # Normalize scores
-    def normalize(results):
+    def normalize(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not results:
             return results
         max_score = max(r["similarity"] for r in results)

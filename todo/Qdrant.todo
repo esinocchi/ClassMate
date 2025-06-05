@@ -2,7 +2,7 @@ Setting up Qdrant:
     - Convert db.py to suppport Qdrant @started(25-05-16 19:29)
         ✔ Test basic connect to Qdrant Cloud, and basic Vector Search @started(25-05-16 19:29) @done(25-05-23 20:29) @lasted(1w1h51s)
         ✔ Implement BM25 scoring @started(25-06-01 18:41) @done(25-06-02 02:15) @lasted(7h34m50s)
-        - Fix mypy errors
-        - Refine code to follow Google Python Style Guide
-        - Add extensive tests and collect metrics
+        ✔ Fix mypy errors @done(25-06-05 16:20)
+        - Add extensive tests and collect metrics @started(25-06-05 16:23)
         - Perform profiling to determine how to optimize the search process
+        - Refine code to follow PEP8

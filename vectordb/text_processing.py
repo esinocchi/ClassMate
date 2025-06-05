@@ -4,11 +4,11 @@ import tzlocal
 import re
 
 
-def get_course_dict(data):
+def get_course_dict(data: Dict[str, Any]) -> Dict[str, str]:
     """
     Get dictionary of course_id to course_name
     """
-    course_dict = {}
+    course_dict: Dict[str, str] = {}
     for course_id in data["user_metadata"]["courses_selected"]:
         course_dict[course_id] = data["user_metadata"]["courses_selected"][course_id]
         print(course_dict[course_id])
@@ -118,7 +118,7 @@ def normalize_text(text: str) -> str:
     return normalized
 
 
-def add_local_time(doc: Dict[str, Any]) -> Dict[str, Any]:
+def add_local_time(doc: Dict[str, Any]) -> str:
     """
     Add local time to doc
     """
@@ -144,7 +144,7 @@ def add_local_time(doc: Dict[str, Any]) -> Dict[str, Any]:
     return ""
 
 
-def to_natural_language(item):
+def to_natural_language(item: Dict[str, Any]) -> str:
     """Convert a Canvas item to natural language for embedding."""
     type = item.get("type", "").lower()
     course = item.get("course_name", "")
@@ -215,7 +215,7 @@ def to_natural_language(item):
     return result
 
 
-def get_title(item):
+def get_title(item: Dict[str, Any]) -> str:
     title = item.get("title") or item.get("name") or item.get("display_name") or ""
     return title
 

@@ -37,11 +37,11 @@ class SentenceTransformerEmbeddingFunction:
             self.model = SentenceTransformer(model_id)
             self.model_id = model_id
             # Get embedding dimensions from the loaded model
-            self.embedding_dims = self.model.get_sentence_embedding_dimension()
+            self.embedding_dimension = self.model.get_sentence_embedding_dimension()
             logger.info(
                 f"Initialized Sentence Transformer embedding function with model: {model_id}"
             )
-            logger.info(f"Embedding dimensions: {self.embedding_dims}")
+            logger.info(f"Embedding dimensions: {self.embedding_dimension}")
         except Exception as e:
             logger.error(f"Failed to load Sentence Transformer model '{model_id}': {e}")
             raise  # Re-raise the exception as the function cannot operate without the model
@@ -74,15 +74,15 @@ class SentenceTransformerEmbeddingFunction:
             # Ensure the output shape is correct
             if (
                 embeddings_np.shape[0] != len(input_texts)
-                or embeddings_np.shape[1] != self.embedding_dims
+                or embeddings_np.shape[1] != self.embedding_dimension
             ):
                 logger.error(
-                    f"Embedding shape mismatch: Expected ({len(input_texts)}, {self.embedding_dims}), Got {embeddings_np.shape}"
+                    f"Embedding shape mismatch: Expected ({len(input_texts)}, {self.embedding_dimension}), Got {embeddings_np.shape}"
                 )
                 # Handle mismatch - potentially return placeholders or raise error
                 # Returning placeholders for robustness, similar to previous logic
                 return [
-                    np.zeros(self.embedding_dims, dtype=np.float32).tolist()
+                    np.zeros(self.embedding_dimension, dtype=np.float32).tolist()
                     for _ in input_texts
                 ]
 
@@ -95,7 +95,7 @@ class SentenceTransformerEmbeddingFunction:
             logger.error(f"Error during Sentence Transformer encoding: {e}")
             # Return placeholder embeddings on error
             return [
-                np.zeros(self.embedding_dims, dtype=np.float32).tolist()
+                np.zeros(self.embedding_dimension, dtype=np.float32).tolist()
                 for _ in input_texts
             ]
 
