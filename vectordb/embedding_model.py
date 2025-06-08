@@ -12,10 +12,8 @@ import logging
 import numpy as np
 from typing import List
 
-# Import SentenceTransformer
 from sentence_transformers import SentenceTransformer
 
-# Configure logging
 logger = logging.getLogger("canvas_vector_db.embedding")
 
 
