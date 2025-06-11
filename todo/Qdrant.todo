@@ -4,5 +4,8 @@ Setting up Qdrant:
         ✔ Implement BM25 scoring @started(25-06-01 18:41) @done(25-06-02 02:15) @lasted(7h34m50s)
         ✔ Fix mypy errors @done(25-06-05 16:20)
         - Add extensive tests and collect metrics @started(25-06-05 16:23)
+            - Review extensive_test_data.py
+            - Organize test_helpers.py into smaller files by functionality
+            - Figure out how to evaluate the search results (whether the search was successful or not)
         - Perform profiling to determine how to optimize the search process
         - Refine code to follow PEP8
