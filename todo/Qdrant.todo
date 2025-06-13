@@ -6,6 +6,11 @@ Setting up Qdrant:
         - Add extensive tests and collect metrics @started(25-06-05 16:23)
             - Review extensive_test_data.py
             - Organize test_helpers.py into smaller files by functionality
-            - Figure out how to evaluate the search results (whether the search was successful or not)
+            - Implement Groq API to evaluate the search results from testing
+            - Optimize the search procoess and test the results (repeat the process until the results are satisfactory)
         - Perform profiling to determine how to optimize the search process
-        - Refine code to follow PEP8
+
+Improve code reliability and maintainability:
+    - Anaylze the Code Optimization Report and make improvements
+
+    

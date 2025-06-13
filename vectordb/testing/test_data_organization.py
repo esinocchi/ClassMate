@@ -12,6 +12,7 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any
+from vectordb.testing.create_test_courses import generate_realistic_courses
 
 
 def create_extensive_test_json(
@@ -31,128 +32,75 @@ def create_extensive_test_json(
     """
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Course subjects and their details
-    course_subjects = [
-        {
-            "id": "3000000",
-            "name": "Computer Science Fundamentals",
-            "code": "CS101",
-            "subject": "computer science",
-        },
-        {
-            "id": "3000001",
-            "name": "Advanced Data Structures",
-            "code": "CS201",
-            "subject": "algorithms",
-        },
-        {
-            "id": "3000002",
-            "name": "Database Systems",
-            "code": "CS301",
-            "subject": "databases",
-        },
-        {
-            "id": "3000003",
-            "name": "Machine Learning Basics",
-            "code": "ML101",
-            "subject": "machine learning",
-        },
-        {
-            "id": "3000004",
-            "name": "Web Development",
-            "code": "WEB201",
-            "subject": "web development",
-        },
-        {
-            "id": "3000005",
-            "name": "Software Engineering",
-            "code": "SE301",
-            "subject": "software engineering",
-        },
-        {
-            "id": "3000006",
-            "name": "Calculus I",
-            "code": "MATH101",
-            "subject": "mathematics",
-        },
-        {
-            "id": "3000007",
-            "name": "Statistics and Probability",
-            "code": "STAT201",
-            "subject": "statistics",
-        },
-        {"id": "3000008", "name": "Physics I", "code": "PHYS101", "subject": "physics"},
-        {
-            "id": "3000009",
-            "name": "Technical Writing",
-            "code": "ENG301",
-            "subject": "writing",
-        },
-    ]
+    # Generate realistic course data using the realistic_course_data module
+    course_subjects = generate_realistic_courses()
 
-    # Generate courses with syllabi
-    courses = []
-    courses_selected = {}
-    for course in course_subjects:
-        courses_selected[course["id"]] = course["code"]
-        courses.append(
+    # Realistic assignment templates based on actual Canvas data patterns
+    assignment_templates = {
+        "CMPSC": [
             {
-                "id": course["id"],
-                "name": course["name"],
-                "course_code": course["code"],
-                "syllabus_body": f"<h1>{course['name']} Syllabus</h1><p>This course covers fundamental concepts in {course['subject']}. Students will learn through lectures, assignments, and hands-on projects.</p><p>Prerequisites: Basic understanding of {course['subject']} concepts.</p>",
-                "timezone": "America/New_York",
+                "type": "lab",
+                "names": ["Lab", "Programming Lab", "Coding Assignment"],
+                "descriptions": [
+                    "<p>This assignment involves implementing key concepts in systems programming.</p><p><strong>GitHub Classroom Link:</strong> <a href='https://classroom.github.com/a/example'>Accept Assignment</a></p><p><strong>Due Date:</strong> Submit via GitHub by the deadline.</p>",
+                    "<p>Complete the programming exercise focusing on data structures and algorithms.</p><p><strong>Submission Requirements:</strong></p><ul><li>Submit source code files</li><li>Include documentation</li><li>Test your implementation</li></ul>",
+                    "<p>Implement the required functionality as specified in the assignment description.</p><p><strong>Grading Criteria:</strong></p><ul><li>Correctness: 60%</li><li>Code Quality: 25%</li><li>Documentation: 15%</li></ul>"
+                ],
+                "submission_types": ["online_upload", "external_tool"]
+            },
+            {
+                "type": "project",
+                "names": ["Project", "Final Project", "Course Project"],
+                "descriptions": [
+                    "<p>This is a comprehensive project that demonstrates your understanding of the course material.</p><p><strong>Project Requirements:</strong></p><ul><li>Implement core functionality</li><li>Write comprehensive tests</li><li>Create user documentation</li><li>Present your solution</li></ul>",
+                    "<p>Develop a complete application incorporating multiple course concepts.</p><p><strong>Deliverables:</strong></p><ol><li>Source code repository</li><li>Technical documentation</li><li>Demo video</li><li>Final presentation</li></ol>"
+                ],
+                "submission_types": ["online_upload", "online_text_entry"]
             }
-        )
-
-    # Assignment templates for different types
-    assignment_templates = [
-        {
-            "type": "homework",
-            "names": ["Homework", "Problem Set", "Exercise", "Practice"],
-            "descriptions": [
-                "Complete the assigned problems",
-                "Solve the given exercises",
-                "Work through the practice problems",
-            ],
-        },
-        {
-            "type": "lab",
-            "names": ["Lab", "Laboratory", "Practical"],
-            "descriptions": [
-                "Complete the lab assignment",
-                "Perform the laboratory exercise",
-                "Finish the practical work",
-            ],
-        },
-        {
-            "type": "project",
-            "names": ["Project", "Final Project", "Group Project"],
-            "descriptions": [
-                "Complete the project requirements",
-                "Develop the assigned project",
-                "Build the required application",
-            ],
-        },
-        {
-            "type": "quiz",
-            "names": ["Quiz", "Short Quiz", "Weekly Quiz"],
-            "descriptions": [
-                "Take the quiz on course material",
-                "Complete the assessment",
-                "Answer the quiz questions",
-            ],
-        },
-        {
-            "type": "exam",
-            "names": ["Exam", "Midterm", "Final Exam"],
-            "descriptions": [
-                "Take the examination",
-                "Complete the test",
-                "Finish the assessment",
-            ],
-        },
-    ]
+        ],
+        "CMPEN": [
+            {
+                "type": "homework",
+                "names": ["Homework", "Problem Set", "Assignment"],
+                "descriptions": [
+                    "<p>Complete the assigned problems from the textbook.</p><p><strong>Instructions:</strong></p><ul><li>Show all work</li><li>Provide clear explanations</li><li>Submit as PDF</li></ul>",
+                    "<p>Solve the engineering problems related to digital design.</p><p><strong>Submission Format:</strong> Upload a single PDF file with all solutions.</p>"
+                ],
+                "submission_types": ["online_upload"]
+            },
+            {
+                "type": "lab",
+                "names": ["Lab Report", "Laboratory Exercise", "Practical"],
+                "descriptions": [
+                    "<p>Complete the laboratory exercise and submit a detailed report.</p><p><strong>Report Requirements:</strong></p><ul><li>Experimental procedure</li><li>Data analysis</li><li>Conclusions</li></ul>",
+                    "<p>Perform the assigned laboratory work and document your findings.</p><p><strong>Due Date:</strong> Submit within one week of lab session.</p>"
+                ],
+                "submission_types": ["online_upload"]
+            }
+        ],
+        "EARTH": [
+            {
+                "type": "assignment",
+                "names": ["Assignment", "Research Assignment", "Case Study"],
+                "descriptions": [
+                    "<p>Analyze the environmental case study and provide your assessment.</p><p><strong>Requirements:</strong></p><ul><li>2-3 page analysis</li><li>Use course concepts</li><li>Cite relevant sources</li></ul>",
+                    "<p>Complete the earth science research project on the assigned topic.</p><p><strong>Format:</strong> Submit as Word document or PDF.</p>"
+                ],
+                "submission_types": ["online_upload", "online_text_entry"]
+            }
+        ],
+        "ACCTG": [
+            {
+                "type": "homework",
+                "names": ["Homework", "Problem Set", "Practice Problems"],
+                "descriptions": [
+                    "<p>Complete the accounting problems from Chapter {chapter}.</p><p><strong>Instructions:</strong></p><ul><li>Show all calculations</li><li>Use proper accounting format</li><li>Submit Excel file or PDF</li></ul>",
+                    "<p>Solve the financial accounting exercises.</p><p><strong>Grading:</strong> Based on accuracy and presentation.</p>"
+                ],
+                "submission_types": ["online_upload"]
+            }
+        ]
+    }
 
     # Generate assignments
     assignments = []
@@ -160,23 +108,43 @@ def create_extensive_test_json(
     base_date = datetime(2024, 8, 15)
 
     for course in course_subjects:
-        # Generate 20-25 assignments per course
-        num_assignments = random.randint(20, 25)
+        # Extract subject from course code for template selection
+        course_code = course.get("course_code", "")
+        subject = course_code.split()[0] if course_code else "GENERIC"
+        
+        # Get appropriate templates for this subject
+        subject_templates = assignment_templates.get(subject, assignment_templates.get("CMPSC", []))
+        if not subject_templates:
+            # Fallback to generic templates
+            subject_templates = [
+                {
+                    "type": "assignment",
+                    "names": ["Assignment", "Homework", "Exercise"],
+                    "descriptions": ["<p>Complete the assigned work for this course.</p>"],
+                    "submission_types": ["online_upload"]
+                }
+            ]
+
+        # Generate 15-20 assignments per course (more realistic number)
+        num_assignments = random.randint(15, 20)
         for i in range(num_assignments):
-            template = random.choice(assignment_templates)
+            template = random.choice(subject_templates)
             name_base = random.choice(template["names"])
             description = random.choice(template["descriptions"])
 
             # Add variety to names and descriptions
-            if template["type"] in ["homework", "lab", "quiz"]:
+            if template["type"] in ["homework", "lab", "assignment"]:
                 name = f"{name_base} {i + 1}"
-                description = f"{description} for {course['subject']} concepts."
             else:
                 name = f"{name_base}"
-                description = f"{description} focusing on {course['subject']}."
+                
+            # Format description with chapter numbers for accounting
+            if subject == "ACCTG" and "{chapter}" in description:
+                chapter_num = random.randint(1, 15)
+                description = description.format(chapter=chapter_num)
 
-            # Vary due dates
-            days_offset = random.randint(1, 120)
+            # Vary due dates realistically (spread over semester)
+            days_offset = random.randint(7, 120)  # Start assignments after first week
             due_date = base_date + timedelta(days=days_offset)
 
             assignments.append(
@@ -184,10 +152,10 @@ def create_extensive_test_json(
                     "id": str(assignment_id),
                     "type": None,
                     "name": name,
-                    "description": f"<p>{description}</p><p>This assignment covers key topics in {course['name']}.</p>",
+                    "description": description,
                     "due_at": due_date.strftime("%Y-%m-%dT23:59:00Z"),
                     "course_id": course["id"],
-                    "submission_types": ["online_text_entry", "online_upload"],
+                    "submission_types": template.get("submission_types", ["online_text_entry", "online_upload"]),
                     "can_submit": None,
                     "graded_submission_exist": None,
                     "graded_submissions_exist": None,
@@ -198,55 +166,156 @@ def create_extensive_test_json(
             )
             assignment_id += 1
 
-    # File types and names
-    file_templates = [
-        {
-            "type": "lecture",
-            "names": ["Lecture Notes", "Slides", "Presentation"],
-            "extensions": [".pdf", ".pptx"],
-        },
-        {
-            "type": "reading",
-            "names": ["Reading Material", "Chapter", "Article"],
-            "extensions": [".pdf", ".docx"],
-        },
-        {
-            "type": "code",
-            "names": ["Code Example", "Sample Code", "Template"],
-            "extensions": [".py", ".java", ".cpp"],
-        },
-        {
-            "type": "data",
-            "names": ["Dataset", "Data File", "Sample Data"],
-            "extensions": [".csv", ".json", ".xlsx"],
-        },
-    ]
+    # Realistic file templates based on actual Canvas data patterns
+    file_templates = {
+        "CMPSC": [
+            {
+                "type": "lecture",
+                "names": ["Lecture", "Slides", "Notes"],
+                "patterns": ["Lecture {num}", "Week {week} Slides", "Chapter {chapter} Notes"],
+                "extensions": [".pdf", ".pptx"],
+                "folders": ["Lectures", "Course Materials", "Slides"]
+            },
+            {
+                "type": "lab",
+                "names": ["Lab", "Assignment", "Exercise"],
+                "patterns": ["Lab {num}", "Programming Assignment {num}", "Exercise {num}"],
+                "extensions": [".pdf", ".zip", ".md"],
+                "folders": ["Labs", "Assignments", "Programming"]
+            },
+            {
+                "type": "code",
+                "names": ["Code", "Template", "Example"],
+                "patterns": ["starter_code_{num}", "template_{name}", "example_{topic}"],
+                "extensions": [".c", ".cpp", ".py", ".java", ".zip"],
+                "folders": ["Code Examples", "Templates", "Resources"]
+            }
+        ],
+        "CMPEN": [
+            {
+                "type": "lecture",
+                "names": ["Lecture", "Notes", "Slides"],
+                "patterns": ["Lecture {num}", "Chapter {chapter}", "Topic {num}"],
+                "extensions": [".pdf", ".pptx"],
+                "folders": ["Lectures", "Course Notes"]
+            },
+            {
+                "type": "lab",
+                "names": ["Lab", "Manual", "Guide"],
+                "patterns": ["Lab {num} Manual", "Lab Guide {num}", "Experiment {num}"],
+                "extensions": [".pdf", ".docx"],
+                "folders": ["Lab Manuals", "Experiments"]
+            }
+        ],
+        "EARTH": [
+            {
+                "type": "reading",
+                "names": ["Reading", "Article", "Chapter"],
+                "patterns": ["Chapter {chapter}", "Reading {num}", "Article {num}"],
+                "extensions": [".pdf", ".docx"],
+                "folders": ["Readings", "Course Materials"]
+            },
+            {
+                "type": "data",
+                "names": ["Data", "Dataset", "Case Study"],
+                "patterns": ["Dataset {num}", "Case Study {num}", "Data Analysis {num}"],
+                "extensions": [".csv", ".xlsx", ".pdf"],
+                "folders": ["Data", "Case Studies"]
+            }
+        ],
+        "ACCTG": [
+            {
+                "type": "reading",
+                "names": ["Chapter", "Reading", "Material"],
+                "patterns": ["Chapter {chapter}", "Reading Assignment {num}", "Study Material {num}"],
+                "extensions": [".pdf", ".docx"],
+                "folders": ["Textbook", "Readings"]
+            },
+            {
+                "type": "practice",
+                "names": ["Practice", "Problems", "Exercises"],
+                "patterns": ["Practice Problems {num}", "Chapter {chapter} Exercises", "Problem Set {num}"],
+                "extensions": [".pdf", ".xlsx"],
+                "folders": ["Practice Problems", "Exercises"]
+            }
+        ]
+    }
 
     # Generate files
     files = []
     file_id = 30000000
 
     for course in course_subjects:
-        # Generate 15-20 files per course
-        num_files = random.randint(15, 20)
-        for i in range(num_files):
-            template = random.choice(file_templates)
-            name_base = random.choice(template["names"])
-            extension = random.choice(template["extensions"])
+        # Extract subject from course code for template selection
+        course_code = course.get("course_code", "")
+        subject = course_code.split()[0] if course_code else "GENERIC"
+        
+        # Get appropriate file templates for this subject
+        subject_file_templates = file_templates.get(subject, file_templates.get("CMPSC", []))
+        if not subject_file_templates:
+            # Fallback to generic templates
+            subject_file_templates = [
+                {
+                    "type": "document",
+                    "names": ["Document", "File", "Material"],
+                    "patterns": ["Document {num}"],
+                    "extensions": [".pdf", ".docx"],
+                    "folders": ["Course Materials"]
+                }
+            ]
 
-            display_name = f"{name_base} {i + 1}{extension}"
+        # Generate 12-18 files per course (more realistic number)
+        num_files = random.randint(12, 18)
+        for i in range(num_files):
+            template = random.choice(subject_file_templates)
+            pattern = random.choice(template["patterns"])
+            extension = random.choice(template["extensions"])
+            folder = random.choice(template["folders"])
+
+            # Generate realistic file names using patterns
+            if "{num}" in pattern:
+                display_name = pattern.format(num=i + 1) + extension
+            elif "{week}" in pattern:
+                week_num = (i // 2) + 1  # 2 files per week roughly
+                display_name = pattern.format(week=week_num) + extension
+            elif "{chapter}" in pattern:
+                chapter_num = (i // 3) + 1  # 3 files per chapter roughly
+                display_name = pattern.format(chapter=chapter_num) + extension
+            elif "{name}" in pattern:
+                names = ["basics", "advanced", "practice", "review", "final"]
+                name = random.choice(names)
+                display_name = pattern.format(name=name) + extension
+            elif "{topic}" in pattern:
+                topics = ["intro", "algorithms", "structures", "systems", "design"]
+                topic = random.choice(topics)
+                display_name = pattern.format(topic=topic) + extension
+            else:
+                display_name = f"{pattern} {i + 1}{extension}"
+
             filename = display_name.lower().replace(" ", "_")
+
+            # Realistic file sizes based on type
+            if extension in [".pdf", ".pptx"]:
+                file_size = random.randint(512000, 10485760)  # 512KB to 10MB
+            elif extension in [".zip"]:
+                file_size = random.randint(1048576, 52428800)  # 1MB to 50MB
+            elif extension in [".c", ".cpp", ".py", ".java"]:
+                file_size = random.randint(1024, 102400)  # 1KB to 100KB
+            elif extension in [".csv", ".xlsx"]:
+                file_size = random.randint(10240, 1048576)  # 10KB to 1MB
+            else:
+                file_size = random.randint(10240, 5242880)  # 10KB to 5MB
 
             files.append(
                 {
                     "course_id": course["id"],
                     "id": str(file_id),
                     "type": None,
-                    "folder_id": f"folder_{course['code']}_docs",
+                    "folder_id": f"folder_{subject.lower()}_{folder.lower().replace(' ', '_')}",
                     "display_name": display_name,
                     "filename": filename,
                     "url": f"http://example.com/files/{file_id}/download?download_frd=1",
-                    "size": random.randint(10240, 5242880),  # 10KB to 5MB
+                    "size": file_size,
                     "updated_at": (
                         base_date + timedelta(days=random.randint(1, 100))
                     ).strftime("%Y-%m-%dT12:00:00Z"),
@@ -258,49 +327,90 @@ def create_extensive_test_json(
             )
             file_id += 1
 
-    # Generate announcements
+    # Generate announcements with realistic HTML content
     announcements = []
     announcement_id = 40000000
     announcement_templates = [
-        "Welcome to {course_name}! Please review the syllabus and course materials.",
-        "Reminder: {assignment_type} is due next week. Please submit on time.",
-        "New lecture materials have been posted for {course_name}.",
-        "Office hours this week will be held on {day} from 2-4 PM.",
-        "Important update regarding the upcoming {exam_type} in {course_name}.",
-        "Group project assignments have been posted. Check your teams.",
-        "Lab session for {course_name} has been moved to {new_time}.",
-        "Reading assignment for next week: Chapter {chapter_num}.",
-        "Midterm exam results are now available in the gradebook.",
-        "Final project presentations will be held during the last week of class.",
+        {
+            "title": "Welcome to {course_name}",
+            "message": "<p>Welcome to <strong>{course_name}</strong>!</p><p>Please take some time to review the syllabus and familiarize yourself with the course structure. All course materials are available in Canvas.</p><p>If you have any questions, please don't hesitate to reach out during office hours or via email.</p><p>Looking forward to a great semester!</p><p>Best regards,<br>Your Instructor</p>"
+        },
+        {
+            "title": "Assignment Reminder - {assignment_type}",
+            "message": "<p><strong>Reminder:</strong> {assignment_type} is due <strong>next week</strong>.</p><p>Please make sure to:</p><ul><li>Submit your work on time</li><li>Follow the submission guidelines</li><li>Check your work before submitting</li></ul><p>Late submissions will be penalized according to the course policy.</p>"
+        },
+        {
+            "title": "New Course Materials Posted",
+            "message": "<p>New lecture materials have been posted for <strong>{course_name}</strong>.</p><p>You can find them in the <em>Files</em> section under the appropriate week folder.</p><p>Please review these materials before our next class session.</p>"
+        },
+        {
+            "title": "Office Hours Update",
+            "message": "<p><strong>Office Hours This Week:</strong></p><p>I will be holding office hours on <strong>{day} from 2:00 PM - 4:00 PM</strong> in my office.</p><p>Feel free to drop by if you have questions about the course material, assignments, or need clarification on any topics.</p><p>You can also schedule an appointment if these times don't work for you.</p>"
+        },
+        {
+            "title": "Exam Information - {exam_type}",
+            "message": "<p><strong>Important Update:</strong> Information about the upcoming <strong>{exam_type}</strong> in {course_name}.</p><p><strong>Exam Details:</strong></p><ul><li>Date: [To be announced]</li><li>Time: During regular class time</li><li>Format: In-person written exam</li><li>Coverage: Chapters 1-{chapter_num}</li></ul><p>Study guide will be posted next week.</p>"
+        },
+        {
+            "title": "Group Project Assignments",
+            "message": "<p><strong>Group Project Teams</strong> have been posted!</p><p>Please check the <em>People</em> section to see your team assignments.</p><p><strong>Next Steps:</strong></p><ol><li>Contact your team members</li><li>Schedule your first team meeting</li><li>Review the project requirements</li><li>Submit your project proposal by the deadline</li></ol>"
+        },
+        {
+            "title": "Lab Session Schedule Change",
+            "message": "<p><strong>Schedule Update:</strong> Lab session for <strong>{course_name}</strong> has been moved.</p><p><strong>New Time:</strong> {new_time}</p><p><strong>Location:</strong> Same lab room</p><p>Please update your calendars accordingly. If you have conflicts with the new time, please contact me as soon as possible.</p>"
+        },
+        {
+            "title": "Reading Assignment - Chapter {chapter_num}",
+            "message": "<p><strong>Reading Assignment for Next Week:</strong></p><p>Please read <strong>Chapter {chapter_num}</strong> from the textbook before our next class.</p><p><strong>Focus Areas:</strong></p><ul><li>Key concepts and definitions</li><li>Examples and case studies</li><li>End-of-chapter questions</li></ul><p>We will discuss this material in class and it will be covered on the next exam.</p>"
+        },
+        {
+            "title": "Midterm Exam Results Available",
+            "message": "<p><strong>Midterm Exam Results</strong> are now available in the gradebook.</p><p>Overall, the class performed well with an average score of 82%.</p><p><strong>If you have questions about your grade:</strong></p><ul><li>Review the answer key (posted in Files)</li><li>Come to office hours for discussion</li><li>Email me if you need clarification</li></ul><p>Remember, this is just one component of your final grade.</p>"
+        },
+        {
+            "title": "Final Project Presentations",
+            "message": "<p><strong>Final Project Presentations</strong> will be held during the last week of class.</p><p><strong>Presentation Schedule:</strong></p><ul><li>Each team will have 10 minutes to present</li><li>5 minutes for questions and discussion</li><li>All team members must participate</li></ul><p><strong>Presentation Requirements:</strong></p><ul><li>Demonstrate your working solution</li><li>Explain your design decisions</li><li>Discuss challenges and solutions</li></ul><p>Detailed rubric will be posted soon.</p>"
+        }
     ]
 
     for course in course_subjects:
-        # Generate 10-12 announcements per course
-        num_announcements = random.randint(10, 12)
+        # Generate 8-10 announcements per course (more realistic number)
+        num_announcements = random.randint(8, 10)
         for i in range(num_announcements):
             template = random.choice(announcement_templates)
 
-            # Fill in template variables
-            message = template.format(
-                course_name=course["name"],
-                assignment_type=random.choice(
+            # Fill in template variables safely
+            format_vars = {
+                "course_name": course["name"],
+                "assignment_type": random.choice(
                     ["Assignment", "Homework", "Lab", "Project"]
                 ),
-                day=random.choice(
+                "exam_type": random.choice(["Midterm Exam", "Final Exam", "Quiz"]),
+                "day": random.choice(
                     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
                 ),
-                exam_type=random.choice(["midterm", "final exam", "quiz"]),
-                new_time=random.choice(["10 AM", "2 PM", "3 PM"]),
-                chapter_num=random.randint(1, 15),
-            )
+                "new_time": random.choice(["10:00 AM", "2:00 PM", "3:00 PM"]),
+                "chapter_num": random.randint(1, 15),
+            }
+            
+            # Format title and message, handling missing variables gracefully
+            try:
+                title = template["title"].format(**format_vars)
+            except KeyError as e:
+                title = template["title"]  # Use original if formatting fails
+                
+            try:
+                message = template["message"].format(**format_vars)
+            except KeyError as e:
+                message = template["message"]  # Use original if formatting fails
 
             posted_date = base_date + timedelta(days=random.randint(1, 100))
 
             announcements.append(
                 {
                     "id": str(announcement_id),
-                    "title": f"Course Update - {course['code']}",
-                    "message": f"<p>{message}</p>",
+                    "title": title,
+                    "message": message,
                     "posted_at": posted_date.strftime("%Y-%m-%dT10:00:00Z"),
                     "course_id": course["id"],
                     "discussion_type": "threaded",
@@ -336,7 +446,7 @@ def create_extensive_test_json(
             calendar_events.append(
                 {
                     "id": f"event_{event_id}",
-                    "title": f"{template['title']} - {course['code']}",
+                    "title": f"{template['title']} - {course.get('course_code', course['name'])}",
                     "start_at": start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "end_at": end_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "description": f"{template['title']} for {course['name']}",
@@ -407,6 +517,12 @@ def create_extensive_test_json(
             )
             quiz_id += 1
 
+    # Create courses_selected dictionary from generated courses
+    courses_selected = {str(course["id"]): course["name"] for course in course_subjects}
+    
+    # Set courses variable for data compilation
+    courses = course_subjects
+
     # Compile the complete data structure
     data = {
         "user_metadata": {
@@ -451,18 +567,22 @@ def generate_test_search_queries() -> List[Dict[str, Any]]:
         None
     """
 
-    # Base course IDs from the extensive test data
+    # Base course IDs from the realistic course data
     course_ids = [
-        "3000000",
-        "3000001",
-        "3000002",
-        "3000003",
-        "3000004",
-        "3000005",
-        "3000006",
-        "3000007",
-        "3000008",
-        "3000009",
+        "2400000",  # CMPSC 311
+        "2400001",  # CMPSC 465
+        "2400002",  # CMPSC 221
+        "2400003",  # CMPSC 132
+        "2400004",  # CMPSC 331
+        "2400005",  # CMPEN 331
+        "2400006",  # CMPEN 270
+        "2400007",  # CMPEN 271
+        "2400008",  # EARTH 103N
+        "2400009",  # EARTH 104
+        "2400010",  # EARTH 105
+        "2400011",  # ACCTG 211
+        "2400012",  # ACCTG 212
+        "2400013",  # ACCTG 301
     ]
 
     search_queries = []

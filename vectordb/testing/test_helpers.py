@@ -194,7 +194,7 @@ async def setup_extensive_test_data(
     Raises:
         AssertionError: If data setup fails.
     """
-    from vectordb.testing.extensive_test_data import create_extensive_test_json
+    from vectordb.testing.test_data_organization import create_extensive_test_json
 
     # Create extensive test data
     extensive_data_path = test_data_dir / "extensive_test_data.json"

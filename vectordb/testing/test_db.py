@@ -26,7 +26,6 @@ sys.path.insert(0, str(root_dir))
 from vectordb.db import VectorDatabase
 from vectordb.bm25_scorer import CanvasBM25
 from vectordb.testing.test_helpers import (
-    create_dummy_test_json,
     setup_extensive_test_data,
     perform_single_search,
     print_search_progress,
@@ -34,6 +33,7 @@ from vectordb.testing.test_helpers import (
     print_successful_search_examples,
     validate_search_diversity,
 )
+from vectordb.testing.test_data_organization import create_extensive_test_json
 
 # Test configuration constants
 TEST_DATA_DIR = root_dir / "test_data_temp"
@@ -61,7 +61,7 @@ def manage_test_environment():
     TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Test environment setup: {TEST_DATA_DIR}")
 
-    create_dummy_test_json(TEST_JSON_FILE_PATH)
+    create_extensive_test_json(TEST_JSON_FILE_PATH)
 
     yield
 
@@ -95,7 +95,7 @@ async def db_instance(manage_test_environment):
     Raises:
         Exception: If cleanup of Qdrant collection fails.
     """
-    test_user_id = "test_user_123"
+    test_user_id = "extensive_test_user_456"
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     unique_collection_name = f"{TEST_COLLECTION_NAME_PREFIX}{test_user_id}_{timestamp}"
 
@@ -161,7 +161,7 @@ async def test_process_data_and_upload(db_instance: VectorDatabase):
         "process_data should return True on successful data processing and upload."
     )
 
-    expected_doc_count = 8
+    expected_min_doc_count = 200  # Updated for extensive test data
 
     await asyncio.sleep(0.5)
 
@@ -171,8 +171,8 @@ async def test_process_data_and_upload(db_instance: VectorDatabase):
         )
         actual_doc_count = count_response.count
 
-        assert actual_doc_count == expected_doc_count, (
-            f"Document count in Qdrant ({actual_doc_count}) should be {expected_doc_count}."
+        assert actual_doc_count >= expected_min_doc_count, (
+            f"Document count in Qdrant ({actual_doc_count}) should be at least {expected_min_doc_count}."
         )
 
     except Exception as e:
@@ -195,8 +195,8 @@ async def test_search_vectors_basic(db_instance: VectorDatabase):
     await asyncio.sleep(0.5)
 
     search_params = {
-        "query": "syllabus for testing",
-        "course_id": "2500000",
+        "query": "syllabus for CMPSC",
+        "course_id": "2400000",
         "item_types": ["syllabus"],
         "generality": "SPECIFIC",
         "specific_amount": 1,
@@ -214,10 +214,10 @@ async def test_search_vectors_basic(db_instance: VectorDatabase):
         )
 
         found_expected_item = any(
-            item.get("document", {}).get("id") == "syllabus_2500000" for item in results
+            "CMPSC" in item.get("document", {}).get("name", "") for item in results
         )
         assert found_expected_item, (
-            "Expected document 'syllabus_2500000' not found in search results."
+            "Expected CMPSC syllabus not found in search results."
         )
 
     except Exception as e:
@@ -247,13 +247,13 @@ async def test_bm25_keyword_search(db_instance: VectorDatabase):
     await asyncio.sleep(0.5)
 
     search_params = {
-        "course_id": "2500000",
+        "course_id": "2400000",
         "time_range": "ALL_TIME",
         "generality": "MEDIUM",
         "item_types": ["assignment"],
         "specific_dates": [],
-        "keywords": ["lab", "0.5"],
-        "query": "Tell me about lab assignment 0.5",
+        "keywords": ["lab", "programming"],
+        "query": "Tell me about programming lab assignments",
     }
 
     results = await db.search(search_parameters=search_params)
@@ -329,7 +329,7 @@ async def test_search_vectors_extensive(db_instance: VectorDatabase) -> None:
     Raises:
         AssertionError: If search results do not meet expected criteria.
     """
-    from vectordb.testing.extensive_test_data import generate_test_search_queries
+    from vectordb.testing.test_data_organization import generate_test_search_queries
 
     # Setup extensive test data
     extensive_db, doc_count = await setup_extensive_test_data(
