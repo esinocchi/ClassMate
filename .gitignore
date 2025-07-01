@@ -15,3 +15,4 @@ vectordb/test_db.py
 .cursor/
 user_data/
 **/__pycache__/
+vectordb/testing/test_results/
