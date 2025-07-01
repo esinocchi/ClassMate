@@ -557,353 +557,453 @@ def create_extensive_test_json(
     return user_id
 
 
-def generate_test_search_queries() -> List[Dict[str, Any]]:
-    """Generate a comprehensive list of test search queries for extensive testing.
+def generate_test_search_queries(json_file_path: Path = None) -> List[Dict[str, Any]]:
+    """Generate a comprehensive list of test search queries based on actual data in the JSON file.
+    
+    This function reads the extensive test JSON file and creates queries based on the actual
+    courses, assignments, files, announcements, quizzes, and events that were generated.
+    This ensures every query will return relevant results.
+
+    Note: This function generates realistic search queries that mimic how students would
+    actually interact with an AI assistant in Canvas. The queries are conversational
+    and natural, like "Can you find my homework for CS 101?" rather than technical
+    search parameters.
+
+
+    Args:
+        json_file_path: Path to the extensive test JSON file. If None, creates temp file.
 
     Returns:
         List of search parameter dictionaries covering various search scenarios.
 
     Raises:
-        None
+        FileNotFoundError: If the JSON file doesn't exist.
+        json.JSONDecodeError: If the JSON file is malformed.
     """
-
-    # Base course IDs from the realistic course data
-    course_ids = [
-        "2400000",  # CMPSC 311
-        "2400001",  # CMPSC 465
-        "2400002",  # CMPSC 221
-        "2400003",  # CMPSC 132
-        "2400004",  # CMPSC 331
-        "2400005",  # CMPEN 331
-        "2400006",  # CMPEN 270
-        "2400007",  # CMPEN 271
-        "2400008",  # EARTH 103N
-        "2400009",  # EARTH 104
-        "2400010",  # EARTH 105
-        "2400011",  # ACCTG 211
-        "2400012",  # ACCTG 212
-        "2400013",  # ACCTG 301
-    ]
-
+    
+    # If no path provided, create a temporary file
+    if json_file_path is None:
+        import tempfile
+        temp_dir = Path(tempfile.mkdtemp())
+        json_file_path = temp_dir / "temp_extensive_data.json"
+        create_extensive_test_json(json_file_path)
+    
+    # Read the actual generated data
+    if not json_file_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_file_path}")
+    
+    with open(json_file_path, 'r') as f:
+        data = json.load(f)
+    
+    courses = data.get("courses", [])
+    assignments = data.get("assignments", [])
+    files = data.get("files", [])
+    announcements = data.get("announcements", [])
+    quizzes = data.get("quizzes", [])
+    calendar_events = data.get("calendar_events", [])
+    
     search_queries = []
+    
+    # Extract actual course IDs and subjects
+    actual_course_ids = [str(course["id"]) for course in courses]
+    
+    # 1. Course/Syllabus searches based on actual courses
+    for course in courses[:3]:  # Limit to first 3 courses to avoid too many queries
+        course_id = str(course["id"])
+        course_name = course.get("name", "")
+        course_code = course.get("course_code", "")
+        
+        search_queries.append({
+            "search_parameters": {
+                "course_id": course_id,
+                "time_range": "ALL_TIME",
+                "generality": "MEDIUM",
+                "item_types": ["syllabus"],
+                "specific_dates": [],
+                "keywords": ["syllabus", "course", "instructor"],
+                "query": f"Can you show me the syllabus for {course_name}?",
+            }
+        })
 
-    # 1. Syllabus searches (10 queries)
-    for i, course_id in enumerate(course_ids):
-        search_queries.append(
-            {
+    # 2. Assignment searches based on actual assignment names and descriptions
+    for assignment in random.sample(assignments, min(20, len(assignments))):  # Sample 20 assignments
+        assignment_name = assignment.get("name", "")
+        assignment_description = assignment.get("description", "")
+        course_id = str(assignment.get("course_id", ""))
+        
+        # Create queries based on assignment names
+        if assignment_name:
+            # Extract key terms from assignment name
+            name_words = [word.lower() for word in assignment_name.split() if len(word) > 2]
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME", 
+                    "generality": "MEDIUM",
+                    "item_types": ["assignment"],
+                    "specific_dates": [],
+                    "keywords": name_words[:3],  # Use first 3 meaningful words
+                    "query": f"Where can I find the {assignment_name} assignment?",
+                }
+            })
+        
+        # Create queries based on assignment types/content
+        if "lab" in assignment_name.lower():
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
-                    "generality": "SPECIFIC",
-                    "item_types": ["assignment", "file", "quiz"],
+                    "generality": "MEDIUM", 
+                    "item_types": ["assignment"],
                     "specific_dates": [],
-                    "keywords": ["syllabus"],
-                    "query": f"syllabus for course {course_id}",
+                    "keywords": ["lab"],
+                    "query": "What lab assignments do I have?",
                 }
-            }
-        )
-
-    # 2. Assignment searches (20 queries)
-    assignment_queries = [
-        "homework assignment",
-        "lab assignment",
-        "project assignment",
-        "final project",
-        "programming assignment",
-        "math homework",
-        "physics lab",
-        "writing assignment",
-        "group project",
-        "individual assignment",
-        "weekly homework",
-        "problem set",
-        "exercise assignment",
-        "practical work",
-        "coding project",
-        "research project",
-        "data analysis",
-        "algorithm implementation",
-        "database design",
-        "web development",
-    ]
-
-    for i, query in enumerate(assignment_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
+            })
+        elif "project" in assignment_name.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["assignment"], 
+                    "specific_dates": [],
+                    "keywords": ["project"],
+                    "query": "Can you show me my project assignments?",
+                }
+            })
+        elif "homework" in assignment_name.lower():
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
                     "generality": "MEDIUM",
                     "item_types": ["assignment"],
                     "specific_dates": [],
-                    "keywords": query.split(),
-                    "query": query,
+                    "keywords": ["homework"],
+                    "query": "What homework do I need to complete?",
                 }
-            }
-        )
+            })
 
-    # 3. File searches (15 queries)
-    file_queries = [
-        "lecture notes",
-        "slides presentation",
-        "reading material",
-        "code example",
-        "dataset file",
-        "sample code",
-        "chapter reading",
-        "lecture slides",
-        "programming template",
-        "data file",
-        "course materials",
-        "study guide",
-        "reference document",
-        "sample data",
-        "code template",
-    ]
-
-    for i, query in enumerate(file_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
+    # 3. File searches based on actual file names
+    for file_item in random.sample(files, min(15, len(files))):  # Sample 15 files
+        file_name = file_item.get("display_name", "")
+        course_id = str(file_item.get("course_id", ""))
+        
+        if file_name:
+            # Extract meaningful terms from filename
+            name_parts = file_name.replace("_", " ").replace("-", " ").split()
+            keywords = [part.lower() for part in name_parts if len(part) > 2 and not part.isdigit()]
+            
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
                     "generality": "MEDIUM",
                     "item_types": ["file"],
                     "specific_dates": [],
-                    "keywords": query.split(),
-                    "query": query,
+                    "keywords": keywords[:3],  # Use first 3 meaningful words
+                    "query": f"Do you have the {file_name} file?",
                 }
-            }
-        )
+            })
+        
+        # Create generic file type queries
+        if ".pdf" in file_name.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["file"],
+                    "specific_dates": [],
+                    "keywords": ["pdf", "document"],
+                    "query": "Can you find PDF documents for this course?",
+                }
+            })
+        elif "lecture" in file_name.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["file"],
+                    "specific_dates": [],
+                    "keywords": ["lecture"],
+                    "query": "Where are the lecture materials?",
+                }
+            })
 
-    # 4. Quiz searches (10 queries)
-    quiz_queries = [
-        "weekly quiz",
-        "midterm exam",
-        "final exam",
-        "chapter review",
-        "practice quiz",
-        "pop quiz",
-        "assessment",
-        "test",
-        "examination",
-        "quiz review",
-    ]
-
-    for i, query in enumerate(quiz_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
+    # 4. Quiz searches based on actual quiz titles
+    for quiz in random.sample(quizzes, min(10, len(quizzes))):  # Sample 10 quizzes
+        quiz_title = quiz.get("title", "")
+        course_id = str(quiz.get("course_id", ""))
+        
+        if quiz_title:
+            # Extract key terms from quiz title
+            title_words = [word.lower() for word in quiz_title.split() if len(word) > 2]
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
                     "generality": "MEDIUM",
                     "item_types": ["quiz"],
                     "specific_dates": [],
-                    "keywords": query.split(),
-                    "query": query,
+                    "keywords": title_words[:3],
+                    "query": f"When is the {quiz_title}?",
                 }
-            }
-        )
+            })
+        
+        # Create queries based on quiz types
+        if "midterm" in quiz_title.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["quiz"],
+                    "specific_dates": [],
+                    "keywords": ["midterm", "exam"],
+                    "query": "When are my midterm exams scheduled?",
+                }
+            })
+        elif "final" in quiz_title.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["quiz"],
+                    "specific_dates": [],
+                    "keywords": ["final", "exam"],
+                    "query": "What are the dates for my final exams?",
+                }
+            })
 
-    # 5. Event searches (10 queries)
-    event_queries = [
-        "lecture schedule",
-        "lab session",
-        "office hours",
-        "study group",
-        "exam schedule",
-        "presentation",
-        "class meeting",
-        "tutorial",
-        "workshop",
-        "seminar",
-    ]
-
-    for i, query in enumerate(event_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
+    # 5. Calendar event searches based on actual events
+    for event in random.sample(calendar_events, min(10, len(calendar_events))):  # Sample 10 events
+        event_title = event.get("title", "")
+        course_id = str(event.get("course_id", ""))
+        
+        if event_title:
+            # Extract key terms from event title
+            title_words = [word.lower() for word in event_title.split() if len(word) > 2]
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
                     "generality": "MEDIUM",
                     "item_types": ["calendar_events"],
                     "specific_dates": [],
-                    "keywords": query.split(),
-                    "query": query,
+                    "keywords": title_words[:3],
+                    "query": f"When is the next {event_title}?",
                 }
-            }
-        )
-
-    # 6. Multi-type searches (15 queries)
-    multi_type_queries = [
-        {"query": "computer science", "types": ["assignment", "file"]},
-        {"query": "machine learning", "types": ["assignment", "file", "quiz"]},
-        {"query": "database", "types": ["assignment", "quiz"]},
-        {"query": "web development", "types": ["file", "assignment"]},
-        {"query": "mathematics", "types": ["assignment", "quiz", "file"]},
-        {"query": "physics", "types": ["assignment", "file"]},
-        {"query": "statistics", "types": ["assignment", "file", "quiz"]},
-        {"query": "programming", "types": ["assignment", "file"]},
-        {"query": "software engineering", "types": ["assignment", "file"]},
-        {"query": "technical writing", "types": ["assignment", "file"]},
-        {"query": "data structures", "types": ["assignment", "quiz"]},
-        {"query": "algorithms", "types": ["assignment", "file"]},
-        {"query": "calculus", "types": ["assignment", "quiz", "file"]},
-        {"query": "project work", "types": ["assignment", "calendar_events"]},
-        {"query": "exam preparation", "types": ["quiz", "file", "calendar_events"]},
-    ]
-
-    for i, multi_query in enumerate(multi_type_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
+            })
+        
+        # Create queries based on event types
+        if "lecture" in event_title.lower():
+            search_queries.append({
                 "search_parameters": {
                     "course_id": course_id,
                     "time_range": "ALL_TIME",
-                    "generality": "HIGH",
-                    "item_types": multi_query["types"],
+                    "generality": "MEDIUM",
+                    "item_types": ["calendar_events"],
                     "specific_dates": [],
-                    "keywords": multi_query["query"].split(),
-                    "query": multi_query["query"],
+                    "keywords": ["lecture"],
+                    "query": "What are my lecture times?",
                 }
-            }
-        )
+            })
+        elif "office hours" in event_title.lower():
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["calendar_events"],
+                    "specific_dates": [],
+                    "keywords": ["office", "hours"],
+                    "query": "When are office hours available?",
+                }
+            })
 
-    # 7. Cross-course searches (10 queries)
+    # 6. Announcement searches based on actual announcements
+    for announcement in random.sample(announcements, min(10, len(announcements))):  # Sample 10 announcements
+        announcement_title = announcement.get("title", "")
+        course_id = str(announcement.get("course_id", ""))
+        
+        if announcement_title:
+            # Extract key terms from announcement title
+            title_words = [word.lower() for word in announcement_title.split() if len(word) > 2]
+            search_queries.append({
+                "search_parameters": {
+                    "course_id": course_id,
+                    "time_range": "ALL_TIME",
+                    "generality": "MEDIUM",
+                    "item_types": ["announcement"],
+                    "specific_dates": [],
+                    "keywords": title_words[:3],
+                    "query": f"Can you show me the announcement about {announcement_title}?",
+                }
+            })
+    
+    # 7. Multi-type searches based on actual course subjects
+    course_subjects_map = {}
+    for course in courses:
+        course_code = course.get("course_code", "")
+        subject = course_code.split()[0] if course_code else "GENERIC"
+        course_id = str(course["id"])
+        if subject not in course_subjects_map:
+            course_subjects_map[subject] = course_id
+    
+    multi_type_queries = []
+    if "CMPSC" in course_subjects_map:
+        multi_type_queries.extend([
+            {"query": "programming", "types": ["assignment", "file"], "course_id": course_subjects_map["CMPSC"]},
+            {"query": "lab", "types": ["assignment", "file"], "course_id": course_subjects_map["CMPSC"]},
+            {"query": "project", "types": ["assignment", "calendar_events"], "course_id": course_subjects_map["CMPSC"]},
+        ])
+    if "CMPEN" in course_subjects_map:
+        multi_type_queries.extend([
+            {"query": "engineering", "types": ["assignment", "file"], "course_id": course_subjects_map["CMPEN"]},
+            {"query": "design", "types": ["assignment", "quiz"], "course_id": course_subjects_map["CMPEN"]},
+        ])
+    if "EARTH" in course_subjects_map:
+        multi_type_queries.extend([
+            {"query": "environmental", "types": ["assignment", "file"], "course_id": course_subjects_map["EARTH"]},
+            {"query": "case study", "types": ["assignment", "file"], "course_id": course_subjects_map["EARTH"]},
+        ])
+    if "ACCTG" in course_subjects_map:
+        multi_type_queries.extend([
+            {"query": "accounting", "types": ["assignment", "quiz"], "course_id": course_subjects_map["ACCTG"]},
+            {"query": "financial", "types": ["assignment", "file"], "course_id": course_subjects_map["ACCTG"]},
+        ])
+
+    for multi_query in multi_type_queries:
+        search_queries.append({
+            "search_parameters": {
+                "course_id": multi_query["course_id"],
+                "time_range": "ALL_TIME",
+                "generality": "HIGH",
+                "item_types": multi_query["types"],
+                "specific_dates": [],
+                "keywords": multi_query["query"].split(),
+                "query": f"What {multi_query['query']} materials do I have?",
+            }
+        })
+
+    # 8. Cross-course searches based on realistic student queries
+    # Create natural cross-course queries that students would actually ask
     cross_course_queries = [
-        "programming assignments",
-        "mathematics concepts",
-        "project work",
-        "exam schedules",
-        "lecture materials",
-        "lab sessions",
-        "homework assignments",
-        "study materials",
-        "course updates",
-        "final projects",
+        {
+            "keywords": ["homework", "assignment"],
+            "query": "What homework do I have across all my classes?",
+            "types": ["assignment"]
+        },
+        {
+            "keywords": ["quiz", "test", "exam"],
+            "query": "Do I have any upcoming tests or quizzes?",
+            "types": ["quiz", "assignment"]
+        },
+        {
+            "keywords": ["project", "final"],
+            "query": "What projects are due soon in any of my courses?",
+            "types": ["assignment"]
+        },
+        {
+            "keywords": ["pdf", "reading"],
+            "query": "Can you find reading materials I need to review?",
+            "types": ["file"]
+        },
+        {
+            "keywords": ["lab", "laboratory"],
+            "query": "What lab work do I have coming up?",
+            "types": ["assignment", "file"]
+        },
+        {
+            "keywords": ["presentation", "slides"],
+            "query": "Do I have any presentations to prepare for?",
+            "types": ["assignment", "file"]
+        },
+        {
+            "keywords": ["study", "guide", "review"],
+            "query": "Are there any study guides available for my courses?",
+            "types": ["file", "assignment"]
+        }
     ]
-
-    for query in cross_course_queries:
-        search_queries.append(
-            {
-                "search_parameters": {
-                    "course_id": "all_courses",
-                    "time_range": "ALL_TIME",
-                    "generality": "HIGH",
-                    "item_types": ["assignment", "file", "quiz"],
-                    "specific_dates": [],
-                    "keywords": query.split(),
-                    "query": query,
-                }
+    
+    # Create cross-course queries using realistic student language
+    for cross_query in cross_course_queries:
+        search_queries.append({
+            "search_parameters": {
+                "course_id": "all_courses",
+                "time_range": "ALL_TIME",
+                "generality": "HIGH",
+                "item_types": cross_query["types"],
+                "specific_dates": [],
+                "keywords": cross_query["keywords"],
+                "query": cross_query["query"],
             }
-        )
+        })
 
-    # 8. Time-based searches (10 queries)
+    # 9. Time-based searches using actual due dates from data
     time_based_queries = [
-        {"query": "recent assignments", "time_range": "RECENT_PAST"},
-        {"query": "upcoming quizzes", "time_range": "FUTURE"},
-        {"query": "past exams", "time_range": "EXTENDED_PAST"},
-        {"query": "current week assignments", "time_range": "RECENT_PAST"},
-        {"query": "next week events", "time_range": "FUTURE"},
-        {"query": "old lecture notes", "time_range": "EXTENDED_PAST"},
-        {"query": "today's schedule", "time_range": "RECENT_PAST"},
-        {"query": "future deadlines", "time_range": "FUTURE"},
-        {"query": "previous semester work", "time_range": "EXTENDED_PAST"},
-        {"query": "this month's tasks", "time_range": "RECENT_PAST"},
+        {"query": "assignments", "time_range": "RECENT_PAST", "types": ["assignment"]},
+        {"query": "quizzes", "time_range": "FUTURE", "types": ["quiz"]},
+        {"query": "events", "time_range": "RECENT_PAST", "types": ["calendar_events"]},
     ]
 
-    for i, time_query in enumerate(time_based_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
-                "search_parameters": {
-                    "course_id": course_id,
-                    "time_range": time_query["time_range"],
-                    "generality": "MEDIUM",
-                    "item_types": ["assignment", "quiz", "calendar_events"],
-                    "specific_dates": [],
-                    "keywords": time_query["query"].split(),
-                    "query": time_query["query"],
-                }
+    for time_query in time_based_queries:
+        # Use a random course for time-based searches
+        course_id = random.choice(actual_course_ids) if actual_course_ids else "all_courses"
+        search_queries.append({
+            "search_parameters": {
+                "course_id": course_id,
+                "time_range": time_query["time_range"],
+                "generality": "MEDIUM",
+                "item_types": time_query["types"],
+                "specific_dates": [],
+                "keywords": [time_query["query"]],
+                "query": f"What {time_query['query']} do I have {time_query['time_range'].lower().replace('_', ' ')}?",
             }
-        )
+        })
 
-    # 9. Specific date searches (10 queries)
-    specific_date_queries = [
-        {"query": "assignments due on 2024-12-15", "dates": ["2024-12-15"]},
-        {
-            "query": "events between 2024-11-01 and 2024-11-30",
-            "dates": ["2024-11-01", "2024-11-30"],
-        },
-        {"query": "quizzes on 2024-10-20", "dates": ["2024-10-20"]},
-        {"query": "deadlines in December 2024", "dates": ["2024-12-01", "2024-12-31"]},
-        {"query": "schedule for 2024-09-15", "dates": ["2024-09-15"]},
-        {"query": "work due 2024-11-15", "dates": ["2024-11-15"]},
-        {"query": "events on 2024-10-31", "dates": ["2024-10-31"]},
-        {
-            "query": "assignments between 2024-09-01 and 2024-09-15",
-            "dates": ["2024-09-01", "2024-09-15"],
-        },
-        {"query": "exams in January 2025", "dates": ["2025-01-01", "2025-01-31"]},
-        {"query": "tasks for 2024-12-01", "dates": ["2024-12-01"]},
-    ]
-
-    for i, date_query in enumerate(specific_date_queries):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
-                "search_parameters": {
-                    "course_id": course_id,
-                    "time_range": "ALL_TIME",
-                    "generality": "SPECIFIC",
-                    "item_types": ["assignment", "quiz", "calendar_events"],
-                    "specific_dates": date_query["dates"],
-                    "keywords": [
-                        word
-                        for word in date_query["query"].split()
-                        if not any(char.isdigit() for char in word)
-                    ],
-                    "query": date_query["query"],
-                }
+    # 10. Specific date searches based on actual due dates in the data
+    # Extract some actual dates from assignments and quizzes
+    actual_dates = []
+    for assignment in assignments[:5]:
+        due_date = assignment.get("due_at", "")
+        if due_date:
+            # Extract just the date part
+            date_part = due_date.split("T")[0]
+            actual_dates.append(date_part)
+    
+    for quiz in quizzes[:3]:
+        due_date = quiz.get("due_at", "")
+        if due_date:
+            date_part = due_date.split("T")[0]
+            actual_dates.append(date_part)
+    
+    # Create queries for actual dates found in the data
+    for date in actual_dates[:5]:  # Limit to 5 date queries
+        course_id = random.choice(actual_course_ids) if actual_course_ids else "all_courses"
+        search_queries.append({
+            "search_parameters": {
+                "course_id": course_id,
+                "time_range": "ALL_TIME",
+                "generality": "SPECIFIC",
+                "item_types": ["assignment", "quiz", "calendar_events"],
+                "specific_dates": [date],
+                "keywords": ["due", "assignment", "quiz"],
+                "query": f"What's due on {date}?",
             }
-        )
+        })
 
-    # 10. Keyword-based searches (10 queries)
-    keyword_searches = [
-        {"query": "find homework assignments", "keywords": ["homework", "assignment"]},
-        {"query": "lab work and projects", "keywords": ["lab", "project"]},
-        {"query": "exam and quiz materials", "keywords": ["exam", "quiz"]},
-        {
-            "query": "lecture notes and slides",
-            "keywords": ["lecture", "notes", "slides"],
-        },
-        {"query": "programming and coding", "keywords": ["programming", "coding"]},
-        {"query": "data analysis work", "keywords": ["data", "analysis"]},
-        {"query": "final project requirements", "keywords": ["final", "project"]},
-        {"query": "study guide materials", "keywords": ["study", "guide"]},
-        {"query": "course syllabus information", "keywords": ["syllabus", "course"]},
-        {"query": "assignment due dates", "keywords": ["assignment", "due"]},
-    ]
-
-    for i, keyword_search in enumerate(keyword_searches):
-        course_id = course_ids[i % len(course_ids)]
-        search_queries.append(
-            {
-                "search_parameters": {
-                    "course_id": course_id,
-                    "time_range": "ALL_TIME",
-                    "generality": "MEDIUM",
-                    "item_types": ["assignment", "file", "quiz"],
-                    "specific_dates": [],
-                    "keywords": keyword_search["keywords"],
-                    "query": keyword_search["query"],
-                }
-            }
-        )
-
-    print(f"Generated {len(search_queries)} test search queries")
+    # Clean up temporary file if we created one
+    if json_file_path and "temp_extensive_data.json" in str(json_file_path):
+        try:
+            json_file_path.unlink()
+            json_file_path.parent.rmdir()
+        except:
+            pass  # Ignore cleanup errors
+    
+    print(f"Generated {len(search_queries)} test search queries based on actual data")
     return search_queries

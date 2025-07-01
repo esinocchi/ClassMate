@@ -17,42 +17,120 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+import os
+import ollama
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from vectordb.db import VectorDatabase
 
+# Global thread pool for Ollama calls - enables true multi-threading
+_ollama_executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="ollama-eval")
 
-def evaluate_search_result(results: Any, query_text: str) -> Tuple[bool, str]:
-    """Evaluates if a search result is successful.
+def _sync_ollama_evaluation(results: Any, query_text: str) -> bool:
+    """Synchronous Ollama evaluation function that runs in a separate thread.
+    
+    This function will be executed in the ThreadPoolExecutor, allowing
+    multiple Ollama API calls to run simultaneously in different threads.
+    
+    Args:
+        results: The search results to evaluate.
+        query_text: The original query text for context.
+        
+    Returns:
+        bool: True if the search result is successful, False otherwise.
+    """
+    system_context = """You are a precise document relevance evaluator for a Canvas Learning Management System. Your role is to assess whether vector database search results appropriately match student queries about their course materials.
+
+    Your task: Determine if the provided document(s) results meaningfully addresses the user's query about their Canvas LMS data (courses, assignments, files, announcements, etc.).
+
+    Output format CRITICAL: Respond with exactly "True" or "False" - no additional text.
+
+    Evaluation criteria for "True":
+    - The results directly answers the query with specific, relevant information
+    - The results contain course materials, assignments, or announcements that relate to the query topic
+    - The results provide useful context that would help the student with their query
+    - The semantic meaning aligns with what the student is seeking
+
+    Examples of "True" results:
+    - Query: "What assignments are due this week?" → Results: List of assignments with due dates in the current week
+    - Query: "Show me the syllabus for CMPSC 221" → Results: Syllabus document for CMPSC 221 course
+    - Query: "What are the requirements for the final project?" → Results: Assignment details describing final project requirements
+    - Query: "When is the midterm exam?" → Results: Calendar event or announcement about midterm exam date
+
+    Evaluation criteria for "False":
+    - The results contain no information related to the query topic
+    - The results are from an unrelated course or completely off-topic
+    - The results are corrupted, empty, or contains only metadata without useful content
+    - The information does not provide any value for answering the student's question
+
+    Examples of "False" results:
+    - Query: "What assignments are due this week?" → Results: Syllabus from a course with no assignment information
+    - Query: "Show me the syllabus for CMPSC 221" → Results: Assignment from CMPSC 221 course
+    - Query: "What are the requirements for the final project?" → Results: Empty document or corrupted content
+    - Query: "When is the midterm exam?" → Results: Unrelated announcement about course registration
+
+    Think step-by-step:
+    1. What is the student asking for?
+    2. What information does the results contain?
+    3. Does the results meaningfully address the query?"""
+
+    user_prompt = f"""<query>
+    {query_text}
+    </query>
+
+    <search_result>
+    {results}
+    </search_result>
+
+    Evaluate if this search result matches the query."""
+
+    try:
+        # This is the actual blocking Ollama call that runs in a separate thread
+        response = ollama.chat(
+            model="phi4-mini",
+            messages=[
+                {"role": "system", "content": system_context},
+                {"role": "user", "content": user_prompt}
+            ],
+            options={
+                "temperature": 0.0,
+                "num_predict": 10,
+                "stop": ["\n", ".", "!"]
+            }
+        )
+        
+        output = response['message']['content'].strip().lower()
+        
+        if "true" in output:
+            return True
+        elif "false" in output:
+            return False
+        else:
+            print(f"Error: Invalid output from Ollama: {output}")
+            return False
+            
+    except Exception as e:
+        print(f"Error calling Ollama: {e}")
+        return False
+
+
+async def evaluate_search_result(results: Any, query_text: str) -> bool:
+    """Evaluates if a search result is successful using ThreadPoolExecutor.
+    
+    This function uses a ThreadPoolExecutor to run Ollama calls in separate threads,
+    enabling true parallelism for I/O-bound operations.
 
     Args:
         results: The search results to evaluate.
         query_text: The original query text for context.
 
     Returns:
-        A tuple of (success_boolean, failure_reason_string).
+        bool: True if the search result is successful, False otherwise.
     """
-    if results is None:
-        return False, "Search returned None"
-
-    if not isinstance(results, list):
-        return False, f"Search returned non-list type: {type(results)}"
-
-    if len(results) == 0:
-        # Empty results are acceptable - search executed without error
-        return True, ""
-
-    # Validate result structure
-    for result in results:
-        if not isinstance(result, dict):
-            return False, "Result item is not a dictionary"
-
-        if "document" not in result:
-            return False, "Result missing 'document' field"
-
-        if "similarity" not in result and "type" not in result:
-            return False, "Result missing 'similarity' or 'type' field"
-
-    return True, ""
+    # Run the blocking Ollama call in a separate thread
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_ollama_executor, _sync_ollama_evaluation, results, query_text)
 
 
 def create_search_result_summary(
@@ -62,6 +140,7 @@ def create_search_result_summary(
     is_success: bool,
     result_count: int = 0,
     failure_reason: str = "",
+    results: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Creates a standardized search result summary.
 
@@ -71,8 +150,8 @@ def create_search_result_summary(
         search_params: The search parameters used.
         is_success: Whether the search was successful.
         result_count: Number of results returned (for successful searches).
-        failure_reason: Reason for failure (for failed searches).
-
+        failure_reason: Reason for failure (for failed searches, exceptions only).
+        results: The search results (for successful searches).
     Returns:
         A dictionary containing the search result summary.
     """
@@ -85,13 +164,13 @@ def create_search_result_summary(
 
     if is_success:
         base_summary.update({"status": "SUCCESS", "result_count": result_count})
+        if results:
+            base_summary["results"] = results
     else:
-        base_summary.update(
-            {
-                "status": "FAILED" if failure_reason != "Exception" else "ERROR",
-                "failure_reason": failure_reason,
-            }
-        )
+        status = "ERROR" if failure_reason.startswith("Exception:") else "FAILED"
+        base_summary.update({"status": status})
+        if failure_reason:  # Only add failure_reason if it exists (for exceptions)
+            base_summary["failure_reason"] = failure_reason
 
     return base_summary
 
@@ -180,12 +259,12 @@ def validate_search_diversity(
 
 
 async def setup_extensive_test_data(
-    test_data_dir: Path, test_collection_name_prefix: str
+    extensive_data_path: Path, test_collection_name_prefix: str
 ) -> Tuple[VectorDatabase, int]:
     """Sets up extensive test data and creates VectorDatabase instance.
 
     Args:
-        test_data_dir: Directory where test data files should be created.
+        extensive_data_path: Path to the extensive test data JSON file.
         test_collection_name_prefix: Prefix for the test collection name.
 
     Returns:
@@ -194,11 +273,10 @@ async def setup_extensive_test_data(
     Raises:
         AssertionError: If data setup fails.
     """
-    from vectordb.testing.test_data_organization import create_extensive_test_json
-
-    # Create extensive test data
-    extensive_data_path = test_data_dir / "extensive_test_data.json"
-    extensive_user_id = create_extensive_test_json(extensive_data_path)
+    # Read user_id from the pre-existing JSON file
+    with open(extensive_data_path, "r") as f:
+        data = json.load(f)
+    extensive_user_id = data["user_metadata"]["id"]
 
     # Create VectorDatabase instance with correct parameters
     extensive_db = VectorDatabase(
@@ -247,7 +325,7 @@ async def perform_single_search(
 
     try:
         results = await db.search(search_parameters=search_params)
-        is_success, failure_reason = evaluate_search_result(results, query_text)
+        is_success = await evaluate_search_result(results, query_text)
 
         return create_search_result_summary(
             query_index=query_index + 1,
@@ -255,7 +333,7 @@ async def perform_single_search(
             search_params=search_params,
             is_success=is_success,
             result_count=len(results) if results else 0,
-            failure_reason=failure_reason,
+            results=results,
         )
 
     except Exception as e:
@@ -269,8 +347,8 @@ async def perform_single_search(
         )
 
 
-def create_dummy_test_json(file_path: Path, user_id: str = "test_user_123") -> str:
-    """Creates a dummy JSON file for testing, mimicking Canvas data structure.
+def create_simple_user_data(file_path: Path, user_id: str = "test_user_123") -> str:
+    """Creates a simple JSON file for testing, mimicking Canvas data structure.
 
     Args:
         file_path: Path where the dummy JSON file will be created.
@@ -404,3 +482,76 @@ def create_dummy_test_json(file_path: Path, user_id: str = "test_user_123") -> s
         json.dump(data, f, indent=4)
 
     return user_id
+
+async def perform_parallel_searches(
+    db: VectorDatabase, 
+    search_queries: List[Dict[str, Any]], 
+    max_concurrent: int = 5
+) -> List[Dict[str, Any]]:
+    """
+    Perform multiple searches in parallel with concurrency control.
+    
+    Args:
+        db: VectorDatabase instance
+        search_queries: List of search query dictionaries
+        max_concurrent: Maximum number of concurrent operations
+        
+    Returns:
+        List of search result summaries
+    """
+    
+    # Create semaphore to limit concurrent operations
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def bounded_search(query_data: Dict[str, Any], index: int) -> Dict[str, Any]:
+        """Wrapper that respects concurrency limits."""
+        async with semaphore:
+            print(f"Starting search {index + 1}/{len(search_queries)}: {query_data['search_parameters']['query'][:50]}...")
+            result = await perform_single_search(db, query_data, index)
+            print(f"Completed search {index + 1}/{len(search_queries)}")
+            return result
+    
+    # Create all tasks
+    tasks = [
+        bounded_search(query_data, i) 
+        for i, query_data in enumerate(search_queries)
+    ]
+    
+    print(f"Starting {len(tasks)} searches with max {max_concurrent} concurrent operations...")
+    start_time = time.time()
+    
+    # Execute all tasks in parallel (but respecting semaphore limit)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    end_time = time.time()
+    print(f"All searches completed in {end_time - start_time:.2f} seconds")
+    
+    # Handle any exceptions
+    processed_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            print(f"Search {i + 1} failed with exception: {result}")
+            # Create a failed result summary
+            query_data = search_queries[i]
+            failed_result = create_search_result_summary(
+                query_index=i + 1,
+                query_text=query_data["search_parameters"]["query"],
+                search_params=query_data["search_parameters"],
+                is_success=False,
+                failure_reason=f"Exception: {str(result)}",
+            )
+            processed_results.append(failed_result)
+        else:
+            processed_results.append(result)
+    
+    return processed_results
+
+def cleanup_ollama_executor():
+    """Cleanup function to properly shutdown the ThreadPoolExecutor.
+    
+    Call this at the end of your test runs to ensure all threads are properly closed.
+    """
+    global _ollama_executor
+    if _ollama_executor:
+        _ollama_executor.shutdown(wait=True)
+        print("✅ Ollama ThreadPoolExecutor cleaned up successfully")

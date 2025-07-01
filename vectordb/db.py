@@ -560,12 +560,17 @@ class VectorDatabase:
         courses = search_parameters.get("course_id", "all_courses")
         keywords = search_parameters.get("keywords", [])
 
-        function_type_mapping = {
-            "calculate_grade": ["assignment"],
-            "find_file": ["file"],
-            "search": ["assignment", "file", "quiz", "announcement", "event"],
-        }
-        item_types = function_type_mapping.get(function_name, [])
+        # Use user-specified item_types from search_parameters, not hardcoded function mapping
+        item_types = search_parameters.get("item_types", [])
+        
+        # If no item_types specified, fall back to function-based defaults
+        if not item_types:
+            function_type_mapping = {
+                "calculate_grade": ["assignment"],
+                "find_file": ["file"],
+                "search": ["assignment", "file", "quiz", "announcement", "event"],
+            }
+            item_types = function_type_mapping.get(function_name, [])
 
         if keywords and self.bm25_scorer:
             keywords = " ".join(keywords)
@@ -587,7 +592,7 @@ class VectorDatabase:
             doc = result["document"]
             doc_id = doc["id"]
 
-            print(f"Processing document: {doc_id}, Type: {result.get('type')}")
+            #print(f"Processing document: {doc_id}, Type: {result.get('type')}")
 
             if doc.get("type") == "file":
                 try:

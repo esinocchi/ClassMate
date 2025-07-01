@@ -60,34 +60,43 @@ def generate_realistic_courses() -> List[Dict[str, Any]]:
         }
     ]
     
+    # Flatten all possible courses into a single list
+    all_possible_courses = []
+    for template in course_templates:
+        for number, title in zip(template["numbers"], template["titles"]):
+            all_possible_courses.append({
+                "subject": template["subject"],
+                "number": number,
+                "title": title,
+                "semester": template["semester"]
+            })
+    
+    # Randomly select 5 courses from all possibilities
+    selected_courses = random.sample(all_possible_courses, 5)
+    
     courses = []
     course_id = 2400000
     
-    for template in course_templates:
-        for i, (number, title) in enumerate(zip(template["numbers"], template["titles"])):
-            # Generate realistic course name patterns
-            course_code = f"{template['subject']} {number}"
-            if "section" in template.get("variations", ["section"]):
-                full_name = f"Section Merge: {course_code}: {title} - {template['semester']}"
-                course_code_full = f"Section Merge: {course_code}: {title} - {template['semester']}"
-            else:
-                full_name = f"{course_code} ({template['semester']})"
-                course_code_full = full_name
-            
-            # Generate detailed syllabus with realistic content
-            syllabus = generate_realistic_syllabus(template["subject"], number, title)
-            
-            course = {
-                "id": course_id + i,
-                "name": full_name,
-                "course_code": course_code_full,
-                "original_name": None,
-                "default_view": full_name,
-                "syllabus_body": syllabus,
-                "public_description": None,
-                "time_zone": "America/New_York"
-            }
-            courses.append(course)
+    for i, course_data in enumerate(selected_courses):
+        # Generate realistic course name patterns
+        course_code = f"{course_data['subject']} {course_data['number']}"
+        full_name = f"{course_code} ({course_data['semester']})"
+        course_code_full = full_name
+        
+        # Generate detailed syllabus with realistic content
+        syllabus = generate_realistic_syllabus(course_data["subject"], course_data["number"], course_data["title"])
+        
+        course = {
+            "id": course_id + i,
+            "name": full_name,
+            "course_code": course_code_full,
+            "original_name": None,
+            "default_view": full_name,
+            "syllabus_body": syllabus,
+            "public_description": None,
+            "time_zone": "America/New_York"
+        }
+        courses.append(course)
     
     return courses
 
