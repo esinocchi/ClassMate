@@ -7,9 +7,3 @@ Setting up Qdrant:
 
 Improve code reliability and maintainability:
     - Anaylze the Code Optimization Report and make improvements in /vectordb
-
-AI Search Bar:
-    - Figure out what this search bar is going to exactly do
-    - Brainstorm the design of the AI Search Bar with Figma
-    - Create a Product Requirements Document (PRD) for the AI Search Bar
-    - Implement the AI Search Bar with Qdrant
