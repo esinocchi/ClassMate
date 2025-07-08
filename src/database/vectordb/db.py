@@ -28,7 +28,6 @@ Typical usage example:
   results = await db.search(search_parameters)
 """
 
-
 import asyncio
 import json
 import os
@@ -611,6 +610,17 @@ class VectorDatabase:
             result_item.pop("related_docs", None)
 
         return combined_results[:top_k]
+    
+    # TODO: Implement filter_search method for dashboard use
+    async def filter_search(self, search_parameters):
+        """
+        Filter search for documents based on search parameters.
+        Args:
+            search_parameters: Dictionary containing filter parameters.
+        Returns:
+            List of search results.
+        """
+        pass
 
     async def load_local_data_from_json(self):
         """Loads data from the JSON file into memory (document_map, course_map, etc.)

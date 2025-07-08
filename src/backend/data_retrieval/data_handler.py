@@ -7,7 +7,7 @@ import asyncio
 import threading
 from dotenv import load_dotenv
 import shutil
-from vectordb.db import VectorDatabase
+from src.database.vectordb.db import VectorDatabase
 from concurrent.futures import ThreadPoolExecutor
 load_dotenv()
 

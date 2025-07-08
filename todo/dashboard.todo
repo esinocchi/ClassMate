@@ -1,0 +1,34 @@
+Building Dashboard System:
+    ☐ Implement filter_search method in VectorDatabase 
+        ☐ Add _execute_filter_only_query method to db.py
+        ☐ Add filter_search method that uses scroll instead of query_points
+        ☐ Test filter_search with time_range and item_types filters
+    ☐ Complete CanvasDataProvider implementation
+        ☐ Add get_assignments_by_course method
+        ☐ Add get_todays_events method for calendar
+        ☐ Add get_recent_announcements method
+        ☐ Test all data provider methods with real data
+    ☐ Outline core dashboard service 
+        ☐ Implement outline for dashboard_service.py 
+        ☐ Add get_todays_plan method
+        ☐ Add get_study_plan method
+        ☐ Add get_dashboard_data method that combines everything
+    ☐ Create analysis components
+        ☐ Implement time_estimator.py with basic rules
+        ☐ Implement difficulty_assessor.py with basic scoring
+        ☐ Implement priority_ranker.py with urgency/importance scoring
+        ☐ Test analysis components with sample assignments
+    ☐ Build generators
+        ☐ Implement todo_generator.py for today's tasks
+        ☐ Implement study_plan_generator.py for weekly planning
+        ☐ Test generators with real Canvas data
+    ☐ Add LLM integration for enhanced analysis
+        ☐ Set up local Phi-4 model loading
+        ☐ Create LLM service for time estimation
+        ☐ Create LLM service for difficulty assessment
+        ☐ Test LLM integration with sample assignments
+    ☐ Create dashboard API endpoints
+        ☐ Add /dashboard/today endpoint
+        ☐ Add /dashboard/study-plan endpoint
+        ☐ Add /dashboard/overview endpoint
+        ☐ Test all endpoints with frontend integration
