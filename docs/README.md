@@ -1,139 +1,285 @@
-# CanvasClassmate: AI-Powered Canvas Assistant
+# ClassMate: AI-Powered Canvas Assistant
 
-CanvasClassmate is an AI-powered assistant designed to enhance the learning experience for students using the Canvas Learning Management System (LMS). It leverages advanced natural language processing techniques, including large language models (LLMs) and vector databases, to provide intelligent search, question answering, and content summarization capabilities.
+ClassMate is an AI-powered assistant designed to enhance the learning experience for students using the Canvas Learning Management System (LMS). It leverages advanced natural language processing techniques, including large language models (LLMs) and vector databases, to provide intelligent search, question answering, content summarization, and personalized study planning capabilities.
 
 ## Project Overview
 
-The system processes Canvas course data (assignments, announcements, files, quizzes, syllabus, etc.) and makes it searchable using semantic similarity.  This allows students to ask natural language questions about their course materials and receive relevant, concise answers.  The core technology involves creating vector embeddings of course content and using a vector database (ChromaDB) for efficient retrieval.
+The system processes Canvas course data (assignments, announcements, files, quizzes, syllabus, etc.) and makes it searchable using semantic similarity. This allows students to ask natural language questions about their course materials and receive relevant, concise answers. The core technology involves creating vector embeddings of course content using local Sentence Transformer models and storing them in a Qdrant vector database for efficient retrieval.
+
+## Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Chrome         │    │  FastAPI         │    │  Qdrant Vector  │
+│  Extension      │◄──►│  Backend         │◄──►│  Database       │
+│  (Frontend)     │    │  (API Layer)     │    │  (Storage)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+        │                        │                        │
+        │                        ▼                        │
+        │              ┌──────────────────┐               │
+        │              │  Task-Specific   │               │
+        │              │  Agents          │               │
+        │              └──────────────────┘               │
+        │                        │                        │
+        ▼                        ▼                        ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Canvas LMS     │    │  OpenAI API      │    │  Sentence       │
+│  (Data Source)  │    │  (LLM Services)  │    │  Transformers   │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+```
 
 ## Data Flow
 
-1.  **Data Retrieval (backend/data_retrieval):**
-    *   The `data_retrieval` module fetches data from the Canvas API using a user-provided API token.  It retrieves information about courses, assignments, announcements, files, quizzes, and the syllabus.
-    *   This data is structured into a JSON format and stored locally.
-    *   The `get_all_user_data.py` script orchestrates this data retrieval process.
-    *   The `data_handler.py` script manages the user data and initiates background updates.
+1. **Data Retrieval (`src/backend/data_retrieval/`):**
+   - The `data_retrieval` module fetches data from the Canvas API using user-provided API tokens
+   - Retrieves courses, assignments, announcements, files, quizzes, and syllabus content
+   - Data is structured into JSON format and stored locally for processing
+   - `get_all_user_data.py` orchestrates the data collection process
+   - `data_handler.py` manages user data lifecycle and background updates
 
-2.  **Content Extraction (vectordb/content_extraction.py):**
-    *   The `content_extraction` module handles the extraction of text and images from various file types (PDF, DOCX, PPTX, HTML).
-    *   It includes functions to download files from URLs, parse HTML content (including resolving links to actual filenames), and extract text from different document formats.
-    *   The `extract_file_content_from_url` function is a key component, handling both Canvas and non-Canvas URLs, and dealing with potential errors like missing files or incorrect URL formats.
+2. **Content Extraction (`src/database/vectordb/content_extraction.py`):**
+   - Handles extraction of text and images from various file types (PDF, DOCX, PPTX, HTML)
+   - Downloads files from Canvas URLs and parses content
+   - Resolves HTML links to actual filenames and extracts structured text
+   - Handles both Canvas and external URLs with error recovery
 
-3.  **Vector Database and Embedding (vectordb/db.py and vectordb/embedding_model.py):**
-    *   The `vectordb/db.py` module is the heart of the semantic search functionality.  It takes the structured JSON data and creates vector embeddings using the Hugging Face Inference API.
-    *   It uses ChromaDB, a vector database, to store these embeddings for efficient similarity searches.
-    *   The `VectorDatabase` class manages the entire process: loading data, preprocessing text, creating embeddings, storing them in ChromaDB, and performing searches.
-    *   The `search` method allows for complex queries with filtering by course ID (single or multiple), time range, item type, specific dates, and keywords. It combines semantic search with keyword matching for comprehensive results.
-    *   The `_handle_keywords` method implements keyword-based filtering, supplementing the semantic search.
-    *   The `embedding_model.py` file provides the `HFEmbeddingFunction` class, which interfaces with the Hugging Face API to generate embeddings.
+3. **Vector Database and Embedding (`src/database/vectordb/`):**
+   - **Core Database (`db.py`)**: Manages Qdrant vector database connections and operations
+   - **Embedding Model (`embedding_model.py`)**: Uses local Sentence Transformer model (`intfloat/e5-small-v2`) for generating embeddings
+   - **BM25 Scoring (`bm25_scorer.py`)**: Implements BM25 algorithm for keyword-based search, fused with semantic search
+   - **Text Processing (`text_processing.py`)**: Handles text normalization and preprocessing for embeddings
+   - **Filtering (`filters.py`)**: Builds complex query filters for time ranges, courses, and content types
+   - **Post-processing (`post_process.py`)**: Augments results with metadata and relevance scoring
 
-4.  **Chatbot Interface (chat_bot/conversation_handler.py):**
-    *   The `conversation_handler.py` module provides a conversational interface for interacting with the system.
-    *   The `ConversationHandler` class manages the conversation flow, user information, and calls to the vector database.
-    *   It includes methods like `find_course_information`, `find_file`, and `create_notes`, which utilize the vector database's search capabilities to answer user queries.
-    *   It validates and sanitizes search parameters.
+4. **Conversational Interface (`src/backend/chat_bot/conversation_handler.py`):**
+   - `ConversationHandler` manages multi-turn conversations and context
+   - Integrates with OpenAI API for natural language understanding
+   - Validates and sanitizes search parameters
+   - Coordinates between vector database and task-specific agents
 
-5. **Task Specific Agents (backend/task_specific_agents):**
-    * The `task_specific_agents` directory contains modules for specific tasks, such as:
-        *   `calendar_agent.py`: Retrieves calendar events from the Canvas API.
-        *   `grade_calculator_agent.py`: Calculates grades and provides insights based on assignment data.
-        *   `lecture_to_notes_agent.py`: Converts lecture files into notes in PDF format.
+5. **Task-Specific Agents (`src/backend/task_specific_agents/`):**
+   - **Calendar Agent (`calendar_agent.py`)**: Retrieves and manages calendar events
+   - **Grade Calculator (`grade_calculator_agent.py`)**: Calculates required grades and provides academic insights
+   - **Lecture-to-Notes (`lecture_to_notes_agent.py`)**: Converts lecture files to structured PDF notes using fine-tuned GPT models
 
-6.  **Front-End (Front_End folder):**
-    *   The front-end is implemented as a Chrome extension, providing a user interface directly within the Canvas website.
-    *   `Front_End_Script.js`: Contains the JavaScript code that handles user interaction, communication with the backend, and dynamic updates to the UI.  It manages the chat interface, settings, and data storage using `chrome.storage.local`.
-    *   `Front_End_Style.css`:  Provides the styling for the chat interface and settings panel.
-    *   `manifest.json`:  The manifest file for the Chrome extension, defining permissions, resources, and entry points.
-    *   `images/`: Contains images used in the extension's UI.
-    *   The front-end communicates with the backend via HTTP requests (using `fetch`) to the API endpoints defined in `endpoints.py`.
+6. **Dashboard System (`src/backend/dashboard/`):**
+   - **Data Provider (`data/canvas_data_provider.py`)**: Abstracts vector database operations for dashboard use
+   - **Core Service (`core/dashboard_service.py`)**: Orchestrates dashboard data aggregation
+   - **Analysis Components (`analysis/`)**: Provides time estimation, difficulty assessment, and priority ranking
+   - **Generators (`generators/`)**: Creates personalized study plans and todo lists
 
-7.  **Backend and API (endpoints.py):**
-    *   The backend is built using the FastAPI framework, providing a RESTful API for the front-end to interact with.
-    *   `endpoints.py`: Defines the API endpoints, handling requests for data retrieval, processing, and chatbot interactions.  It uses Pydantic models for request and response validation.
-    *   The backend is hosted on an AWS EC2 instance, making it accessible to the Chrome extension.  FastAPI serves the API, handling requests and coordinating the other backend components.
-    *   CORS (Cross-Origin Resource Sharing) is configured to allow requests from the Canvas domain (`https://psu.instructure.com`) and the custom domain (`https://canvasclassmate.me`).
+7. **Chrome Extension (`src/extension/`):**
+   - **Frontend Script (`Front_End_Script.js`)**: Handles user interactions and API communication
+   - **Styling (`Front_End_Style.css`)**: Provides responsive UI styling
+   - **Manifest (`manifest.json`)**: Defines extension permissions and resources
+   - **Images (`images/`)**: Contains UI icons and graphics
+   - Communicates with backend via HTTPS requests to `canvasclassmate.me`
+
+8. **Backend API (`src/backend/endpoints.py`):**
+   - Built with FastAPI framework for high-performance async operations
+   - Handles authentication and request validation using Pydantic models
+   - Implements CORS for cross-origin requests from Canvas domains
+   - Coordinates all backend components and provides RESTful endpoints
 
 ## Key Features
 
-*   **Semantic Search:** Find relevant course materials using natural language queries.
-*   **Keyword Search:** Refine search results with specific keywords.
-*   **Filtering:** Narrow down results by course ID, document type, time range, and specific dates.
-*   **Content Extraction:** Extract text and images from various file types (PDF, DOCX, PPTX, HTML).
-*   **ChromaDB Integration:** Efficiently store and retrieve vector embeddings.
-*   **Hugging Face API:** Utilize a powerful language model for embedding generation.
-*   **Data Handling:** Manage user data and background updates.
-*   **Task-Specific Agents:** Perform specialized tasks like calendar event retrieval and grade calculation.
-*   **Chrome Extension Interface:**  Provides a user-friendly chat interface directly within Canvas.
-*   **AWS EC2 Hosting:** The backend is hosted on an AWS EC2 instance for reliable and scalable access.
+### Core Functionality
+- **Semantic Search**: Find relevant course materials using natural language queries
+- **Hybrid Search**: Combines semantic similarity with BM25 keyword matching for comprehensive results
+- **Advanced Filtering**: Filter by course, document type, time range, and specific dates
+- **Content Extraction**: Extract and process text from PDF, DOCX, PPTX, and HTML files
+- **Multi-turn Conversations**: Maintain context across conversation sessions
 
-## Modules and Their Functions
+### AI-Powered Features
+- **Intelligent Study Planning**: Generate personalized study schedules based on upcoming deadlines
+- **Grade Calculation**: Calculate required scores to achieve target grades
+- **Lecture-to-Notes**: Convert lecture files into structured, academic-style PDF notes
+- **Assignment Analysis**: Assess difficulty and time requirements for assignments
 
-### `vectordb/db.py`
+### Technical Features
+- **Qdrant Vector Database**: High-performance vector storage and retrieval
+- **Local Embeddings**: Uses Sentence Transformers for privacy-preserving embeddings
+- **Async Processing**: Non-blocking operations for improved performance
+- **Chrome Extension**: Seamless integration within Canvas interface
+- **Cloud Hosting**: Reliable backend hosted on AWS EC2
 
-*   **`VectorDatabase`:** The main class for managing the vector database.
-    *   `__init__`: Initializes the database, loads data, and sets up the ChromaDB client and embedding function.
-    *   `process_data`: Loads data from the JSON file, preprocesses it, creates embeddings, and stores them in ChromaDB.
-    *   `search`: Performs semantic and keyword searches based on provided parameters.
-    *   `_build_chromadb_query`: Constructs the `where` clause for ChromaDB queries based on search parameters.
-    *   `_execute_chromadb_query`: Executes a query against the ChromaDB collection.
-    *   `_handle_keywords`: Filters results based on keyword matches.
-    *   `_augment_results`: Adds additional information to search results (e.g., local timestamps).
-    *   `_post_process_results`: (Placeholder - intended for prioritizing exact/partial matches).
-    *   `_include_related_documents`: (Placeholder - intended for adding related documents).
+## Technology Stack
 
-### `vectordb/content_extraction.py`
+### Backend
+- **Framework**: FastAPI (Python)
+- **Vector Database**: Qdrant Cloud
+- **Embeddings**: Sentence Transformers (`intfloat/e5-small-v2`)
+- **LLM Integration**: OpenAI API (GPT-4), Groq, Ollama
+- **Search**: BM25 + Semantic Search Fusion
+- **File Processing**: PyMuPDF, python-docx, python-pptx
+- **Async Operations**: aiohttp, asyncio
 
-*   `extract_file_content_from_url`: Downloads and extracts content from a file at a given URL. Handles Canvas and non-Canvas URLs.
-*   `parse_file_content`: Parses content from PDF, DOCX, or PPTX files.
-*   `get_file_type`: Determines the file type based on the filename extension.
-*   `extract_text_and_images`: Extracts text and images from file bytes.
+### Frontend
+- **Platform**: Chrome Extension (Manifest V3)
+- **Languages**: JavaScript, CSS, HTML
+- **Storage**: Chrome Storage API
+- **Communication**: Fetch API with CORS
 
-### `chat_bot/conversation_handler.py`
+### Infrastructure
+- **Hosting**: AWS EC2
+- **Domain**: `canvasclassmate.me`
+- **Database**: Qdrant Cloud
+- **Package Management**: uv (Python)
 
-*   **`ConversationHandler`:** Manages the conversation with the user.
-    *   `__init__`: Initializes the handler with user information, courses, and API token.
-    *   `find_course_information`: Retrieves course information (syllabus, description, materials) using the vector database.
-    *   `find_file`: Locates a specific file using the vector database.
-    *   `create_notes`: Generates notes from a lecture file.
-    *   `validate_search_parameters`: Ensures search parameters are valid.
+## Project Structure
 
-### `backend/data_retrieval/get_all_user_data.py`
+```
+ClassMate/
+├── src/
+│   ├── backend/
+│   │   ├── chat_bot/
+│   │   │   └── conversation_handler.py
+│   │   ├── data_retrieval/
+│   │   │   ├── data_handler.py
+│   │   │   └── get_all_user_data.py
+│   │   ├── dashboard/
+│   │   │   ├── analysis/
+│   │   │   ├── core/
+│   │   │   ├── data/
+│   │   │   └── generators/
+│   │   ├── task_specific_agents/
+│   │   │   ├── calendar_agent.py
+│   │   │   ├── grade_calculator_agent.py
+│   │   │   └── lecture_to_notes_agent.py
+│   │   └── endpoints.py
+│   ├── database/
+│   │   └── vectordb/
+│   │       ├── db.py
+│   │       ├── embedding_model.py
+│   │       ├── bm25_scorer.py
+│   │       ├── content_extraction.py
+│   │       ├── text_processing.py
+│   │       ├── filters.py
+│   │       ├── post_process.py
+│   │       └── testing/
+│   └── extension/
+│       ├── Front_End_Script.js
+│       ├── Front_End_Style.css
+│       ├── manifest.json
+│       └── images/
+├── docs/
+│   └── README.md
+├── tests/
+├── pyproject.toml
+└── requirements.txt
+```
 
-*   `get_all_user_data`: Fetches all relevant user data from the Canvas API and saves it to a JSON file.
-*   `get_text_from_links`: Extracts text from links found within Canvas content.
+## Module Reference
 
-### `backend/data_retrieval/data_handler.py`
-*   **`DataHandler`:** Manages user data and background updates.
-    *   `__init__`: Initializes the data handler with user ID, domain, and other information.
-    *   `update_user_data`: Updates the user's data by fetching from Canvas and updating the vector database.
+### Core Database (`src/database/vectordb/db.py`)
+- **`VectorDatabase`**: Main class for Qdrant vector database management
+  - `connect_to_qdrant()`: Establishes connection to Qdrant cloud instance
+  - `process_data()`: Loads JSON data, creates embeddings, and stores in Qdrant
+  - `search()`: Performs hybrid semantic and keyword search
+  - `filter_search()`: Executes filter-only queries for dashboard components
+  - `build_qdrant_query()`: Constructs Qdrant query filters
+  - `_execute_qdrant_query()`: Executes queries against Qdrant collection
 
-### `backend/task_specific_agents/*.py`
+### Embedding Model (`src/database/vectordb/embedding_model.py`)
+- **`SentenceTransformerEmbeddingFunction`**: Local embedding generation
+  - Uses `intfloat/e5-small-v2` model for privacy-preserving embeddings
+  - Supports batch processing for efficient embedding generation
+  - Provides 384-dimensional embeddings optimized for educational content
 
-*   `calendar_agent.py`:
-    *   `find_events`: Retrieves calendar events from Canvas.
-*   `grade_calculator_agent.py`:
-    *   `calculate_grade`: Calculates grades and provides insights.
-*   `lecture_to_notes_agent.py`:
-    *   `lecture_file_to_notes_pdf`: Converts lecture files to notes.
+### BM25 Scorer (`src/database/vectordb/bm25_scorer.py`)
+- **`CanvasBM25`**: Keyword-based search implementation
+  - Optimized for educational content and academic terminology
+  - Supports result fusion with semantic search
+  - Configurable parameters for different content types
 
-### `vectordb/embedding_model.py`
+### Conversation Handler (`src/backend/chat_bot/conversation_handler.py`)
+- **`ConversationHandler`**: Manages conversational AI interactions
+  - `process_user_message()`: Processes user queries and generates responses
+  - `find_events_and_assignments()`: Searches for upcoming tasks and events
+  - `find_course_information()`: Retrieves course materials and information
+  - `create_notes()`: Generates structured notes from lecture content
 
-*   **`HFEmbeddingFunction`:** Provides an interface to the Hugging Face API for generating embeddings.
-    *   `__init__`: Initializes the embedding function with the API URL and token.
-    *   `__call__`: Generates embeddings for a batch of text inputs.
+### Task-Specific Agents
+- **Calendar Agent**: Manages Canvas calendar integration and event retrieval
+- **Grade Calculator**: Calculates required scores and provides academic insights
+- **Lecture-to-Notes**: Converts lecture files to structured PDF notes using LaTeX
 
-### `Front_End/Front_End_Script.js`
-*   Handles user interactions within the Chrome extension.
-*   Manages the chat interface and settings panel.
-*   Sends requests to the backend API (defined in `endpoints.py`).
-*   Stores and retrieves user data and conversation history using `chrome.storage.local`.
-*   Dynamically updates the UI based on user input and API responses.
+### Data Management (`src/backend/data_retrieval/`)
+- **`DataHandler`**: Manages user data lifecycle and Canvas API integration
+- **`get_all_user_data()`**: Orchestrates comprehensive data collection from Canvas
 
-### `endpoints.py`
-*   Defines the RESTful API endpoints using the FastAPI framework.
-*   Handles requests from the front-end (Chrome extension).
-*   Coordinates the backend components (data retrieval, vector database, chatbot logic).
-*   Uses Pydantic models for request and response validation.
-*   Implements CORS (Cross-Origin Resource Sharing) to allow requests from the Canvas domain and the custom domain.
+### Chrome Extension (`src/extension/`)
+- **Frontend Script**: Handles UI interactions and backend communication
+- **Styling**: Provides responsive design for Canvas integration
+- **Manifest**: Defines extension permissions and resources
 
-This README provides a comprehensive overview of the CanvasClassmate project, its functionality, data flow, key modules, front-end implementation, and backend hosting. It avoids code snippets and focuses on explaining *what* each part does, making it easy for users and developers to understand the system. The interaction between the front-end and backend is clearly described, along with the relevant files and technologies used.
+## Installation & Development
+
+### Prerequisites
+- Python 3.10+
+- Node.js (for extension development)
+- Qdrant Cloud account
+- OpenAI API key
+- Canvas API token
+
+### Backend Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys
+
+# Run the backend
+uvicorn src.backend.endpoints:app --reload
+```
+
+### Extension Development
+```bash
+# Load extension in Chrome
+1. Open Chrome Extensions (chrome://extensions/)
+2. Enable Developer Mode
+3. Click "Load unpacked" and select src/extension/
+```
+
+## API Endpoints
+
+### Main Pipeline
+- `POST /endpoints/mainPipelineEntry` - Main chatbot interaction endpoint
+- `GET /endpoints/initiate_user` - Initialize user session
+- `POST /endpoints/pushCourses` - Update user course selections
+- `GET /endpoints/pullCourses` - Retrieve user courses
+- `GET /endpoints/pullNotes` - Download generated PDF notes
+
+### Dashboard (In Development)
+- `GET /dashboard/today` - Get today's tasks and deadlines
+- `GET /dashboard/study-plan` - Generate personalized study plan
+- `GET /dashboard/overview` - Get comprehensive dashboard data
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Authors
+
+- Jacob Meert
+- Arshawn Vossoughi  
+- Evan Sinocchi
+- Kasra Ghadimi
+
+## Acknowledgments
+
+- Canvas LMS for providing comprehensive API access
+- Qdrant for high-performance vector database services
+- Sentence Transformers for local embedding generation
+- OpenAI for advanced language model capabilities
+```
