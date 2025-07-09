@@ -213,36 +213,6 @@ ClassMate/
 - **Styling**: Provides responsive design for Canvas integration
 - **Manifest**: Defines extension permissions and resources
 
-## Installation & Development
-
-### Prerequisites
-- Python 3.10+
-- Node.js (for extension development)
-- Qdrant Cloud account
-- OpenAI API key
-- Canvas API token
-
-### Backend Setup
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
-
-# Run the backend
-uvicorn src.backend.endpoints:app --reload
-```
-
-### Extension Development
-```bash
-# Load extension in Chrome
-1. Open Chrome Extensions (chrome://extensions/)
-2. Enable Developer Mode
-3. Click "Load unpacked" and select src/extension/
-```
-
 ## API Endpoints
 
 ### Main Pipeline
@@ -264,10 +234,6 @@ uvicorn src.backend.endpoints:app --reload
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Authors
 
